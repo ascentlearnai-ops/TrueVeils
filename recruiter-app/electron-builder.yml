@@ -1,0 +1,15 @@
+appId: com.truveil.recruiter
+productName: Truveil
+directories:
+  output: dist
+mac:
+  category: public.app-category.business
+  target:
+    - dmg
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: true
+  perMachine: false
+  runAfterFinish: true

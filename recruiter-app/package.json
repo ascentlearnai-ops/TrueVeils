@@ -1,0 +1,34 @@
+{
+  "name": "truveil-recruiter",
+  "version": "1.0.0",
+  "description": "Truveil Recruiter App",
+  "main": "main.js",
+  "author": "Truveil Inc.",
+  "build": {
+    "appId": "com.truveil.recruiter",
+    "productName": "TruveilRecruiter",
+    "win": {
+      "target": "portable"
+    }
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1",
+    "form-data": "^4.0.0",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.0",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1"
+  }
+}

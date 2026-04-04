@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Truveil</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <span class="logo">Truveil</span>
+    <div class="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Idle</span>
+    </div>
+  </div>
+
+  <!-- Idle Screen -->
+  <div class="screen active" id="idle-screen">
+    <div class="hero-center">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" x2="12" y1="19" y2="22"/>
+      </svg>
+      <h2>Ready to Monitor</h2>
+      <p>Initialize a high-fidelity monitoring session to surface AI-assisted anomalies.</p>
+      <button class="btn btn-primary" id="newSessionBtn">New Interview Session</button>
+    </div>
+  </div>
+
+  <!-- Waiting Screen -->
+  <div class="screen" id="waiting-screen">
+    <div class="hero-center" style="max-width:480px; margin:0 auto;">
+      <h3 style="font-size:16px; font-weight:500; color:#fff;">Session Initialized</h3>
+      <p style="margin-bottom:16px;">Distribute this secure handshake link to the candidate.</p>
+      <div class="link-card">
+        <label>Candidate Handshake</label>
+        <div class="link-value" id="candidateLink">—</div>
+        <button class="btn btn-primary" id="copyLinkBtn">Copy Link</button>
+      </div>
+      <div class="waiting-status" style="margin-top:24px;">Awaiting candidate telemetry<span class="dots"></span></div>
+      <button class="btn btn-ghost" id="startAnywayBtn" style="margin-top:24px;">Bypass Handshake (Force Listen)</button>
+    </div>
+  </div>
+
+  <!-- Dashboard Screen -->
+  <div class="screen" id="dashboard-screen">
+    <div class="dashboard-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="status-dot recording"></span>
+        <span style="font-size:13px; font-weight:500; color:#fff;">Live Telemetry</span>
+      </div>
+      <div class="timer" id="sessionTimer">00:04:12</div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="dashboard-stats">
+      <div class="ds-item">
+        <div class="ds-label">Threat Score</div>
+        <div class="ds-value" id="statsScore">88%</div>
+      </div>
+      <div class="ds-item">
+        <div class="ds-label">Active Flags</div>
+        <div class="ds-value" id="statsFlags">3</div>
+      </div>
+      <div class="ds-item">
+        <div class="ds-label">Analyzed Packets</div>
+        <div class="ds-value" id="statsResponses">14</div>
+      </div>
+    </div>
+
+    <div class="dashboard-body">
+      <!-- LEFT COLUMN -->
+      <div class="dashboard-left">
+        <!-- Score -->
+        <div class="score-widget high-risk" id="scoreSection">
+          <div class="score-ring">
+            <svg viewBox="0 0 64 64">
+              <circle class="ring-bg" cx="32" cy="32" r="28"/>
+              <circle class="ring-fill" id="scoreRing" cx="32" cy="32" r="28"
+                stroke-dasharray="175.9" stroke-dashoffset="21.1" stroke="#ef4444"/>
+            </svg>
+            <div class="score-value" id="scoreValue">88%</div>
+          </div>
+          <div class="score-info">
+            <h3 id="scoreLabel">High Interference</h3>
+            <p id="scoreReasoning">Synchronized structure lacking genuine vocal filler.</p>
+            <div class="score-trend rising" id="scoreTrend">↑ +12% Confidence</div>
+          </div>
+        </div>
+
+        <!-- Flags -->
+        <div class="flags-section">
+          <div class="section-title">
+            <span>Detected Anomalies</span>
+            <span class="count" id="flagCount">0</span>
+          </div>
+          <div class="flags-list" id="flagsList">
+            <div style="color:var(--text-dim); font-size:12px; font-family:var(--font-mono);">No active anomalies</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="dashboard-right">
+        <div class="transcript-section">
+          <div class="section-title">
+            <span>Audio Transcript</span>
+            <span class="count" id="transcriptCount">0</span>
+          </div>
+          <div class="transcript-list" id="transcriptList">
+            <div style="color:var(--text-dim); font-size:12px; font-family:var(--font-mono);">Listening for voice signature...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-footer">
+      <div style="font-family:var(--font-mono); font-size:11px; color:var(--text-dim);" id="sessionId">SESSION: d8f3-4b9a-11ce</div>
+      <button class="btn btn-danger" id="endSessionBtn">Terminate Telemetry</button>
+    </div>
+  </div>
+
+  <!-- Ended Screen -->
+  <div class="screen" id="ended-screen">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22cc66" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+    <h2>Session Complete</h2>
+    <p>Your interview report has been generated.</p>
+    <div class="ended-actions">
+      <button class="btn btn-primary" id="newSessionBtn2">New Session</button>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

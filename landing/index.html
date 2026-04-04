@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Truveil — The No.1 AI interview fraud detection platform. Catch AI-assisted answers, hidden overlays, and cheating tools in real time.">
+  <title>Truveil — The No.1 AI Interview Fraud Detection</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <nav>
+    <div class="nav-logo">Truveil</div>
+    <div class="nav-links">
+      <a href="#detection">Detection</a>
+      <a href="#proof">Proof</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#pricing">Pricing</a>
+    </div>
+    <div class="nav-right">
+      <a href="#" class="login">Login</a>
+      <a href="#" class="btn btn-primary" onclick="openDownloadModal(event)">Download Free</a>
+    </div>
+  </nav>
+
+  <!-- ——— Hero ——— -->
+  <header class="hero">
+    <div class="trust-badge"><span class="dot"></span> USED BY 500+ RECRUITING TEAMS</div>
+    <h1>The No. 1 AI Interview<br>Fraud Detection <span class="dim">Platform</span></h1>
+    <p class="sub">8 detection layers protecting your interviews in real time. Catch AI-assisted answers, hidden overlays, and cheating tools — before they cost you $50K.</p>
+    <div class="hero-ctas">
+      <a href="#" class="btn btn-primary lg">⊞ Download for Windows</a>
+      <a href="#" class="btn btn-secondary lg"> Download for Mac</a>
+    </div>
+    <div class="hero-note">🔒 No credit card needed</div>
+
+    <!-- Live Dashboard -->
+    <div class="glass-window hero-dash reveal">
+      <div class="glass-bar">
+        <span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>
+        <span class="glass-bar-title">Truveil — Live Session</span>
+        <span class="glass-bar-title" id="timer" style="margin-left:0;margin-right:0">00:04:32</span>
+      </div>
+      <div class="dash-body">
+        <div class="dash-left">
+          <div class="dash-label">Live Transcript</div>
+          <div id="transcript-text"><span class="cursor"></span></div>
+        </div>
+        <div class="dash-right">
+          <div class="dash-label">AI Score</div>
+          <div class="dash-score"><span id="anim-score">0</span>%</div>
+          <div class="dash-risk" id="anim-risk">HIGH RISK</div>
+        </div>
+      </div>
+      <div class="dash-flags">
+        <div class="flag-line" id="f1"><span class="flag-dot"></span> Zero filler words detected — flagged as AI-generated</div>
+        <div class="flag-line" id="f2"><span class="flag-dot"></span> Suspiciously complete sentence structure</div>
+        <div class="flag-line" id="f3"><span class="flag-dot"></span> Window blur: external app detected at 04:31</div>
+      </div>
+      <div class="dash-footer">
+        <span><span class="rec-dot"></span>RECORDING</span>
+        <span>SESSION abc123xyz</span>
+      </div>
+    </div>
+  </header>
+
+
+
+  <!-- ——— Ticker ——— -->
+  <div class="ticker-wrap">
+    <div class="ticker-label">Trusted by teams at</div>
+    <div class="ticker">
+      <span>Google</span><span>Meta</span><span>Amazon</span><span>Microsoft</span><span>Apple</span><span>Netflix</span><span>Stripe</span><span>Coinbase</span><span>Uber</span><span>Airbnb</span>
+      <span>Google</span><span>Meta</span><span>Amazon</span><span>Microsoft</span><span>Apple</span><span>Netflix</span><span>Stripe</span><span>Coinbase</span><span>Uber</span><span>Airbnb</span>
+    </div>
+  </div>
+
+  <!-- ——— Detection ——— -->
+  <div class="section" id="detection">
+    <div class="section-header reveal">
+      <div class="section-badge"><span class="dot"></span> DETECTION</div>
+      <h2 class="section-title">How We Catch Cheaters</h2>
+      <p class="section-sub">Every layer works silently. No setup. No config. Just protection.</p>
+    </div>
+    <div class="bento">
+      <!-- Wide card -->
+      <div class="bento-card wide reveal">
+        <div class="card-body">
+          <div class="card-label">AI Speech Analysis</div>
+          <h3>Every response scored for AI patterns</h3>
+          <p>Filler word frequency, sentence structure, reading cadence — flags appear the instant something is off.</p>
+          <div class="mini-app">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+            <div class="mini-body">
+              <div class="mock-row"><span class="mock-name">"Yes, at my previous role I led a team of senior engineers through a complete..."</span><span class="mock-score high">82%</span></div>
+              <div class="mock-row"><span class="mock-name">"Um, yeah so basically we, uh, used React for the frontend mostly I think..."</span><span class="mock-score low">12%</span></div>
+              <div class="mock-row"><span class="mock-name">"I implemented a comprehensive event-driven microservices architecture using..."</span><span class="mock-score high">91%</span></div>
+              <div class="mock-row"><span class="mock-name">"Hmm, let me think... I think we had like, three different services that..."</span><span class="mock-score low">8%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Overlay -->
+      <div class="bento-card reveal">
+        <div class="card-body">
+          <div class="card-label">Overlay Detection</div>
+          <h3>Hidden app scanner</h3>
+          <p>Detects Interview Coder, Ezzi, ShadeCoder using OS-level window flag scanning.</p>
+          <div class="mini-app">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+            <div class="mini-body" style="font-size:10.5px;color:var(--text-dim)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--success)">● Scanning...</span><span style="font-variant-numeric:tabular-nums">58 Hz</span></div>
+              <div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03)">✓ No hidden overlays detected</div>
+              <div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03)">✓ No click-through windows</div>
+              <div style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03)">✓ Screen recording clean</div>
+              <div style="padding:5px 0">✓ Activity monitor clear</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Kiosk -->
+      <div class="bento-card reveal">
+        <div class="card-body">
+          <div class="card-label">Secure Kiosk</div>
+          <h3>Locked-down environment</h3>
+          <p>Keyboard shortcuts blocked, focus tracked, clipboard monitored — every escape attempt logged.</p>
+          <div class="mini-app">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+            <div class="mini-body" style="text-align:center;padding:18px 12px">
+              <div style="font-size:18px;margin-bottom:6px">🛡️</div>
+              <div style="font-size:12px;font-weight:700;margin-bottom:3px">Session Active</div>
+              <div style="font-size:10px;color:var(--text-dim)">00:12:45 elapsed • Monitoring</div>
+              <div style="margin-top:8px;display:flex;gap:5px;justify-content:center">
+                <span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(34,197,94,.08);color:var(--success);font-weight:600">Connected</span>
+                <span style="font-size:9px;padding:2px 7px;border-radius:3px;background:var(--accent-dim);color:var(--accent-soft);font-weight:600">Secure</span>
+                <span style="font-size:9px;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,.03);color:var(--text-dim);font-weight:600">Kiosk</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— Stats ——— -->
+  <div class="stats-row reveal">
+    <div class="stat-item"><div class="stat-num"><span class="blue">8</span></div><div class="stat-label">Detection layers</div></div>
+    <div class="stat-item"><div class="stat-num"><span class="blue">&lt;5</span>s</div><div class="stat-label">Flag response time</div></div>
+    <div class="stat-item"><div class="stat-num"><span class="blue">$28</span>K</div><div class="stat-label">Avg bad hire cost</div></div>
+    <div class="stat-item"><div class="stat-num"><span class="blue">500</span>+</div><div class="stat-label">Teams protected</div></div>
+  </div>
+
+  <!-- ——— Proof ——— -->
+  <div class="section" id="proof">
+    <div class="section-header reveal">
+      <div class="section-badge"><span class="dot"></span> PROOF</div>
+      <h2 class="section-title">The Proof Is in the Comparison</h2>
+      <p class="section-sub">What Truveil catches that you can't detect manually.</p>
+    </div>
+    <div class="comparison reveal">
+      <table class="comp-table">
+        <thead><tr><th>Detection Feature</th><th class="hl">Truveil</th><th>Manual Review</th><th>Basic Proctoring</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">AI-Generated Answer Detection</td><td class="chk">✓</td><td class="x">✕</td><td class="x">✕</td></tr>
+          <tr><td class="feat">Hidden Overlay Scanning</td><td class="chk">✓</td><td class="x">✕</td><td class="x">✕</td></tr>
+          <tr><td class="feat">Real-Time Flagging</td><td class="chk">✓</td><td class="x">✕</td><td class="x">✕</td></tr>
+          <tr><td class="feat">Keyboard Escape Blocking</td><td class="chk">✓</td><td class="x">✕</td><td class="chk">✓</td></tr>
+          <tr><td class="feat">Clipboard Monitoring</td><td class="chk">✓</td><td class="x">✕</td><td class="x">✕</td></tr>
+          <tr><td class="feat">Multi-Monitor Detection</td><td class="chk">✓</td><td class="x">✕</td><td class="chk">✓</td></tr>
+          <tr><td class="feat">AI Confidence Scoring</td><td class="chk">✓</td><td class="x">✕</td><td class="x">✕</td></tr>
+          <tr><td class="feat">PDF Session Report</td><td class="chk">✓</td><td class="x">✕</td><td class="x">✕</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ——— How It Works ——— -->
+  <div class="section" id="how-it-works">
+    <div class="section-header reveal">
+      <div class="section-badge"><span class="dot"></span> HOW IT WORKS</div>
+      <h2 class="section-title">Setup in Under 3 Minutes</h2>
+    </div>
+    <div class="steps-grid">
+      <div class="bento-card reveal"><div class="step-card">
+        <div class="mini-app" style="margin:0 0 16px">
+          <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+          <div class="mini-body" style="text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:6px">⬇️</div><div style="font-size:11px;color:var(--text-muted)">truveil-v1.0.dmg</div></div>
+        </div>
+        <div class="step-num">STEP 01</div><h3>Download Truveil</h3><p>Install on Mac or Windows. Sits in your menu bar.</p>
+      </div></div>
+      <div class="bento-card reveal"><div class="step-card">
+        <div class="mini-app" style="margin:0 0 16px">
+          <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+          <div class="mini-body" style="padding:10px;font-size:10px">
+            <div style="color:var(--text-dim);margin-bottom:6px">Candidate Link</div>
+            <div style="padding:6px 8px;background:rgba(255,255,255,.02);border-radius:3px;color:var(--text-muted);margin-bottom:6px;word-break:break-all;font-size:10px">truveil.app/s/a8f2c1...</div>
+            <div style="text-align:center;padding:5px;background:var(--accent);color:#fff;border-radius:3px;font-weight:700;font-size:9px">Copy Link</div>
+          </div>
+        </div>
+        <div class="step-num">STEP 02</div><h3>Generate a secure link</h3><p>Paste the candidate link in your Zoom chat.</p>
+      </div></div>
+      <div class="bento-card reveal"><div class="step-card">
+        <div class="mini-app" style="margin:0 0 16px">
+          <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+          <div class="mini-body" style="padding:10px">
+            <div class="mock-row"><span class="mock-name" style="font-size:10px">"I architected the entire..."</span><span class="mock-score high" style="font-size:9px">87%</span></div>
+            <div class="mock-row"><span class="mock-name" style="font-size:10px">"Um, so we basically..."</span><span class="mock-score low" style="font-size:9px">9%</span></div>
+            <div style="margin-top:6px;padding:4px;background:rgba(239,68,68,.04);border-radius:3px;font-size:9px;color:var(--danger);text-align:center;font-weight:600">⚠ 2 flags detected</div>
+          </div>
+        </div>
+        <div class="step-num">STEP 03</div><h3>Monitor in real time</h3><p>Watch AI scores and flags update live.</p>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ——— Testimonials ——— -->
+  <div class="section">
+    <div class="section-header reveal">
+      <div class="section-badge"><span class="dot"></span> TESTIMONIALS</div>
+      <h2 class="section-title">Trusted by 500+ Recruiting Teams</h2>
+    </div>
+    <div class="test-grid">
+      <div class="t-card reveal">
+        <div class="t-stars">★★★★★</div>
+        <div class="t-text">"We caught 3 candidates using Interview Coder in one week. The hidden overlay detection alone is worth the subscription."</div>
+        <div class="t-author"><div class="t-avatar">S</div><div><div class="t-name">Sarah K.</div><div class="t-role">Senior Recruiter, Series B Startup</div></div></div>
+      </div>
+      <div class="t-card reveal">
+        <div class="t-stars">★★★★★</div>
+        <div class="t-text">"Candidates who interviewed brilliantly performed poorly on the job. Truveil explained everything. Complete game changer."</div>
+        <div class="t-author"><div class="t-avatar">M</div><div><div class="t-name">Marcus T.</div><div class="t-role">VP Talent Acquisition</div></div></div>
+      </div>
+      <div class="t-card reveal">
+        <div class="t-stars">★★★★★</div>
+        <div class="t-text">"Setup was under 5 minutes. Now I send the link before every call. It's part of our standard hiring workflow."</div>
+        <div class="t-author"><div class="t-avatar">P</div><div><div class="t-name">Priya R.</div><div class="t-role">Head of Engineering Hiring</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— Pricing ——— -->
+  <div class="section" id="pricing">
+    <div class="section-header reveal">
+      <div class="section-badge"><span class="dot"></span> PRICING</div>
+      <h2 class="section-title">Simple, Transparent Pricing</h2>
+      <p class="section-sub">One bad hire costs $28K. An interview costs $0.90.</p>
+    </div>
+    <div class="price-grid">
+      <div class="p-card reveal">
+        <div class="p-name">Starter</div><div class="p-price">$9<span>/mo</span></div>
+        <div class="p-desc">For small teams</div>
+        <ul class="p-list"><li>10 interview sessions</li><li>AI detection + transcript</li><li>PDF report per session</li><li>Email support</li></ul>
+        <button class="btn btn-secondary p-btn">Get Started →</button>
+      </div>
+      <div class="p-card pop reveal">
+        <div class="p-badge">POPULAR</div>
+        <div class="p-name">Growth</div><div class="p-price">$29<span>/mo</span></div>
+        <div class="p-desc">For active hiring</div>
+        <ul class="p-list"><li>Unlimited sessions</li><li>Up to 5 recruiters</li><li>Priority AI processing</li><li>ATS export (CSV)</li><li>Slack notifications</li></ul>
+        <button class="btn btn-primary p-btn">Get Started →</button>
+      </div>
+      <div class="p-card reveal">
+        <div class="p-name">Enterprise</div><div class="p-price">Custom</div>
+        <div class="p-desc">For agencies & large HR</div>
+        <ul class="p-list"><li>Unlimited recruiters</li><li>SSO / SAML</li><li>Compliance reports</li><li>SLA guarantee</li><li>Dedicated support</li></ul>
+        <button class="btn btn-secondary p-btn">Talk to Sales →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— FAQ ——— -->
+  <div class="section" id="faq">
+    <div class="section-header reveal">
+      <div class="section-badge"><span class="dot"></span> FAQ</div>
+      <h2 class="section-title">Got questions? We've got answers</h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How does Truveil detect AI-assisted answers?<span class="arr">+</span></button><div class="faq-a"><p>Truveil uses Whisper for real-time transcription and AI forensic analysis. It detects patterns like missing filler words, perfect sentence structure, reading cadence, and response latency.</p></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does the candidate know they're being monitored?<span class="arr">+</span></button><div class="faq-a"><p>Yes. Candidates install a secure kiosk app that clearly states monitoring is active. Truveil is about transparency and deterrence — candidates agree before the session starts.</p></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What interview platforms does it work with?<span class="arr">+</span></button><div class="faq-a"><p>Truveil works alongside Zoom, Google Meet, Microsoft Teams, and more. The recruiter app captures system audio independently — no plugins needed.</p></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try it for free?<span class="arr">+</span></button><div class="faq-a"><p>Yes. Download and explore the app for free. Your first interview session is on us. No credit card required.</p></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What about false positives?<span class="arr">+</span></button><div class="faq-a"><p>Every flag includes an AI confidence score and detailed reasoning. Our detection is tuned for accuracy — we give you data, not decisions.</p></div></div>
+    </div>
+  </div>
+
+  <!-- ——— CTA ——— -->
+  <div class="final-cta">
+    <h2 class="reveal">Ready to protect your<br>next interview?</h2>
+    <p class="reveal">Start your first session free. No credit card required.</p>
+    <a href="#" class="btn btn-primary lg reveal">Download Truveil Free</a>
+    <div class="hero-note reveal" style="margin-top:14px">Works on Mac & Windows • Zoom, Meet & Teams</div>
+  </div>
+
+  <footer>
+    <div class="footer-col">
+      <div class="nav-logo" style="margin-bottom:8px;-webkit-text-fill-color:#fff">Truveil</div>
+      <p>Real answers only.</p>
+      <p style="font-size:9px;color:rgba(255,255,255,.1);margin-top:10px">© 2026 Truveil Inc.</p>
+    </div>
+    <div class="footer-col"><h5>Product</h5><ul><li><a href="#detection">Detection</a></li><li><a href="#how-it-works">How it works</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#">Download</a></li></ul></div>
+    <div class="footer-col"><h5>Company</h5><ul><li><a href="#">About</a></li><li><a href="#">Blog</a></li><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li></ul></div>
+    <div class="footer-col"><h5>Support</h5><ul><li><a href="#">Help Center</a></li><li><a href="#">API Docs</a></li><li><a href="#faq">FAQ</a></li><li><a href="#">Contact</a></li></ul></div>
+  </footer>
+
+  <script>
+    const obs=new IntersectionObserver(e=>e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('visible');obs.unobserve(x.target)}}),{threshold:.08,rootMargin:'0px 0px -30px 0px'});
+    document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+    // Dashboard animation
+    const phrases=[
+      {text:'"Yes, at my previous role I led a team of engineers through a complete microservices migration using event-driven architecture with zero downtime..."',score:82},
+      {text:'"Hmm, so like... we mostly used Java I think? And um, we had this monolith that was kind of a pain to work with honestly..."',score:14},
+      {text:'"I designed and implemented a comprehensive CI/CD pipeline utilizing Kubernetes orchestration, Terraform infrastructure-as-code, and GitOps principles..."',score:94}
+    ];
+    let pi=0,ci=0;
+    const tt=document.getElementById('transcript-text');
+    const sc=document.getElementById('anim-score');
+    const rk=document.getElementById('anim-risk');
+    const fl=[document.getElementById('f1'),document.getElementById('f2'),document.getElementById('f3')];
+    const tm=document.getElementById('timer');
+    let ts=272;
+    setInterval(()=>{ts++;tm.textContent=`00:${String(Math.floor(ts/60)).padStart(2,'0')}:${String(ts%60).padStart(2,'0')}`},1000);
+
+    function reset(){
+      tt.innerHTML='<span class="cursor"></span>';
+      sc.textContent='0';rk.className='dash-risk';
+      fl.forEach(f=>f.classList.remove('visible'));
+      ci=0;setTimeout(type,800);
+    }
+    function type(){
+      const p=phrases[pi];
+      if(ci<p.text.length){
+        const cur=tt.querySelector('.cursor');
+        tt.insertBefore(document.createTextNode(p.text.charAt(ci)),cur);
+        ci++;
+        if(ci===Math.floor(p.text.length*.4))animScore(p.score);
+        setTimeout(type,18+Math.random()*14);
+      }
+    }
+    function animScore(target){
+      let s=0;const iv=setInterval(()=>{s++;sc.textContent=s;if(s>=target){clearInterval(iv);if(target>50){rk.className='dash-risk high';showFlags()}else{rk.className='dash-risk';setTimeout(next,2500)}}},8);
+    }
+    function showFlags(){
+      setTimeout(()=>fl[0].classList.add('visible'),150);
+      setTimeout(()=>fl[1].classList.add('visible'),700);
+      setTimeout(()=>fl[2].classList.add('visible'),1300);
+      setTimeout(next,5000);
+    }
+    function next(){pi=(pi+1)%phrases.length;reset()}
+    setTimeout(type,400);
+  </script>
+  <!-- ——— Download Modal ——— -->
+  <div class="modal-overlay" id="dlModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Truveil Terms & Conditions</h3>
+        <button class="modal-close" onclick="closeDownloadModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p>By downloading Truveil, you agree to our Terms of Service and Privacy Policy. The Truveil software employs device-level monitoring and advanced AI inference to detect interviewing anomalies. Please ensure you have authorization from your organization to deploy this software.</p>
+        
+        <div class="terms-check">
+          <input type="checkbox" id="termsCheck" onchange="toggleDownloadBtn()">
+          <label for="termsCheck">I have read and agree to the Terms & Conditions.</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="TruveilRecruiter-Setup.exe" class="btn btn-primary btn-dl-final" id="finalDlBtn" download onclick="closeDownloadModal()">Accept & Download App</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Terms Modal Logic
+    const dlModal = document.getElementById('dlModal');
+    const termsCheck = document.getElementById('termsCheck');
+    const finalDlBtn = document.getElementById('finalDlBtn');
+
+    function openDownloadModal(e) {
+      e.preventDefault();
+      dlModal.classList.add('active');
+      termsCheck.checked = false;
+      finalDlBtn.style.opacity = '0.5';
+      finalDlBtn.style.pointerEvents = 'none';
+    }
+
+    function closeDownloadModal() {
+      dlModal.classList.remove('active');
+    }
+
+    function toggleDownloadBtn() {
+      if (termsCheck.checked) {
+        finalDlBtn.style.opacity = '1';
+        finalDlBtn.style.pointerEvents = 'all';
+      } else {
+        finalDlBtn.style.opacity = '0.5';
+        finalDlBtn.style.pointerEvents = 'none';
+      }
+    }
+  </script>
+</body>
+</html>
