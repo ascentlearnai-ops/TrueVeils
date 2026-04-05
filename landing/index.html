@@ -247,22 +247,22 @@
     </div>
     <div class="price-grid">
       <div class="p-card reveal">
-        <div class="p-name">Starter</div><div class="p-price">$9<span>/mo</span></div>
-        <div class="p-desc">For small teams</div>
-        <ul class="p-list"><li>10 interview sessions</li><li>AI detection + transcript</li><li>PDF report per session</li><li>Email support</li></ul>
-        <button class="btn btn-secondary p-btn">Get Started →</button>
+        <div class="p-name">Free</div><div class="p-price">$0<span>/mo</span></div>
+        <div class="p-desc">Try it before you buy</div>
+        <ul class="p-list"><li>1 interview session</li><li>AI detection + transcript</li><li>Digital session report</li><li>No credit card required</li></ul>
+        <button class="btn btn-secondary p-btn">Start Free →</button>
       </div>
       <div class="p-card pop reveal">
         <div class="p-badge">POPULAR</div>
-        <div class="p-name">Growth</div><div class="p-price">$29<span>/mo</span></div>
-        <div class="p-desc">For active hiring</div>
-        <ul class="p-list"><li>Unlimited sessions</li><li>Up to 5 recruiters</li><li>Priority AI processing</li><li>ATS export (CSV)</li><li>Slack notifications</li></ul>
-        <button class="btn btn-primary p-btn">Get Started →</button>
+        <div class="p-name">Pro</div><div class="p-price">$99<span>/mo</span></div>
+        <div class="p-desc">For active hiring teams</div>
+        <ul class="p-list"><li>50 interviews / month</li><li>All 8 detection layers</li><li>Live dashboard + flags feed</li><li>30-day report retention</li><li>Priority AI processing</li></ul>
+        <button class="btn btn-primary p-btn">Upgrade to Pro →</button>
       </div>
       <div class="p-card reveal">
         <div class="p-name">Enterprise</div><div class="p-price">Custom</div>
         <div class="p-desc">For agencies & large HR</div>
-        <ul class="p-list"><li>Unlimited recruiters</li><li>SSO / SAML</li><li>Compliance reports</li><li>SLA guarantee</li><li>Dedicated support</li></ul>
+        <ul class="p-list"><li>Unlimited interviews</li><li>Unlimited recruiters</li><li>SSO / SAML</li><li>SLA guarantee</li><li>Dedicated support</li></ul>
         <button class="btn btn-secondary p-btn">Talk to Sales →</button>
       </div>
     </div>
@@ -305,6 +305,20 @@
   <script>
     const obs=new IntersectionObserver(e=>e.forEach(x=>{if(x.isIntersecting){x.target.classList.add('visible');obs.unobserve(x.target)}}),{threshold:.08,rootMargin:'0px 0px -30px 0px'});
     document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+    // Bento spotlight hover
+    document.querySelectorAll('.bento-card').forEach(card=>{
+      card.addEventListener('pointermove',e=>{
+        const r=card.getBoundingClientRect();
+        card.style.setProperty('--mx',(e.clientX-r.left)+'px');
+        card.style.setProperty('--my',(e.clientY-r.top)+'px');
+      });
+    });
+
+    // Nav scroll state
+    const navEl=document.querySelector('nav');
+    const onScroll=()=>navEl.classList.toggle('scrolled',window.scrollY>8);
+    window.addEventListener('scroll',onScroll,{passive:true});onScroll();
 
     // Dashboard animation
     const phrases=[
