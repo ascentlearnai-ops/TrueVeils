@@ -9,6 +9,23 @@
 </head>
 <body>
 
+  <!-- Ambient gradient orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Floating particles -->
+  <div class="particles" id="particles"></div>
+
+  <!-- Cursor follow glow -->
+  <div class="cursor-glow" id="cursorGlow"></div>
+
+  <!-- Noise texture overlay -->
+  <svg class="noise-overlay" xmlns="http://www.w3.org/2000/svg">
+    <filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#noiseFilter)"/>
+  </svg>
+
   <nav>
     <div class="nav-logo">Truveil</div>
     <div class="nav-links">
@@ -501,6 +518,33 @@
       }
     }
     setTimeout(typeChar, 800);
+
+    // ——— Floating Particles ———
+    (function() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.top = Math.random() * 100 + '%';
+        p.style.width = (1 + Math.random() * 2) + 'px';
+        p.style.height = p.style.width;
+        p.style.animationDuration = (12 + Math.random() * 18) + 's';
+        p.style.animationDelay = (Math.random() * 10) + 's';
+        p.style.opacity = (.15 + Math.random() * .35);
+        container.appendChild(p);
+      }
+    })();
+
+    // ——— Cursor Glow ———
+    const cursorGlow = document.getElementById('cursorGlow');
+    let glowActive = false;
+    document.addEventListener('mousemove', (e) => {
+      if (!glowActive) { cursorGlow.classList.add('active'); glowActive = true; }
+      cursorGlow.style.left = e.clientX + 'px';
+      cursorGlow.style.top = e.clientY + 'px';
+    });
+    document.addEventListener('mouseleave', () => { cursorGlow.classList.remove('active'); glowActive = false; });
 
     // ——— Modal ———
     const dlModal = document.getElementById('dlModal');
