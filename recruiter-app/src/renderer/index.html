@@ -27,6 +27,10 @@
       <span class="tb-app">Command Center</span>
     </div>
     <div class="tb-right">
+      <button class="tb-btn" id="openSettingsBtn" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <span class="tb-divider"></span>
       <span class="status-dot" id="statusDot"></span>
       <span class="status-text" id="statusText">Idle</span>
     </div>
@@ -41,49 +45,71 @@
           <polyline points="9 12 11 14 15 10"/>
         </svg>
       </div>
-      <div class="trust-badge"><span class="dot"></span>READY · 8 DETECTION LAYERS</div>
+      <div class="trust-badge"><span class="dot"></span>READY · LIVE TRANSCRIPTION + AI ANALYSIS</div>
       <h1>Catch interview fraud<br><span class="gradient-text">in real time.</span></h1>
-      <p class="idle-sub">Initialize a monitoring session. Truveil scores every response, scans for hidden overlays, and flags suspicious activity instantly.</p>
+      <p class="idle-sub">Start a session, capture the interview audio, and Truveil will score every response, flag AI patterns, and deliver a full report when you're done.</p>
       <button class="btn btn-primary lg" id="newSessionBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
         New Interview Session
       </button>
       <div class="idle-features">
-        <div class="if"><span class="if-dot"></span> AI Speech Scoring</div>
-        <div class="if"><span class="if-dot"></span> Overlay Detection</div>
-        <div class="if"><span class="if-dot"></span> Tab Monitoring</div>
-        <div class="if"><span class="if-dot"></span> Gaze Tracking</div>
+        <div class="if"><span class="if-dot"></span> Live Transcription</div>
+        <div class="if"><span class="if-dot"></span> AI Response Scoring</div>
+        <div class="if"><span class="if-dot"></span> Forensic Flag Feed</div>
+        <div class="if"><span class="if-dot"></span> Instant HTML Report</div>
       </div>
     </div>
   </div>
 
-  <!-- ─── Waiting Screen ─── -->
-  <div class="screen" id="waiting-screen">
+  <!-- ─── Setup Screen ─── -->
+  <div class="screen" id="setup-screen">
     <div class="waiting-card glass-card">
       <div class="waiting-pulse">
         <span class="pulse-ring"></span>
         <span class="pulse-ring d2"></span>
         <span class="pulse-core"></span>
       </div>
-      <div class="trust-badge"><span class="dot"></span>SESSION INITIALIZED</div>
-      <h2>Awaiting Candidate</h2>
-      <p class="idle-sub">Send this secure handshake link. Telemetry begins as soon as the candidate joins.</p>
+      <div class="trust-badge"><span class="dot"></span>SESSION READY</div>
+      <h2>Configure this session</h2>
+      <p class="idle-sub">Quick details for your report — then we'll start listening.</p>
 
-      <div class="link-card">
-        <label>CANDIDATE HANDSHAKE</label>
-        <div class="link-value" id="candidateLink">—</div>
-        <button class="btn btn-primary" id="copyLinkBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copy Link
+      <div class="session-code-card">
+        <label>SESSION ID</label>
+        <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
+      </div>
+
+      <div class="form">
+        <div class="field">
+          <label>Candidate name</label>
+          <input type="text" id="candidateNameInput" placeholder="e.g. Alex Chen" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Role / Position</label>
+          <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Audio source</label>
+          <div class="segmented" id="audioSourceSeg">
+            <button type="button" class="seg-btn active" data-source="microphone">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+              Microphone
+            </button>
+            <button type="button" class="seg-btn" data-source="system">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+              System Audio
+            </button>
+          </div>
+          <div class="field-hint" id="audioHint">Captures your microphone. Works anywhere — put your interview audio on speakers.</div>
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button class="btn btn-ghost" id="cancelSetupBtn">Cancel</button>
+        <button class="btn btn-primary" id="startMonitoringBtn">
+          <span class="dots-pulse"><span></span><span></span><span></span></span>
+          Start Monitoring
         </button>
       </div>
-
-      <div class="waiting-status">
-        <span class="dots-pulse"><span></span><span></span><span></span></span>
-        Awaiting candidate telemetry
-      </div>
-
-      <button class="btn btn-ghost sm" id="startAnywayBtn">Bypass Handshake (Force Listen)</button>
     </div>
   </div>
 
@@ -91,14 +117,17 @@
   <div class="screen" id="dashboard-screen">
     <div class="glass-window">
 
-      <!-- Glass bar -->
       <div class="glass-bar">
-        <div class="dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
-        <span class="glass-title">Truveil Command Center</span>
-        <span class="glass-title mono" id="sessionTimer">00:00:00</span>
+        <div class="gb-left">
+          <span class="gb-logo-dot"></span>
+          <span class="glass-title" id="glassTitle">Truveil Command Center</span>
+        </div>
+        <div class="gb-right">
+          <span class="gb-live"><span class="gb-live-dot"></span>LIVE</span>
+          <span class="glass-title mono" id="sessionTimer">00:00:00</span>
+        </div>
       </div>
 
-      <!-- Top metrics bar (4 cells) -->
       <div class="mock-metrics">
         <div class="mm">
           <div class="mm-label">OVERALL RISK</div>
@@ -113,18 +142,15 @@
           <div class="mm-val" id="statsResponses">0</div>
         </div>
         <div class="mm">
-          <div class="mm-label">SCORE TREND</div>
+          <div class="mm-label">LATEST</div>
           <div class="mm-val mm-trend" id="scoreTrend">—</div>
         </div>
       </div>
 
-      <!-- Two-column body -->
       <div class="dash-body">
 
-        <!-- LEFT — Live Transcript + Score widget -->
         <div class="dash-left">
 
-          <!-- Score widget -->
           <div class="score-widget" id="scoreSection">
             <div class="score-ring">
               <svg viewBox="0 0 64 64">
@@ -132,7 +158,7 @@
                 <circle class="ring-fill" id="scoreRing" cx="32" cy="32" r="28"
                   stroke-dasharray="175.9" stroke-dashoffset="175.9" stroke="#22c55e"/>
               </svg>
-              <div class="score-value" id="scoreValue">0%</div>
+              <div class="score-value" id="scoreValue">—</div>
             </div>
             <div class="score-info">
               <div class="score-label-tag">AI CONFIDENCE</div>
@@ -141,7 +167,6 @@
             </div>
           </div>
 
-          <!-- Transcript -->
           <div class="panel">
             <div class="panel-header">
               <div class="panel-label">
@@ -159,7 +184,6 @@
           </div>
         </div>
 
-        <!-- RIGHT — Flags feed -->
         <div class="dash-right">
           <div class="panel panel-flags">
             <div class="panel-header">
@@ -176,7 +200,6 @@
         </div>
       </div>
 
-      <!-- Glass footer -->
       <div class="glass-footer">
         <div class="gf-left">
           <span class="rec-dot"></span>
@@ -204,10 +227,48 @@
       </div>
       <div class="trust-badge ok"><span class="dot"></span>SESSION COMPLETE</div>
       <h2>Report ready</h2>
-      <p class="idle-sub">All telemetry has been processed. Your interview report is available.</p>
-      <button class="btn btn-primary lg" id="newSessionBtn2">Start New Session</button>
+      <p class="idle-sub" id="endedSub">Your interview report has been saved and opened in your browser.</p>
+      <div class="ended-stats" id="endedStats"></div>
+      <div class="ended-actions">
+        <button class="btn btn-ghost" id="openReportsFolderBtn">Show in Folder</button>
+        <button class="btn btn-primary" id="newSessionBtn2">Start New Session</button>
+      </div>
     </div>
   </div>
+
+  <!-- ─── Settings Modal ─── -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content glass-card">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button class="modal-close" id="closeSettingsBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>OpenRouter API key <span class="field-opt">optional</span></label>
+          <input type="password" id="openrouterKeyInput" placeholder="sk-or-v1-…" autocomplete="off">
+          <div class="field-hint">Optional. Truveil ships with a shared key. Add your own for unrestricted analysis throughput.</div>
+        </div>
+        <div class="field">
+          <label>Analysis model</label>
+          <select id="modelSelect">
+            <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash (fast, cheap)</option>
+            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (balanced)</option>
+            <option value="openai/gpt-4o-mini">GPT-4o mini</option>
+          </select>
+          <div class="field-hint">Model used to score each response for AI-assistance signals.</div>
+        </div>
+        <div class="settings-status" id="settingsStatus"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="cancelSettingsBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveSettingsBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Toast ─── -->
+  <div class="toast" id="toast"></div>
 
   <script src="dashboard.js"></script>
 </body>

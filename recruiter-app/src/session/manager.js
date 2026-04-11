@@ -1,19 +1,22 @@
-const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+const crypto = require('crypto');
 
-async function create(recruiterId) {
-  const res = await fetch(`${process.env.BACKEND_URL}/sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recruiterId })
-  });
+function generateCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+  return `TRV-${code}`;
+}
 
-  if (!res.ok) throw new Error('Failed to create session');
-  const data = await res.json();
-
+function create({ candidateName, role } = {}) {
+  const sessionId = generateCode();
   return {
-    sessionId: data.sessionId,
-    candidateLink: data.candidateLink
+    sessionId,
+    candidateName: (candidateName || '').trim() || 'Candidate',
+    role: (role || '').trim() || 'Interview',
+    createdAt: Date.now()
   };
 }
 
-module.exports = { create };
+module.exports = { create, generateCode };

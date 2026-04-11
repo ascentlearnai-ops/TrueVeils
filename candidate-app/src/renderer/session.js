@@ -1,112 +1,158 @@
-let wsClient;
-let micRecorder;
-let currentSessionId = '';
-let elapsedInterval;
-let sessionStartTime;
+// ─── Truveil Secure — Candidate Renderer ──────────────────────────────
+const $ = id => document.getElementById(id);
 
-// ——— Screen Management ————————————————————————————————————————
+const screens = {
+  setup: $('setup-screen'),
+  active: $('active-screen'),
+  ended: $('ended-screen')
+};
+
 function showScreen(name) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(name + '-screen').classList.add('active');
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
 }
 
-// ——— Consent Flow —————————————————————————————————————————————
-document.getElementById('acceptBtn').addEventListener('click', () => {
-  showScreen('session');
-  startSession();
+// ─── State ─────────────────────────────────────────────────────────────
+let sessionStart = null;
+let timerInterval = null;
+let eventCount = 0;
+let integrity = 100;
+let audioStream = null;
+
+const statusPill = $('statusPill');
+const statusText = $('statusText');
+const toastEl = $('toast');
+
+function setStatus(kind, text) {
+  statusPill.classList.remove('active', 'warn');
+  if (kind) statusPill.classList.add(kind);
+  statusText.textContent = text;
+}
+
+function toast(msg, kind = 'info') {
+  toastEl.textContent = msg;
+  toastEl.className = `toast visible ${kind}`;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toastEl.classList.remove('visible'), 3200);
+}
+
+function fmtElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = String(Math.floor(s / 3600)).padStart(2, '0');
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${h}:${m}:${ss}`;
+}
+
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ─── Setup ─────────────────────────────────────────────────────────────
+const sessionCodeInput = $('sessionCodeInput');
+sessionCodeInput.addEventListener('input', (e) => {
+  let v = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  if (v.length > 3 && v.startsWith('TRV') && v[3] !== '-') v = 'TRV-' + v.slice(3);
+  e.target.value = v;
+});
+sessionCodeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('startBtn').click();
 });
 
-function startSession() {
-  sessionStartTime = Date.now();
-  elapsedInterval = setInterval(updateClock, 1000);
+$('startBtn').addEventListener('click', startSession);
+
+async function startSession() {
+  const code = sessionCodeInput.value.trim();
+  const name = $('candidateNameInput').value.trim();
+
+  if (!code) { toast('Enter your session code (TRV-XXXXXX)', 'error'); sessionCodeInput.focus(); return; }
+  if (!/^TRV-[A-Z0-9]{6}$/.test(code)) {
+    toast('Session code should look like TRV-8FR2XP (10 characters)', 'error');
+    sessionCodeInput.focus();
+    return;
+  }
+  if (!name) { toast('Please enter your name', 'error'); $('candidateNameInput').focus(); return; }
+
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    toast('Microphone permission is required for a verified session.', 'error');
+    return;
+  }
+
+  const result = await window.truveil.startSession({ sessionCode: code, candidateName: name });
+  if (!result.ok) {
+    toast(result.error || 'Could not start session', 'error');
+    stopAudio();
+    return;
+  }
+
+  $('displayName').textContent = name;
+  $('displayCode').textContent = code;
+  setStatus('active', 'Monitoring');
+
+  sessionStart = Date.now();
+  startTimer();
+  showScreen('active');
 }
 
-function updateClock() {
-  const elapsed = Date.now() - sessionStartTime;
-  const h = String(Math.floor(elapsed / 3600000)).padStart(2, '0');
-  const m = String(Math.floor((elapsed % 3600000) / 60000)).padStart(2, '0');
-  const s = String(Math.floor((elapsed % 60000) / 1000)).padStart(2, '0');
-  document.getElementById('elapsed-time').textContent = `${h}:${m}:${s}`;
+function stopAudio() {
+  if (audioStream) {
+    audioStream.getTracks().forEach(t => t.stop());
+    audioStream = null;
+  }
 }
 
-// ——— Connection Status ————————————————————————————————————————
-function setConnectionStatus(status) {
-  const dot = document.getElementById('connectionDot');
-  const text = document.getElementById('connectionText');
-  dot.className = 'connection-dot ' + status;
-  if (status === 'connected') text.textContent = 'Connected';
-  else if (status === 'disconnected') text.textContent = 'Reconnecting...';
-  else text.textContent = 'Connecting...';
-}
-
-// ——— Session ID from main process —————————————————————————————
-window.truveil?.onSessionId((id) => {
-  currentSessionId = id;
-  document.getElementById('session-display').textContent = id || '—';
-
-  wsClient = new window.WSClient(id);
-
-  // Monitor WSClient connection state
-  const origConnect = wsClient.connect.bind(wsClient);
-  const origWs = wsClient.ws;
-
-  // Patch to track connection status
-  const checkConnection = setInterval(() => {
-    if (wsClient.ws) {
-      if (wsClient.ws.readyState === WebSocket.OPEN) setConnectionStatus('connected');
-      else if (wsClient.ws.readyState === WebSocket.CONNECTING) setConnectionStatus('');
-      else setConnectionStatus('disconnected');
-    }
+// ─── Timer ─────────────────────────────────────────────────────────────
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    $('elapsed').textContent = fmtElapsed(Date.now() - sessionStart);
   }, 1000);
-
-  window.setupEventMonitors((flag) => {
-    wsClient.sendFlag(flag);
-    showAlert(flag.detail || 'Security event logged');
-  });
-
-  micRecorder = new window.MicRecorder(wsClient);
-  micRecorder.start().catch(err => console.error('Mic error:', err));
-});
-
-// ——— Security Flags from Main Process —————————————————————————
-window.truveil?.onSecurityFlag((flag) => {
-  if (wsClient) {
-    wsClient.sendFlag(flag);
-    showAlert(flag.detail || 'Security condition detected');
-  }
-});
-
-window.truveil?.onEscapeAttempt(() => {
-  if (wsClient) {
-    wsClient.sendFlag({
-      type: 'KEYBOARD_ESCAPE',
-      detail: 'Blocked keyboard shortcut attempt',
-      severity: 'LOW',
-      timestamp: Date.now()
-    });
-    showAlert('Keyboard shortcut blocked');
-  }
-});
-
-window.truveil?.onCloseAttempted(() => {
-  if (wsClient) {
-    wsClient.sendFlag({
-      type: 'CLOSE_ATTEMPT',
-      detail: 'Window close attempt blocked',
-      severity: 'HIGH',
-      timestamp: Date.now()
-    });
-    showAlert('Cannot close during active session');
-  }
-});
-
-// ——— Alert Toasts —————————————————————————————————————————————
-function showAlert(msg) {
-  const area = document.getElementById('alerts');
-  area.innerHTML = '';
-  const toast = document.createElement('div');
-  toast.className = 'alert-toast';
-  toast.textContent = msg;
-  area.appendChild(toast);
-  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
 }
+
+// ─── Events / flags ────────────────────────────────────────────────────
+function logEvent(text, kind = 'warn') {
+  const feed = $('flagFeed');
+  if (feed.querySelector('.ff-empty')) feed.innerHTML = '';
+
+  eventCount++;
+  if (kind === 'warn') integrity = Math.max(0, integrity - 5);
+  $('integrity').textContent = integrity + '%';
+
+  const el = document.createElement('div');
+  el.className = 'ff-item';
+  el.innerHTML = `<span>${text}</span><span class="ff-time">${fmtTime(Date.now())}</span>`;
+  feed.prepend(el);
+}
+
+window.truveil.onFocusLost(() => {
+  if (!sessionStart) return;
+  logEvent('You switched away from Truveil Secure');
+  setStatus('warn', 'Focus lost');
+});
+window.truveil.onFocusGained(() => {
+  if (!sessionStart) return;
+  setStatus('active', 'Monitoring');
+});
+window.truveil.onShortcutBlocked(() => {
+  logEvent('Blocked a close/minimize shortcut');
+});
+
+// ─── End session ───────────────────────────────────────────────────────
+$('endBtn').addEventListener('click', async () => {
+  if (!confirm('End your secure session now? This will tell your recruiter the interview is finished.')) return;
+  clearInterval(timerInterval);
+  stopAudio();
+  await window.truveil.endSession();
+  setStatus(null, 'Complete');
+  showScreen('ended');
+});
+
+$('quitBtn').addEventListener('click', () => {
+  window.truveil.quit();
+});
+
+// ─── Boot ──────────────────────────────────────────────────────────────
+setStatus(null, 'Not started');
+setTimeout(() => sessionCodeInput.focus(), 400);

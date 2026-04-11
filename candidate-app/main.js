@@ -1,102 +1,78 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, powerSaveBlocker, screen } = require('electron');
 const path = require('path');
-const { execSync } = require('child_process');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
-
-// Get session ID from command line args or env
-const sessionId = process.argv.find(a => a.startsWith('--session='))?.split('=')[1]
-  || process.env.SESSION_ID;
 
 let mainWindow;
 let blocker;
+let monitoring = false;
 
 function createWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
-    width: 600,
-    height: 800,
-    fullscreen: false,
-    kiosk: false,
-    alwaysOnTop: false,
-    closable: true,
-    minimizable: true,
-    maximizable: true,
-    resizable: true,
-    frame: true,
-    skipTaskbar: false,
-    backgroundColor: '#000000',
+    width: Math.min(1100, width - 80),
+    height: Math.min(760, height - 80),
+    minWidth: 860,
+    minHeight: 620,
+    backgroundColor: '#050507',
+    titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
-    }
+      contextIsolation: true,
+      sandbox: false
+    },
+    show: false
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src/renderer/index.html'));
-  
-  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'media') {
-      callback(true);
-    } else {
-      callback(false);
-    }
+  mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  mainWindow.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
+    cb(permission === 'media');
   });
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.send('session-id', sessionId);
+  mainWindow.on('blur', () => {
+    if (monitoring) mainWindow.webContents.send('focus-lost');
   });
-
-  // Block ALL escape shortcuts
-  globalShortcut.registerAll([
-    'Alt+F4',
-    'CommandOrControl+W',
-    'CommandOrControl+Q',
-    'CommandOrControl+Tab',
-    'Alt+Tab',
-    'Meta+Tab',
-    'Meta+D',
-    'CommandOrControl+Alt+Delete',
-    'F11',
-    'Escape',
-    'CommandOrControl+R',
-    'F5',
-    'CommandOrControl+Shift+I',    // DevTools
-    'CommandOrControl+Shift+J',    // DevTools
-    'CommandOrControl+Shift+C',    // DevTools
-    'F12'
-  ], () => {
-    // Blocked — report attempt
-    mainWindow.webContents.send('escape-attempt');
-    return false;
+  mainWindow.on('focus', () => {
+    if (monitoring) mainWindow.webContents.send('focus-gained');
   });
-
-  // Prevent sleep during interview
-  blocker = powerSaveBlocker.start('prevent-display-sleep');
 }
 
-// Override close behavior completely
-app.on('before-quit', (e) => {
-  if (!global.sessionEnded) {
-    e.preventDefault();
-    mainWindow.webContents.send('close-attempted');
+app.whenReady().then(createWindow);
+app.on('window-all-closed', () => app.quit());
+
+// ─── IPC ──────────────────────────────────────────────────────────────
+ipcMain.handle('session:start', async (_, { sessionCode, candidateName }) => {
+  if (!sessionCode || !/^TRV-[A-Z0-9]{6}$/i.test(sessionCode)) {
+    return { ok: false, error: 'Please enter a valid session code like TRV-8FR2XP.' };
   }
+  monitoring = true;
+  try { blocker = powerSaveBlocker.start('prevent-display-sleep'); } catch {}
+  // Block common escape shortcuts during the session
+  try {
+    globalShortcut.registerAll([
+      'Alt+F4', 'CommandOrControl+W', 'CommandOrControl+Q', 'F11'
+    ], () => {
+      if (mainWindow) mainWindow.webContents.send('shortcut-blocked');
+    });
+  } catch {}
+  return { ok: true, sessionCode: sessionCode.toUpperCase(), candidateName: (candidateName || '').trim() };
 });
 
-app.whenReady().then(() => {
-  createWindow();
+ipcMain.handle('session:end', async () => {
+  monitoring = false;
+  try { globalShortcut.unregisterAll(); } catch {}
+  try { if (blocker !== undefined) powerSaveBlocker.stop(blocker); } catch {}
+  return { ok: true };
+});
 
-  // Start window scanner
-  const scanner = require('./src/lockdown/scanner');
-  scanner.start(sessionId, mainWindow);
+ipcMain.handle('app:quit', () => {
+  monitoring = false;
+  try { globalShortcut.unregisterAll(); } catch {}
+  app.quit();
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-  if (blocker !== undefined) powerSaveBlocker.stop(blocker);
-});
-
-// IPC: session ended by recruiter
-ipcMain.on('session-ended', () => {
-  global.sessionEnded = true;
-  globalShortcut.unregisterAll();
-  app.quit();
+  try { globalShortcut.unregisterAll(); } catch {}
+  try { if (blocker !== undefined) powerSaveBlocker.stop(blocker); } catch {}
 });

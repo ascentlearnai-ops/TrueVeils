@@ -7,6 +7,12 @@
   "build": {
     "appId": "com.truveil.candidate",
     "productName": "TruveilSecure",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/renderer/**/*",
+      "package.json"
+    ],
     "win": {
       "target": "portable"
     }
