@@ -9,6 +9,37 @@ let monitoring = false;
 let activeSession = null;
 let supabase = null;
 let realtimeChannel = null;
+let pendingInviteCode = null;
+
+function extractInviteCode(value = '') {
+  const text = String(value);
+  const direct = text.match(/\bTRV-[A-Z0-9]{6}\b/i);
+  if (direct) return direct[0].toUpperCase();
+
+  try {
+    const url = new URL(text);
+    const fromQuery = url.searchParams.get('code');
+    if (fromQuery && /^TRV-[A-Z0-9]{6}$/i.test(fromQuery)) return fromQuery.toUpperCase();
+  } catch {}
+
+  return null;
+}
+
+function captureInviteCodeFromArgv(argv = []) {
+  for (const arg of argv) {
+    const code = extractInviteCode(arg);
+    if (code) {
+      pendingInviteCode = code;
+      return code;
+    }
+  }
+  return null;
+}
+
+function sendInviteCode(code = pendingInviteCode) {
+  if (!code || !mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('invite-code', code);
+}
 
 function getConfig() {
   return {
@@ -53,7 +84,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src/renderer/index.html'));
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    sendInviteCode();
+  });
 
   mainWindow.webContents.session.setPermissionRequestHandler((wc, permission, cb) => {
     cb(permission === 'media');
@@ -255,7 +289,41 @@ async function endSession(options = {}) {
   return { ok: true };
 }
 
-app.whenReady().then(createWindow);
+if (process.defaultApp) {
+  if (process.argv.length >= 2) app.setAsDefaultProtocolClient('truveil', process.execPath, [path.resolve(process.argv[1])]);
+} else {
+  app.setAsDefaultProtocolClient('truveil');
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const code = captureInviteCodeFromArgv(argv);
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      sendInviteCode(code);
+    }
+  });
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    const code = extractInviteCode(url);
+    if (code) {
+      pendingInviteCode = code;
+      sendInviteCode(code);
+    }
+  });
+}
+
+captureInviteCodeFromArgv(process.argv);
+
+if (gotSingleInstanceLock) {
+  app.whenReady().then(createWindow);
+}
 app.on('window-all-closed', () => app.quit());
 
 ipcMain.handle('session:start', async (_, { sessionCode, candidateName }) => {

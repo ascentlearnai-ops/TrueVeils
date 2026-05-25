@@ -17,3 +17,5 @@ build/
 *.dll
 *.pack
 *.idx
+!truveil-client/downloads/
+!truveil-client/downloads/TruveilSecure-Setup-1.0.0.exe

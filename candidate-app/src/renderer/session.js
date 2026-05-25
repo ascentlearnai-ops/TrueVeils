@@ -235,6 +235,14 @@ window.truveil.onRemoteSessionEnded(() => {
   finishSession('Your recruiter ended the session.');
 });
 
+window.truveil.onInviteCode((code) => {
+  if (!code || sessionStart) return;
+  sessionCodeInput.value = code;
+  sessionCodeInput.dispatchEvent(new Event('input'));
+  sessionCodeInput.focus();
+  toast(`Session code ${code} loaded from your invite.`, 'info');
+});
+
 $('endBtn').addEventListener('click', async () => {
   if (!confirm('End your secure session now? This will tell your recruiter the interview is finished.')) return;
   await window.truveil.endSession();

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="styles.css">
   <script>
     window.TRUVEIL_CLIENT_CONFIG = {
-      downloadUrl: 'https://github.com/ascentlearnai-ops/TrueVeils/releases/download/v1.0.0/TruveilSecure-Setup-1.0.0.exe'
+      downloadUrl: '/downloads/TruveilSecure-Setup-1.0.0.exe'
     };
   </script>
 </head>
@@ -206,10 +206,11 @@
         <span>Invite code detected</span>
         <strong id="inviteCodeText">TRV-XXXXXX</strong>
         <button type="button" id="copyCodeBtn">Copy code</button>
+        <a href="#" id="openAppLink" hidden>Open app</a>
       </div>
 
       <div class="download-buttons">
-        <a href="https://github.com/ascentlearnai-ops/TrueVeils/releases/download/v1.0.0/TruveilSecure-Setup-1.0.0.exe" class="dl-btn primary" id="windowsDownloadLink" data-download-link>
+        <a href="/downloads/TruveilSecure-Setup-1.0.0.exe" class="dl-btn primary" id="windowsDownloadLink" data-download-link download>
           <div class="dl-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5.5 10.5 4.3v7.5H3Zm0 7h7.5v7.2L3 18.5ZM11.5 4.2 21 3v9H11.5Zm0 8.8H21v9l-9.5-1.2Z"/></svg>
           </div>
@@ -337,9 +338,14 @@
       const panel = document.getElementById('inviteCodePanel');
       const text = document.getElementById('inviteCodeText');
       const copyBtn = document.getElementById('copyCodeBtn');
+      const openAppLink = document.getElementById('openAppLink');
       if (panel && text && copyBtn) {
         text.textContent = inviteCode;
         panel.hidden = false;
+        if (openAppLink) {
+          openAppLink.href = `truveil://session/${inviteCode}`;
+          openAppLink.hidden = false;
+        }
         copyBtn.addEventListener('click', async () => {
           try {
             await navigator.clipboard.writeText(inviteCode);

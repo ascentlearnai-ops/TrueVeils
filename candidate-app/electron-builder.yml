@@ -1,5 +1,9 @@
 appId: com.truveil.secure
 productName: TruveilSecure
+protocols:
+  - name: Truveil Secure
+    schemes:
+      - truveil
 directories:
   output: dist
 files:

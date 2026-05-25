@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('truveil', {
   onFocusLost: (cb) => ipcRenderer.on('focus-lost', cb),
   onFocusGained: (cb) => ipcRenderer.on('focus-gained', cb),
   onShortcutBlocked: (cb) => ipcRenderer.on('shortcut-blocked', cb),
-  onRemoteSessionEnded: (cb) => ipcRenderer.on('remote-session-ended', cb)
+  onRemoteSessionEnded: (cb) => ipcRenderer.on('remote-session-ended', cb),
+  onInviteCode: (cb) => ipcRenderer.on('invite-code', (_, code) => cb(code))
 });
