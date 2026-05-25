@@ -17,6 +17,8 @@ let timerInterval = null;
 let integrity = 100;
 let audioStream = null;
 let sessionEnding = false;
+let recognition = null;
+let recognitionShouldRun = false;
 
 const statusPill = $('statusPill');
 const statusText = $('statusText');
@@ -112,6 +114,7 @@ async function startSession() {
   sessionStart = Date.now();
   sessionEnding = false;
   startTimer();
+  startSpeechRecognition();
   showScreen('active');
   resetStartButton();
 }
@@ -126,6 +129,58 @@ function stopAudio() {
     audioStream.getTracks().forEach(t => t.stop());
     audioStream = null;
   }
+}
+
+function startSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    logEvent('Speech recognition is not available in this runtime', 'warn');
+    toast('Speech recognition is unavailable, but focus monitoring is active.', 'warn');
+    return;
+  }
+
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+  recognitionShouldRun = true;
+
+  recognition.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (!result.isFinal) continue;
+      const text = result[0]?.transcript?.trim();
+      if (text) {
+        window.truveil.sendTranscript({ text, timestamp: Date.now() });
+      }
+    }
+  };
+
+  recognition.onerror = (event) => {
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      recognitionShouldRun = false;
+      logEvent('Speech transcription permission was blocked', 'warn');
+    }
+  };
+
+  recognition.onend = () => {
+    if (!recognitionShouldRun || sessionEnding) return;
+    setTimeout(() => {
+      try { recognition.start(); } catch {}
+    }, 250);
+  };
+
+  try {
+    recognition.start();
+  } catch {
+    logEvent('Speech transcription could not start', 'warn');
+  }
+}
+
+function stopSpeechRecognition() {
+  recognitionShouldRun = false;
+  try { recognition?.stop(); } catch {}
+  recognition = null;
 }
 
 function startTimer() {
@@ -152,6 +207,7 @@ async function finishSession(message) {
   if (sessionEnding) return;
   sessionEnding = true;
   clearInterval(timerInterval);
+  stopSpeechRecognition();
   stopAudio();
   sessionStart = null;
   setStatus(null, 'Complete');

@@ -164,6 +164,29 @@ async function publishCandidateEvent(type, metadata = {}) {
   }
 }
 
+async function publishCandidateTranscript({ text, timestamp }) {
+  if (!activeSession || !realtimeChannel) return { ok: false, error: 'No active realtime session.' };
+
+  const cleanText = String(text || '').trim();
+  if (cleanText.length < 3) return { ok: true, skipped: true };
+
+  const payload = {
+    type: 'candidate_transcript',
+    sessionId: activeSession.sessionCode,
+    candidateName: activeSession.candidateName,
+    text: cleanText,
+    timestamp: timestamp || Date.now()
+  };
+
+  try {
+    await realtimeChannel.send({ type: 'broadcast', event: 'candidate_transcript', payload });
+    return { ok: true };
+  } catch (err) {
+    console.warn('[Truveil] transcript publish failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 async function updateSessionStatus(status, patch = {}) {
   if (!activeSession) return;
   try {
@@ -173,8 +196,6 @@ async function updateSessionStatus(status, patch = {}) {
       .from('sessions')
       .update({
         status,
-        candidate_name: activeSession.candidateName,
-        updated_at: new Date().toISOString(),
         ...patch
       })
       .eq('id', activeSession.sessionCode);
@@ -261,7 +282,7 @@ ipcMain.handle('session:start', async (_, { sessionCode, candidateName }) => {
     try { blocker = powerSaveBlocker.start('prevent-display-sleep'); } catch {}
     try { registerSessionShortcuts(); } catch {}
 
-    await updateSessionStatus('active', { started_at: new Date().toISOString() });
+    await updateSessionStatus('active');
     await publishCandidateEvent('candidate_connected', { severity: 'low' });
 
     return { ok: true, sessionCode: normalizedCode, candidateName: normalizedName };
@@ -270,6 +291,8 @@ ipcMain.handle('session:start', async (_, { sessionCode, candidateName }) => {
     return { ok: false, error: err.message || 'Could not start session.' };
   }
 });
+
+ipcMain.handle('session:transcript', async (_, data) => publishCandidateTranscript(data || {}));
 
 ipcMain.handle('session:end', async () => endSession());
 

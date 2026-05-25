@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const SessionManager = require('./src/session/manager');
@@ -12,6 +13,192 @@ let mainWindow;
 let tray;
 let activeSession = null;
 let sessionData = null; // in-memory log for report
+let supabase = null;
+let realtimeChannel = null;
+
+function getSupabase() {
+  if (supabase) return supabase;
+  const url = process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  supabase = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { params: { eventsPerSecond: 10 } }
+  });
+  return supabase;
+}
+
+function sessionChannelName(sessionId) {
+  return `truveil-session:${sessionId}`;
+}
+
+async function ensureRemoteSession(session) {
+  const client = getSupabase();
+  if (!client) {
+    throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in recruiter-app/.env.');
+  }
+
+  const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://trueveil-client.vercel.app';
+  const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/#download`;
+
+  const { error } = await client.from('sessions').upsert({
+    id: session.sessionId,
+    candidate_link: candidateLink,
+    status: 'waiting',
+    flags: [],
+    transcript: [],
+    created_at: new Date(session.createdAt).toISOString()
+  });
+
+  if (error) throw new Error(error.message);
+}
+
+async function joinRealtimeSession(sessionId) {
+  const client = getSupabase();
+  if (!client) return;
+  if (realtimeChannel) await client.removeChannel(realtimeChannel);
+
+  realtimeChannel = client
+    .channel(sessionChannelName(sessionId), {
+      config: { broadcast: { self: false }, presence: { key: 'recruiter' } }
+    })
+    .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
+      analyzeCandidateTranscript(payload);
+    })
+    .on('broadcast', { event: 'candidate_event' }, ({ payload }) => {
+      handleCandidateEvent(payload);
+    });
+
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timed out joining realtime session.')), 12000);
+    realtimeChannel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        clearTimeout(timeout);
+        resolve();
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        clearTimeout(timeout);
+        reject(new Error(`Could not join realtime session (${status}).`));
+      }
+    });
+  });
+
+  await realtimeChannel.track({ role: 'recruiter', joinedAt: Date.now() });
+}
+
+async function analyzeCandidateTranscript(payload = {}) {
+  if (!sessionData || !payload.text) return;
+
+  const text = String(payload.text || '').trim();
+  if (text.length < 4) return;
+
+  const timestamp = payload.timestamp || Date.now();
+  const settings = SettingsStore.getAll();
+  const apiKey = settings.openrouterKey || process.env.OPENROUTER_API_KEY;
+
+  let entry;
+  try {
+    const analysis = await AIDetector.analyze(text, apiKey);
+    entry = {
+      text,
+      timestamp,
+      aiScore: analysis.score,
+      confidence: analysis.confidence,
+      flags: analysis.flags || [],
+      reasoning: analysis.reasoning
+    };
+  } catch (err) {
+    console.error('[AI Detector]', err.message);
+    entry = {
+      text,
+      timestamp,
+      aiScore: null,
+      flags: [],
+      reasoning: 'AI analysis unavailable - ' + err.message,
+      error: true
+    };
+  }
+
+  sessionData.transcripts.push(entry);
+  if (typeof entry.aiScore === 'number') sessionData.scores.push(entry.aiScore);
+  (entry.flags || []).forEach(flagText => {
+    sessionData.flags.push({
+      text: flagText,
+      timestamp,
+      severity: entry.aiScore >= 70 ? 'high' : 'medium'
+    });
+  });
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('realtime:transcript', entry);
+  }
+}
+
+function handleCandidateEvent(payload = {}) {
+  if (!sessionData || !payload.type) return;
+
+  const labels = {
+    candidate_connected: 'Candidate connected to Truveil Secure',
+    focus_lost: 'Candidate switched away from Truveil Secure',
+    focus_gained: 'Candidate returned to Truveil Secure',
+    shortcut_blocked: 'Candidate attempted a blocked shortcut',
+    candidate_interrupted: 'Candidate ended or closed the secure session',
+    candidate_completed: 'Candidate completed the secure session',
+    session_ended_remote: 'Candidate received recruiter end-session signal'
+  };
+
+  const text = labels[payload.type] || payload.type;
+  const severity = payload.severity || (payload.type === 'focus_lost' ? 'medium' : 'low');
+  const flag = { text, severity, timestamp: payload.timestamp || Date.now() };
+  sessionData.flags.push(flag);
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('realtime:flag', flag);
+    if (payload.type === 'candidate_connected') {
+      mainWindow.webContents.send('realtime:status', { text: 'Candidate connected' });
+    }
+  }
+}
+
+async function closeRealtimeSession({ notifyCandidate = false } = {}) {
+  if (realtimeChannel) {
+    if (notifyCandidate) {
+      try {
+        await realtimeChannel.send({
+          type: 'broadcast',
+          event: 'recruiter_end_session',
+          payload: { timestamp: Date.now() }
+        });
+      } catch (err) {
+        console.warn('[Realtime]', err.message);
+      }
+    }
+
+    try { await getSupabase()?.removeChannel(realtimeChannel); } catch {}
+    realtimeChannel = null;
+  }
+}
+
+async function persistCompletedSession() {
+  if (!sessionData) return;
+  const client = getSupabase();
+  if (!client) return;
+
+  const transcript = sessionData.transcripts.map(entry => ({
+    text: entry.text,
+    timestamp: entry.timestamp,
+    score: entry.aiScore,
+    reasoning: entry.reasoning,
+    flags: entry.flags || []
+  }));
+
+  await client.from('sessions').update({
+    status: 'completed',
+    transcript,
+    flags: sessionData.flags,
+    ended_at: new Date(sessionData.endedAt || Date.now()).toISOString()
+  }).eq('id', sessionData.session.sessionId);
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -71,6 +258,9 @@ ipcMain.handle('settings:save', (_, patch) => SettingsStore.save(patch));
 // Session lifecycle
 ipcMain.handle('session:create', async (_, { candidateName, role }) => {
   const session = SessionManager.create({ candidateName, role });
+  await ensureRemoteSession(session);
+  await joinRealtimeSession(session.sessionId);
+
   activeSession = session;
   sessionData = {
     session,
@@ -140,6 +330,8 @@ ipcMain.handle('session:end', async () => {
   sessionData.endedAt = Date.now();
 
   try {
+    await closeRealtimeSession({ notifyCandidate: true });
+    await persistCompletedSession();
     const reportPath = await ReportGenerator.generate(sessionData);
     shell.openPath(reportPath);
     const finalData = { ...sessionData, reportPath };

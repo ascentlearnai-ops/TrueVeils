@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('truveil', {
   startSession: (data) => ipcRenderer.invoke('session:start', data),
+  sendTranscript: (data) => ipcRenderer.invoke('session:transcript', data),
   endSession: () => ipcRenderer.invoke('session:end'),
   quit: () => ipcRenderer.invoke('app:quit'),
 

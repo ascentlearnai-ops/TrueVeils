@@ -126,30 +126,7 @@ async function startMonitoring() {
     return;
   }
 
-  // Obtain audio stream
-  try {
-    if (audioSource === 'system') {
-      mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      const audioTracks = mediaStream.getAudioTracks();
-      if (!audioTracks.length) {
-        mediaStream.getTracks().forEach(t => t.stop());
-        mediaStream = null;
-        toast('No system audio available — when sharing, check "Share audio". Falling back to microphone.', 'warn');
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } else {
-        // stop video track, we only need audio
-        mediaStream.getVideoTracks().forEach(t => t.stop());
-      }
-    } else {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-  } catch (err) {
-    console.error('Audio capture error:', err);
-    toast('Microphone permission denied. Cannot start session.', 'error');
-    return;
-  }
-
-  // Kick off session timer + Web Speech
+  // Kick off session timer. Candidate audio/transcript arrives over Supabase Realtime.
   await window.truveil.startSession();
   sessionStartTime = Date.now();
   startTimer();
@@ -157,10 +134,8 @@ async function startMonitoring() {
   sessionIdEl.textContent = `SESSION: ${currentSession.sessionId}`;
   glassTitleEl.textContent = `${name} · ${role}`;
 
-  startRecognition();
-
-  statusDot.className = 'status-dot recording';
-  statusText.textContent = 'Recording';
+  statusDot.className = 'status-dot active';
+  statusText.textContent = 'Waiting for candidate';
   showScreen('dashboard');
 }
 
@@ -319,7 +294,7 @@ function renderAnalysis(entryEl, result) {
 
   // Add flags
   if (flags && flags.length) {
-    flags.forEach(f => addFlag(f, result.timestamp, aiScore >= 70 ? 'high' : 'medium'));
+    flags.forEach(f => addFlag(f, result.timestamp, aiScore >= 70 ? 'high' : 'medium', false));
   }
 }
 
@@ -356,7 +331,7 @@ function updateScoreRing(avgScore, latest, reasoning) {
 }
 
 // ─── Flags ────────────────────────────────────────────────────────────
-function addFlag(text, timestamp, severity = 'medium') {
+function addFlag(text, timestamp, severity = 'medium', persist = true) {
   totalFlags++;
   flagCount.textContent = totalFlags;
   statsFlags.textContent = totalFlags;
@@ -374,10 +349,53 @@ function addFlag(text, timestamp, severity = 'medium') {
     </div>`;
   flagsList.prepend(el);
 
-  window.truveil.addFlag({ text, severity, timestamp: timestamp || Date.now() });
+  if (persist) {
+    window.truveil.addFlag({ text, severity, timestamp: timestamp || Date.now() });
+  }
 }
 
 // ─── Timer ────────────────────────────────────────────────────────────
+function renderRealtimeTranscript(result) {
+  if (!result || !result.text) return;
+  if (interimBubble) { interimBubble.remove(); interimBubble = null; }
+  if (!hasFirstTranscript) {
+    transcriptList.innerHTML = '';
+    hasFirstTranscript = true;
+  }
+
+  totalResponses++;
+  transcriptCount.textContent = totalResponses;
+  statsResponses.textContent = totalResponses;
+
+  const timestamp = result.timestamp || Date.now();
+  const entryEl = document.createElement('div');
+  entryEl.className = 'transcript-entry';
+  entryEl.innerHTML = `
+    <div class="entry-header">
+      <span class="entry-time">${fmtTime(timestamp)}</span>
+      <span class="entry-score pending">Analyzing...</span>
+    </div>
+    <div class="entry-text">${esc(result.text)}</div>
+    <div class="entry-reasoning hidden"></div>`;
+  transcriptList.prepend(entryEl);
+
+  renderAnalysis(entryEl, { ...result, timestamp });
+}
+
+window.truveil.onRealtimeTranscript((entry) => {
+  statusDot.className = 'status-dot recording';
+  statusText.textContent = 'Recording';
+  renderRealtimeTranscript(entry);
+});
+
+window.truveil.onRealtimeFlag((flag) => {
+  addFlag(flag.text, flag.timestamp, flag.severity || 'medium', false);
+});
+
+window.truveil.onRealtimeStatus((status) => {
+  if (status?.text) statusText.textContent = status.text;
+});
+
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
