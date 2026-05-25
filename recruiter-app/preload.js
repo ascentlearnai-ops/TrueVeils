@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('truveil', {
 
   // Session
   createSession: (data) => ipcRenderer.invoke('session:create', data),
+  updateSession: (data) => ipcRenderer.invoke('session:update', data),
   startSession: () => ipcRenderer.invoke('session:start'),
   endSession: () => ipcRenderer.invoke('session:end'),
 

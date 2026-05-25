@@ -118,11 +118,10 @@ async function startMonitoring() {
   const name = candidateNameInput.value.trim() || 'Candidate';
   const role = roleInput.value.trim() || 'Interview';
 
-  // Re-create session with names so main has the metadata for the report
   try {
-    currentSession = await window.truveil.createSession({ candidateName: name, role });
+    currentSession = await window.truveil.updateSession({ candidateName: name, role });
   } catch (err) {
-    toast('Failed to create session: ' + err.message, 'error');
+    toast('Failed to update session: ' + err.message, 'error');
     return;
   }
 

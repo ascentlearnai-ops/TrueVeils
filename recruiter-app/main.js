@@ -38,8 +38,8 @@ async function ensureRemoteSession(session) {
     throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in recruiter-app/.env.');
   }
 
-  const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://trueveil-client.vercel.app';
-  const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/#download`;
+  const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
+  const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
 
   const { error } = await client.from('sessions').upsert({
     id: session.sessionId,
@@ -271,6 +271,19 @@ ipcMain.handle('session:create', async (_, { candidateName, role }) => {
     scores: []
   };
   return session;
+});
+
+ipcMain.handle('session:update', async (_, { candidateName, role }) => {
+  if (!activeSession || !sessionData) throw new Error('No active session');
+
+  activeSession = {
+    ...activeSession,
+    candidateName: candidateName || 'Candidate',
+    role: role || 'Interview'
+  };
+  sessionData.session = activeSession;
+
+  return activeSession;
 });
 
 ipcMain.handle('session:start', async () => {
