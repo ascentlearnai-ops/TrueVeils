@@ -1,4 +1,4 @@
-// ─── Truveil Secure — Candidate Renderer ──────────────────────────────
+// Truveil Secure - Candidate Renderer
 const $ = id => document.getElementById(id);
 
 const screens = {
@@ -12,16 +12,17 @@ function showScreen(name) {
   screens[name].classList.add('active');
 }
 
-// ─── State ─────────────────────────────────────────────────────────────
 let sessionStart = null;
 let timerInterval = null;
-let eventCount = 0;
 let integrity = 100;
 let audioStream = null;
+let sessionEnding = false;
 
 const statusPill = $('statusPill');
 const statusText = $('statusText');
 const toastEl = $('toast');
+const startBtn = $('startBtn');
+const sessionCodeInput = $('sessionCodeInput');
 
 function setStatus(kind, text) {
   statusPill.classList.remove('active', 'warn');
@@ -48,35 +49,50 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-// ─── Setup ─────────────────────────────────────────────────────────────
-const sessionCodeInput = $('sessionCodeInput');
 sessionCodeInput.addEventListener('input', (e) => {
   let v = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
   if (v.length > 3 && v.startsWith('TRV') && v[3] !== '-') v = 'TRV-' + v.slice(3);
   e.target.value = v;
 });
+
 sessionCodeInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') $('startBtn').click();
+  if (e.key === 'Enter') startBtn.click();
 });
 
-$('startBtn').addEventListener('click', startSession);
+startBtn.addEventListener('click', startSession);
 
 async function startSession() {
   const code = sessionCodeInput.value.trim();
   const name = $('candidateNameInput').value.trim();
 
-  if (!code) { toast('Enter your session code (TRV-XXXXXX)', 'error'); sessionCodeInput.focus(); return; }
+  if (!code) {
+    toast('Enter your session code (TRV-XXXXXX)', 'error');
+    sessionCodeInput.focus();
+    return;
+  }
+
   if (!/^TRV-[A-Z0-9]{6}$/.test(code)) {
     toast('Session code should look like TRV-8FR2XP (10 characters)', 'error');
     sessionCodeInput.focus();
     return;
   }
-  if (!name) { toast('Please enter your name', 'error'); $('candidateNameInput').focus(); return; }
+
+  if (!name) {
+    toast('Please enter your name', 'error');
+    $('candidateNameInput').focus();
+    return;
+  }
+
+  startBtn.disabled = true;
+  startBtn.textContent = 'Checking session...';
+  setStatus(null, 'Checking session');
 
   try {
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (err) {
+  } catch {
     toast('Microphone permission is required for a verified session.', 'error');
+    resetStartButton();
+    setStatus(null, 'Not started');
     return;
   }
 
@@ -84,6 +100,8 @@ async function startSession() {
   if (!result.ok) {
     toast(result.error || 'Could not start session', 'error');
     stopAudio();
+    resetStartButton();
+    setStatus(null, 'Not started');
     return;
   }
 
@@ -92,8 +110,15 @@ async function startSession() {
   setStatus('active', 'Monitoring');
 
   sessionStart = Date.now();
+  sessionEnding = false;
   startTimer();
   showScreen('active');
+  resetStartButton();
+}
+
+function resetStartButton() {
+  startBtn.disabled = false;
+  startBtn.textContent = 'Start Secure Session';
 }
 
 function stopAudio() {
@@ -103,7 +128,6 @@ function stopAudio() {
   }
 }
 
-// ─── Timer ─────────────────────────────────────────────────────────────
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
@@ -111,12 +135,10 @@ function startTimer() {
   }, 1000);
 }
 
-// ─── Events / flags ────────────────────────────────────────────────────
 function logEvent(text, kind = 'warn') {
   const feed = $('flagFeed');
   if (feed.querySelector('.ff-empty')) feed.innerHTML = '';
 
-  eventCount++;
   if (kind === 'warn') integrity = Math.max(0, integrity - 5);
   $('integrity').textContent = integrity + '%';
 
@@ -126,33 +148,46 @@ function logEvent(text, kind = 'warn') {
   feed.prepend(el);
 }
 
+async function finishSession(message) {
+  if (sessionEnding) return;
+  sessionEnding = true;
+  clearInterval(timerInterval);
+  stopAudio();
+  sessionStart = null;
+  setStatus(null, 'Complete');
+  if (message) toast(message, 'info');
+  showScreen('ended');
+}
+
 window.truveil.onFocusLost(() => {
   if (!sessionStart) return;
   logEvent('You switched away from Truveil Secure');
   setStatus('warn', 'Focus lost');
 });
+
 window.truveil.onFocusGained(() => {
   if (!sessionStart) return;
   setStatus('active', 'Monitoring');
 });
+
 window.truveil.onShortcutBlocked(() => {
+  if (!sessionStart) return;
   logEvent('Blocked a close/minimize shortcut');
 });
 
-// ─── End session ───────────────────────────────────────────────────────
+window.truveil.onRemoteSessionEnded(() => {
+  finishSession('Your recruiter ended the session.');
+});
+
 $('endBtn').addEventListener('click', async () => {
   if (!confirm('End your secure session now? This will tell your recruiter the interview is finished.')) return;
-  clearInterval(timerInterval);
-  stopAudio();
   await window.truveil.endSession();
-  setStatus(null, 'Complete');
-  showScreen('ended');
+  finishSession();
 });
 
 $('quitBtn').addEventListener('click', () => {
   window.truveil.quit();
 });
 
-// ─── Boot ──────────────────────────────────────────────────────────────
 setStatus(null, 'Not started');
 setTimeout(() => sessionCodeInput.focus(), 400);

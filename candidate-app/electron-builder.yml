@@ -2,6 +2,12 @@ appId: com.truveil.secure
 productName: TruveilSecure
 directories:
   output: dist
+files:
+  - main.js
+  - preload.js
+  - package.json
+  - src/config/runtime-config.json
+  - src/renderer/**/*
 mac:
   category: public.app-category.business
   target:
@@ -9,7 +15,9 @@ mac:
 win:
   target:
     - nsis
-  requestedExecutionLevel: requireAdministrator
+  artifactName: TruveilSecure-Setup-${version}.${ext}
+  requestedExecutionLevel: asInvoker
+  signAndEditExecutable: false
 nsis:
   oneClick: true
   perMachine: false
