@@ -54,6 +54,7 @@ const candidateNameInput = $('candidateNameInput');
 const roleInput = $('roleInput');
 const allowedAppsInput = $('allowedAppsInput');
 const allowedSitesInput = $('allowedSitesInput');
+const customBlockedSitesInput = $('customBlockedSitesInput');
 const toastEl = $('toast');
 
 // ─── Utility ───────────────────────────────────────────────────────────
@@ -75,10 +76,17 @@ function listFromTextarea(value) {
     .map(item => item.trim())
     .filter(Boolean);
 }
+function getBlockedSites() {
+  const checked = Array.from(document.querySelectorAll('[data-blocked-site]:checked'))
+    .map(input => input.getAttribute('data-blocked-site'))
+    .filter(Boolean);
+  return Array.from(new Set([...checked, ...listFromTextarea(customBlockedSitesInput.value)]));
+}
 function getAllowedPolicy() {
   return {
     allowed_apps: listFromTextarea(allowedAppsInput.value),
     allowed_sites: listFromTextarea(allowedSitesInput.value),
+    blocked_sites: getBlockedSites(),
     blocking_mode: 'warn_refocus'
   };
 }
@@ -102,6 +110,11 @@ async function onNewSession() {
     roleInput.value = '';
     allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');
     allowedSitesInput.value = ['meet.google.com', 'zoom.us', 'teams.microsoft.com'].join('\n');
+    customBlockedSitesInput.value = '';
+    document.querySelectorAll('[data-blocked-site]').forEach(input => {
+      input.checked = ['chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'perplexity.ai']
+        .includes(input.getAttribute('data-blocked-site'));
+    });
     showScreen('setup');
     setTimeout(() => candidateNameInput.focus(), 300);
   } catch (err) {

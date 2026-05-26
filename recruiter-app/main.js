@@ -38,6 +38,13 @@ function normalizePolicy(policy = {}) {
       'zoom.us',
       'teams.microsoft.com'
     ]),
+    blocked_sites: toList(policy.blocked_sites || policy.blockedSites, [
+      'chatgpt.com',
+      'claude.ai',
+      'gemini.google.com',
+      'copilot.microsoft.com',
+      'perplexity.ai'
+    ]),
     blocking_mode: policy.blocking_mode || policy.blockingMode || 'warn_refocus'
   };
 }
@@ -46,6 +53,7 @@ function getSupabase() {
   if (supabase) return supabase;
   const url = process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL;
   const key = process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY;
+  if (url?.includes('dummy.supabase.co') || key === 'dummy') return null;
   if (!url || !key) return null;
   supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -58,34 +66,92 @@ function sessionChannelName(sessionId) {
   return `truveil-session:${sessionId}`;
 }
 
-async function ensureRemoteSession(session) {
-  const client = getSupabase();
-  if (!client) {
-    throw new Error('Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in recruiter-app/.env.');
-  }
-
+function buildSessionPayload(session, { includePolicy = true } = {}) {
   const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
   const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
-  const policy = normalizePolicy(session.policy);
-
-  const { error } = await client.from('sessions').upsert({
+  const payload = {
     id: session.sessionId,
     candidate_link: candidateLink,
     status: 'waiting',
     flags: [],
     transcript: [],
+    created_at: new Date(session.createdAt).toISOString()
+  };
+
+  if (includePolicy) {
+    const policy = normalizePolicy(session.policy);
+    payload.allowed_apps = policy.allowed_apps;
+    payload.allowed_sites = policy.allowed_sites;
+    payload.blocked_sites = policy.blocked_sites;
+    payload.blocking_mode = policy.blocking_mode;
+  }
+
+  return payload;
+}
+
+function isPolicySchemaError(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+  return text.includes('allowed_apps')
+    || text.includes('allowed_sites')
+    || text.includes('blocked_sites')
+    || text.includes('blocking_mode')
+    || text.includes('schema cache')
+    || text.includes('column');
+}
+
+async function ensureRemoteSession(session) {
+  const client = getSupabase();
+  if (!client) {
+    console.warn('[Supabase] Not configured; created a local-only session code.');
+    return false;
+  }
+
+  const withPolicy = await client.from('sessions').upsert(buildSessionPayload(session));
+  if (!withPolicy.error) return true;
+  if (!isPolicySchemaError(withPolicy.error)) throw new Error(withPolicy.error.message);
+
+  console.warn('[Supabase] Policy columns missing; creating session without persisted policy.');
+  const baseOnly = await client.from('sessions').upsert(buildSessionPayload(session, { includePolicy: false }));
+  if (baseOnly.error) throw new Error(baseOnly.error.message);
+  return true;
+}
+
+async function updateRemotePolicy(sessionId, policy) {
+  const client = getSupabase();
+  if (!client) return;
+
+  const { error } = await client.from('sessions').update({
     allowed_apps: policy.allowed_apps,
     allowed_sites: policy.allowed_sites,
-    blocking_mode: policy.blocking_mode,
-    created_at: new Date(session.createdAt).toISOString()
-  });
+    blocked_sites: policy.blocked_sites,
+    blocking_mode: policy.blocking_mode
+  }).eq('id', sessionId);
 
-  if (error) throw new Error(error.message);
+  if (!error) return;
+  if (!isPolicySchemaError(error)) throw new Error(error.message);
+  console.warn('[Supabase] Policy columns missing; policy will be sent over realtime only.');
+}
+
+async function broadcastSessionPolicy() {
+  if (!activeSession || !realtimeChannel) return;
+  try {
+    await realtimeChannel.send({
+      type: 'broadcast',
+      event: 'session_policy',
+      payload: {
+        sessionId: activeSession.sessionId,
+        policy: normalizePolicy(activeSession.policy),
+        timestamp: Date.now()
+      }
+    });
+  } catch (err) {
+    console.warn('[Realtime] policy broadcast failed:', err.message);
+  }
 }
 
 async function joinRealtimeSession(sessionId) {
   const client = getSupabase();
-  if (!client) return;
+  if (!client) return false;
   if (realtimeChannel) await client.removeChannel(realtimeChannel);
 
   realtimeChannel = client
@@ -114,6 +180,7 @@ async function joinRealtimeSession(sessionId) {
   });
 
   await realtimeChannel.track({ role: 'recruiter', joinedAt: Date.now() });
+  return true;
 }
 
 async function analyzeCandidateTranscript(payload = {}) {
@@ -166,6 +233,10 @@ async function analyzeCandidateTranscript(payload = {}) {
 
 function handleCandidateEvent(payload = {}) {
   if (!sessionData || !payload.type) return;
+
+  if (payload.type === 'candidate_connected') {
+    broadcastSessionPolicy();
+  }
 
   const labels = {
     candidate_connected: 'Candidate connected to Truveil Secure',
@@ -291,8 +362,14 @@ ipcMain.handle('settings:save', (_, patch) => SettingsStore.save(patch));
 ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
   const session = SessionManager.create({ candidateName, role });
   session.policy = normalizePolicy(policy);
-  await ensureRemoteSession(session);
-  await joinRealtimeSession(session.sessionId);
+  const remoteReady = await ensureRemoteSession(session);
+  if (remoteReady) {
+    try {
+      await joinRealtimeSession(session.sessionId);
+    } catch (err) {
+      console.warn('[Realtime]', err.message);
+    }
+  }
 
   activeSession = session;
   sessionData = {
@@ -318,15 +395,8 @@ ipcMain.handle('session:update', async (_, { candidateName, role, policy }) => {
   };
   sessionData.session = activeSession;
 
-  const client = getSupabase();
-  if (client) {
-    const { error } = await client.from('sessions').update({
-      allowed_apps: normalizedPolicy.allowed_apps,
-      allowed_sites: normalizedPolicy.allowed_sites,
-      blocking_mode: normalizedPolicy.blocking_mode
-    }).eq('id', activeSession.sessionId);
-    if (error) throw new Error(error.message);
-  }
+  await updateRemotePolicy(activeSession.sessionId, normalizedPolicy);
+  await broadcastSessionPolicy();
 
   return activeSession;
 });

@@ -119,6 +119,21 @@ teams.microsoft.com</textarea>
             <div class="field-hint">One domain or title fragment per line for browser-based calls.</div>
           </div>
         </div>
+        <div class="field">
+          <label>Blocked websites</label>
+          <div class="blocked-site-grid" id="blockedSiteGrid">
+            <label class="check-tile"><input type="checkbox" data-blocked-site="chatgpt.com" checked><span>ChatGPT</span><small>chatgpt.com</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="claude.ai" checked><span>Claude</span><small>claude.ai</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="gemini.google.com" checked><span>Gemini</span><small>gemini.google.com</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="copilot.microsoft.com" checked><span>Copilot</span><small>copilot.microsoft.com</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="perplexity.ai" checked><span>Perplexity</span><small>perplexity.ai</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="poe.com"><span>Poe</span><small>poe.com</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="you.com"><span>You.com</span><small>you.com</small></label>
+            <label class="check-tile"><input type="checkbox" data-blocked-site="phind.com"><span>Phind</span><small>phind.com</small></label>
+          </div>
+          <textarea id="customBlockedSitesInput" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
+          <div class="field-hint">Checked sites trigger warn + refocus on the candidate app and appear as flags in your dashboard.</div>
+        </div>
       </div>
 
       <div class="setup-actions">
