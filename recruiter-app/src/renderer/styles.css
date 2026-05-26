@@ -416,6 +416,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .field input[type="text"],
 .field input[type="password"],
+.field textarea,
 .field select {
   background: rgba(0,0,0,.35);
   border: 1px solid var(--border);
@@ -427,10 +428,21 @@ button { font-family: inherit; cursor: pointer; }
 }
 .field input::placeholder { color: var(--text-dim); }
 .field input:focus,
+.field textarea:focus,
 .field select:focus {
   border-color: rgba(59,130,246,.5);
   background: rgba(0,0,0,.5);
   box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+.field textarea {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.45;
+}
+.policy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 .field select {
   appearance: none;
@@ -604,4 +616,5 @@ button { font-family: inherit; cursor: pointer; }
   .mm { border-bottom: 1px solid rgba(255,255,255,.04); }
   .idle-card { padding: 36px 24px; }
   .idle-card h1, .idle-card h2 { font-size: 26px; }
+  .policy-grid { grid-template-columns: 1fr; }
 }

@@ -4,13 +4,6 @@
   "description": "Truveil Recruiter App",
   "main": "main.js",
   "author": "Truveil Inc.",
-  "build": {
-    "appId": "com.truveil.recruiter",
-    "productName": "TruveilRecruiter",
-    "win": {
-      "target": "portable"
-    }
-  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",

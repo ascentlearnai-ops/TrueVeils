@@ -52,6 +52,8 @@ const flagCount = $('flagCount');
 const transcriptCount = $('transcriptCount');
 const candidateNameInput = $('candidateNameInput');
 const roleInput = $('roleInput');
+const allowedAppsInput = $('allowedAppsInput');
+const allowedSitesInput = $('allowedSitesInput');
 const toastEl = $('toast');
 
 // ─── Utility ───────────────────────────────────────────────────────────
@@ -67,6 +69,19 @@ function esc(text) {
   return d.innerHTML;
 }
 function fmtTime(ts) { return new Date(ts).toLocaleTimeString(); }
+function listFromTextarea(value) {
+  return String(value || '')
+    .split(/\n|,/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+function getAllowedPolicy() {
+  return {
+    allowed_apps: listFromTextarea(allowedAppsInput.value),
+    allowed_sites: listFromTextarea(allowedSitesInput.value),
+    blocking_mode: 'warn_refocus'
+  };
+}
 
 // ─── Idle: New Session ────────────────────────────────────────────────
 $('newSessionBtn').addEventListener('click', onNewSession);
@@ -85,6 +100,8 @@ async function onNewSession() {
     sessionCodeEl.textContent = currentSession.sessionId;
     candidateNameInput.value = '';
     roleInput.value = '';
+    allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');
+    allowedSitesInput.value = ['meet.google.com', 'zoom.us', 'teams.microsoft.com'].join('\n');
     showScreen('setup');
     setTimeout(() => candidateNameInput.focus(), 300);
   } catch (err) {
@@ -119,7 +136,7 @@ async function startMonitoring() {
   const role = roleInput.value.trim() || 'Interview';
 
   try {
-    currentSession = await window.truveil.updateSession({ candidateName: name, role });
+    currentSession = await window.truveil.updateSession({ candidateName: name, role, policy: getAllowedPolicy() });
   } catch (err) {
     toast('Failed to update session: ' + err.message, 'error');
     return;

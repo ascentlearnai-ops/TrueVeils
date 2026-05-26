@@ -9,6 +9,9 @@ mac:
 win:
   target:
     - nsis
+  artifactName: TruveilRecruiter-Setup-${version}.${ext}
+  requestedExecutionLevel: asInvoker
+  signAndEditExecutable: false
 nsis:
   oneClick: true
   perMachine: false

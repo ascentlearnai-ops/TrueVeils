@@ -16,6 +16,32 @@ let sessionData = null; // in-memory log for report
 let supabase = null;
 let realtimeChannel = null;
 
+function normalizePolicy(policy = {}) {
+  const toList = (value, fallback = []) => {
+    const items = Array.isArray(value)
+      ? value
+      : String(value || '').split(/[\n,]/);
+    const cleaned = items.map(item => String(item).trim()).filter(Boolean);
+    return cleaned.length ? cleaned : fallback;
+  };
+
+  return {
+    allowed_apps: toList(policy.allowed_apps || policy.allowedApps, [
+      'TruveilSecure',
+      'Zoom',
+      'Microsoft Teams',
+      'Google Chrome',
+      'Microsoft Edge'
+    ]),
+    allowed_sites: toList(policy.allowed_sites || policy.allowedSites, [
+      'meet.google.com',
+      'zoom.us',
+      'teams.microsoft.com'
+    ]),
+    blocking_mode: policy.blocking_mode || policy.blockingMode || 'warn_refocus'
+  };
+}
+
 function getSupabase() {
   if (supabase) return supabase;
   const url = process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL;
@@ -40,6 +66,7 @@ async function ensureRemoteSession(session) {
 
   const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
   const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
+  const policy = normalizePolicy(session.policy);
 
   const { error } = await client.from('sessions').upsert({
     id: session.sessionId,
@@ -47,6 +74,9 @@ async function ensureRemoteSession(session) {
     status: 'waiting',
     flags: [],
     transcript: [],
+    allowed_apps: policy.allowed_apps,
+    allowed_sites: policy.allowed_sites,
+    blocking_mode: policy.blocking_mode,
     created_at: new Date(session.createdAt).toISOString()
   });
 
@@ -142,6 +172,8 @@ function handleCandidateEvent(payload = {}) {
     focus_lost: 'Candidate switched away from Truveil Secure',
     focus_gained: 'Candidate returned to Truveil Secure',
     shortcut_blocked: 'Candidate attempted a blocked shortcut',
+    blocking_warning: 'Candidate opened a disallowed app or tab',
+    overlay_detected: 'Potential hidden overlay or AI assistant detected',
     candidate_interrupted: 'Candidate ended or closed the secure session',
     candidate_completed: 'Candidate completed the secure session',
     session_ended_remote: 'Candidate received recruiter end-session signal'
@@ -256,8 +288,9 @@ ipcMain.handle('settings:get', () => SettingsStore.getAll());
 ipcMain.handle('settings:save', (_, patch) => SettingsStore.save(patch));
 
 // Session lifecycle
-ipcMain.handle('session:create', async (_, { candidateName, role }) => {
+ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
   const session = SessionManager.create({ candidateName, role });
+  session.policy = normalizePolicy(policy);
   await ensureRemoteSession(session);
   await joinRealtimeSession(session.sessionId);
 
@@ -273,15 +306,27 @@ ipcMain.handle('session:create', async (_, { candidateName, role }) => {
   return session;
 });
 
-ipcMain.handle('session:update', async (_, { candidateName, role }) => {
+ipcMain.handle('session:update', async (_, { candidateName, role, policy }) => {
   if (!activeSession || !sessionData) throw new Error('No active session');
+  const normalizedPolicy = normalizePolicy(policy || activeSession.policy);
 
   activeSession = {
     ...activeSession,
     candidateName: candidateName || 'Candidate',
-    role: role || 'Interview'
+    role: role || 'Interview',
+    policy: normalizedPolicy
   };
   sessionData.session = activeSession;
+
+  const client = getSupabase();
+  if (client) {
+    const { error } = await client.from('sessions').update({
+      allowed_apps: normalizedPolicy.allowed_apps,
+      allowed_sites: normalizedPolicy.allowed_sites,
+      blocking_mode: normalizedPolicy.blocking_mode
+    }).eq('id', activeSession.sessionId);
+    if (error) throw new Error(error.message);
+  }
 
   return activeSession;
 });

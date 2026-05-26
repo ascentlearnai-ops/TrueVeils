@@ -7,7 +7,10 @@ const supabase = require('../lib/supabase');
 router.post('/', async (req, res) => {
   try {
     const sessionId = uuidv4().replace(/-/g, '').substring(0, 12);
-    const candidateLink = `${process.env.APP_BASE_URL}/download/${sessionId}`;
+    const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || process.env.APP_BASE_URL || 'https://truveil-client.vercel.app';
+    const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(sessionId)}#download`;
+    const allowedApps = req.body.allowedApps || req.body.allowed_apps || [];
+    const allowedSites = req.body.allowedSites || req.body.allowed_sites || [];
 
     const { error } = await supabase.from('sessions').insert({
       id: sessionId,
@@ -16,6 +19,9 @@ router.post('/', async (req, res) => {
       status: 'waiting',
       flags: [],
       transcript: [],
+      allowed_apps: allowedApps,
+      allowed_sites: allowedSites,
+      blocking_mode: req.body.blockingMode || req.body.blocking_mode || 'warn_refocus',
       created_at: new Date().toISOString()
     });
 
