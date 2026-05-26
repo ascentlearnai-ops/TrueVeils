@@ -24,6 +24,23 @@ let supabase = null;
 let realtimeChannel = null;
 let localTranscriber = null;
 
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function runWithRetry(operation, { attempts = 3, baseDelayMs = 650 } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await operation(attempt);
+    } catch (err) {
+      lastError = err;
+      if (attempt < attempts) await delay(baseDelayMs * attempt);
+    }
+  }
+  throw lastError;
+}
+
 function normalizePolicy(policy = {}) {
   const toList = (value, fallback = []) => {
     const items = Array.isArray(value)
@@ -309,6 +326,12 @@ async function handleCandidateAudioChunk(payload = {}) {
   if (!sessionData || !payload.chunkId || !payload.storagePath) return;
   if (!Array.isArray(sessionData.audioChunks)) sessionData.audioChunks = [];
 
+  const existing = sessionData.audioChunks.find(chunk => chunk.chunkId === payload.chunkId);
+  if (existing) {
+    await broadcastAudioChunkStatus(existing);
+    return;
+  }
+
   const client = getSupabase();
   if (!client) return;
 
@@ -342,8 +365,11 @@ async function handleCandidateAudioChunk(payload = {}) {
   await broadcastAudioChunkStatus(entry);
 
   try {
-    const download = await client.storage.from('session-audio').download(payload.storagePath);
-    if (download.error) throw new Error(download.error.message);
+    const download = await runWithRetry(async () => {
+      const result = await client.storage.from('session-audio').download(payload.storagePath);
+      if (result.error) throw new Error(result.error.message);
+      return result;
+    });
 
     const buffer = await blobToBuffer(download.data);
     fs.writeFileSync(localPath, buffer);

@@ -19,6 +19,7 @@ create table if not exists public.audio_chunks (
   created_at timestamptz not null default now(),
   transcribed_at timestamptz,
   cleaned_at timestamptz,
+  constraint audio_chunks_storage_path_session_check check (storage_path like session_id || '/%'),
   constraint audio_chunks_status_check check (status in ('uploading','uploaded','received','transcribing','transcribed','failed','deleted')),
   constraint audio_chunks_score_check check (score is null or (score >= 0 and score <= 100))
 );
