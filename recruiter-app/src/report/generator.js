@@ -31,7 +31,7 @@ function riskLabel(avg) {
 }
 
 async function generate(data) {
-  const { session, startedAt, endedAt, transcripts, flags, scores } = data;
+  const { session, startedAt, endedAt, transcripts, flags, scores, audioChunks = [] } = data;
   const dir = path.join(app.getPath('userData'), 'reports');
   fs.mkdirSync(dir, { recursive: true });
 
@@ -46,7 +46,7 @@ async function generate(data) {
 
   const html = buildHtml({
     session, startMs, endMs, duration, avg, max, highFlags,
-    transcripts, flags, totalResponses: transcripts.length
+    transcripts, flags, audioChunks, totalResponses: transcripts.length
   });
 
   const filename = `${session.sessionId}-${new Date(startMs).toISOString().replace(/[:.]/g, '-').slice(0, 19)}.html`;
@@ -56,7 +56,7 @@ async function generate(data) {
 }
 
 function buildHtml(ctx) {
-  const { session, startMs, endMs, duration, avg, max, highFlags, transcripts, flags, totalResponses } = ctx;
+  const { session, startMs, endMs, duration, avg, max, highFlags, transcripts, flags, audioChunks, totalResponses } = ctx;
   const riskCls = avg >= 70 ? 'high' : avg >= 40 ? 'med' : 'low';
 
   const transcriptRows = transcripts.length
@@ -80,6 +80,17 @@ function buildHtml(ctx) {
         <td>${esc(f.text)}</td>
       </tr>`).join('')
     : '<tr><td colspan="3" class="empty">No anomalies recorded.</td></tr>';
+
+  const audioRows = audioChunks && audioChunks.length
+    ? audioChunks.map(chunk => `
+      <tr>
+        <td class="mono">${fmtTime(chunk.timestamp)}</td>
+        <td>${esc(String((chunk.sequence || 0) + 1))}</td>
+        <td><span class="sev ${esc(chunk.status === 'failed' ? 'high' : chunk.status === 'transcribed' ? 'low' : 'medium')}">${esc(String(chunk.status || 'received').toUpperCase())}</span></td>
+        <td>${chunk.durationMs ? esc(Math.round(chunk.durationMs / 1000) + 's') : '—'}</td>
+        <td>${chunk.transcript ? esc(chunk.transcript) : '<span style="color:rgba(255,255,255,.3)">No clear transcript</span>'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No audio chunks were captured.</td></tr>';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -111,7 +122,7 @@ function buildHtml(ctx) {
   .risk-dial .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .risk-info h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; letter-spacing: -.3px; }
   .risk-info p { font-size: 13px; color: rgba(255,255,255,.5); }
-  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 40px; }
+  .grid4 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 40px; }
   .stat { padding: 20px 22px; background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; }
   .stat-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.35); letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 8px; }
   .stat-val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
@@ -173,7 +184,7 @@ function buildHtml(ctx) {
       </div>
       <div class="risk-info">
         <h2>${riskLabel(avg)}</h2>
-        <p>Overall AI-assistance confidence across ${totalResponses} analyzed response${totalResponses === 1 ? '' : 's'}.</p>
+        <p>Overall AI-assistance risk across ${totalResponses} analyzed response${totalResponses === 1 ? '' : 's'}.</p>
       </div>
     </div>
 
@@ -181,6 +192,7 @@ function buildHtml(ctx) {
       <div class="stat"><div class="stat-label">Average Score</div><div class="stat-val">${avg}%</div></div>
       <div class="stat"><div class="stat-label">Peak Score</div><div class="stat-val">${max}%</div></div>
       <div class="stat"><div class="stat-label">Responses</div><div class="stat-val">${totalResponses}</div></div>
+      <div class="stat"><div class="stat-label">Audio Chunks</div><div class="stat-val">${audioChunks.length}</div></div>
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>
     </div>
 
@@ -192,6 +204,14 @@ function buildHtml(ctx) {
       <table>
         <thead><tr><th style="width:110px">TIME</th><th style="width:110px">SEVERITY</th><th>DETAIL</th></tr></thead>
         <tbody>${flagRows}</tbody>
+      </table>
+    </div>
+
+    <h3>Audio Timeline</h3>
+    <div class="panel" style="padding:0">
+      <table>
+        <thead><tr><th style="width:110px">TIME</th><th style="width:80px">CHUNK</th><th style="width:130px">STATUS</th><th style="width:90px">LENGTH</th><th>LOCAL TRANSCRIPT</th></tr></thead>
+        <tbody>${audioRows}</tbody>
       </table>
     </div>
 

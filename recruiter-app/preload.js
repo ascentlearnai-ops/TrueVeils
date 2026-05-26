@@ -14,9 +14,13 @@ contextBridge.exposeInMainWorld('truveil', {
   // Live analysis
   analyzeTranscript: (data) => ipcRenderer.invoke('analyze:transcript', data),
   addFlag: (data) => ipcRenderer.invoke('flag:add', data),
+  getAudioChunk: (data) => ipcRenderer.invoke('audio:get', data),
   onRealtimeTranscript: (cb) => ipcRenderer.on('realtime:transcript', (_, data) => cb(data)),
   onRealtimeFlag: (cb) => ipcRenderer.on('realtime:flag', (_, data) => cb(data)),
   onRealtimeStatus: (cb) => ipcRenderer.on('realtime:status', (_, data) => cb(data)),
+  onRealtimeAudioChunk: (cb) => ipcRenderer.on('realtime:audio-chunk', (_, data) => cb(data)),
+  onRealtimeAudioLevel: (cb) => ipcRenderer.on('realtime:audio-level', (_, data) => cb(data)),
+  onRealtimeAudioStatus: (cb) => ipcRenderer.on('realtime:audio-status', (_, data) => cb(data)),
 
   // Misc
   copyLink: (text) => ipcRenderer.invoke('clipboard:write', text),

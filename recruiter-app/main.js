@@ -11,9 +11,10 @@ try {
 } catch {}
 
 const SessionManager = require('./src/session/manager');
-const AIDetector = require('./src/ai/detector');
+const LocalRisk = require('./src/ai/local-risk');
 const ReportGenerator = require('./src/report/generator');
 const SettingsStore = require('./src/settings/store');
+const { LocalTranscriber } = require('./src/audio/local-transcriber');
 
 let mainWindow;
 let tray;
@@ -21,6 +22,7 @@ let activeSession = null;
 let sessionData = null; // in-memory log for report
 let supabase = null;
 let realtimeChannel = null;
+let localTranscriber = null;
 
 function normalizePolicy(policy = {}) {
   const toList = (value, fallback = []) => {
@@ -69,6 +71,21 @@ function getSupabase() {
     }
   });
   return supabase;
+}
+
+function sendToRenderer(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, payload);
+  }
+}
+
+function getLocalTranscriber() {
+  if (localTranscriber) return localTranscriber;
+  localTranscriber = new LocalTranscriber({
+    userDataPath: app.getPath('userData'),
+    onStatus: (status) => sendToRenderer('realtime:audio-status', status)
+  });
+  return localTranscriber;
 }
 
 function sessionChannelName(sessionId) {
@@ -170,6 +187,12 @@ async function joinRealtimeSession(sessionId) {
     .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
       analyzeCandidateTranscript(payload);
     })
+    .on('broadcast', { event: 'candidate_audio_chunk' }, ({ payload }) => {
+      handleCandidateAudioChunk(payload);
+    })
+    .on('broadcast', { event: 'candidate_audio_level' }, ({ payload }) => {
+      handleCandidateAudioLevel(payload);
+    })
     .on('broadcast', { event: 'candidate_event' }, ({ payload }) => {
       handleCandidateEvent(payload);
     });
@@ -199,31 +222,19 @@ async function analyzeCandidateTranscript(payload = {}) {
   if (text.length < 4) return;
 
   const timestamp = payload.timestamp || Date.now();
-  const settings = SettingsStore.getAll();
-  const apiKey = settings.openrouterKey || process.env.OPENROUTER_API_KEY;
-
-  let entry;
-  try {
-    const analysis = await AIDetector.analyze(text, apiKey);
-    entry = {
-      text,
-      timestamp,
-      aiScore: analysis.score,
-      confidence: analysis.confidence,
-      flags: analysis.flags || [],
-      reasoning: analysis.reasoning
-    };
-  } catch (err) {
-    console.error('[AI Detector]', err.message);
-    entry = {
-      text,
-      timestamp,
-      aiScore: null,
-      flags: [],
-      reasoning: 'AI analysis unavailable - ' + err.message,
-      error: true
-    };
-  }
+  const analysis = LocalRisk.analyzeTranscript(text, {
+    durationMs: payload.durationMs,
+    sequence: payload.sequence
+  });
+  const entry = {
+    text,
+    timestamp,
+    aiScore: analysis.score,
+    confidence: analysis.confidence,
+    flags: analysis.flags || [],
+    reasoning: analysis.reasoning,
+    source: payload.source || 'local'
+  };
 
   sessionData.transcripts.push(entry);
   if (typeof entry.aiScore === 'number') sessionData.scores.push(entry.aiScore);
@@ -235,8 +246,212 @@ async function analyzeCandidateTranscript(payload = {}) {
     });
   });
 
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('realtime:transcript', entry);
+  sendToRenderer('realtime:transcript', entry);
+}
+
+function safeFilePart(value) {
+  return String(value || 'audio').replace(/[^a-z0-9._-]/gi, '_');
+}
+
+async function blobToBuffer(blob) {
+  if (Buffer.isBuffer(blob)) return blob;
+  if (blob instanceof ArrayBuffer) return Buffer.from(blob);
+  if (ArrayBuffer.isView(blob)) return Buffer.from(blob.buffer, blob.byteOffset, blob.byteLength);
+  if (blob?.arrayBuffer) return Buffer.from(await blob.arrayBuffer());
+  throw new Error('Unsupported storage download payload.');
+}
+
+async function updateAudioChunkRow(chunkId, patch = {}) {
+  const client = getSupabase();
+  if (!client || !chunkId) return;
+  const { error } = await client.from('audio_chunks').update(patch).eq('id', chunkId);
+  if (error) console.warn('[Supabase] audio chunk update failed:', error.message);
+}
+
+async function broadcastAudioChunkStatus(entry, patch = {}) {
+  const payload = {
+    sessionId: entry.sessionId,
+    chunkId: entry.chunkId,
+    sequence: entry.sequence,
+    durationMs: entry.durationMs,
+    mimeType: entry.mimeType,
+    sizeBytes: entry.sizeBytes,
+    status: entry.status,
+    transcript: entry.transcript || '',
+    aiScore: entry.aiScore,
+    flags: entry.flags || [],
+    reasoning: entry.reasoning || '',
+    timestamp: Date.now(),
+    ...patch
+  };
+
+  sendToRenderer('realtime:audio-chunk', payload);
+  if (realtimeChannel) {
+    try {
+      await realtimeChannel.send({ type: 'broadcast', event: 'audio_chunk_status', payload });
+    } catch (err) {
+      console.warn('[Realtime] audio status broadcast failed:', err.message);
+    }
+  }
+}
+
+function handleCandidateAudioLevel(payload = {}) {
+  if (!sessionData) return;
+  sessionData.lastAudioLevel = {
+    rms: Number(payload.rms) || 0,
+    peak: Number(payload.peak) || 0,
+    timestamp: payload.timestamp || Date.now()
+  };
+  sendToRenderer('realtime:audio-level', sessionData.lastAudioLevel);
+}
+
+async function handleCandidateAudioChunk(payload = {}) {
+  if (!sessionData || !payload.chunkId || !payload.storagePath) return;
+  if (!Array.isArray(sessionData.audioChunks)) sessionData.audioChunks = [];
+
+  const client = getSupabase();
+  if (!client) return;
+
+  const sessionId = payload.sessionId || activeSession?.sessionId || sessionData.session.sessionId;
+  const sessionDir = path.join(app.getPath('userData'), 'sessions', safeFilePart(sessionId), 'audio');
+  fs.mkdirSync(sessionDir, { recursive: true });
+
+  const extension = payload.mimeType?.includes('ogg') ? 'ogg' : payload.mimeType?.includes('wav') ? 'wav' : 'webm';
+  const localPath = path.join(sessionDir, `${safeFilePart(payload.chunkId)}.${extension}`);
+  const entry = {
+    sessionId,
+    chunkId: payload.chunkId,
+    storagePath: payload.storagePath,
+    sequence: Number(payload.sequence) || 0,
+    durationMs: Number(payload.durationMs) || 0,
+    mimeType: payload.mimeType || 'audio/webm',
+    sizeBytes: Number(payload.sizeBytes) || 0,
+    peak: Number(payload.peak) || 0,
+    rms: Number(payload.rms) || 0,
+    timestamp: payload.timestamp || Date.now(),
+    localPath,
+    status: 'received',
+    transcript: '',
+    aiScore: null,
+    flags: [],
+    reasoning: ''
+  };
+
+  sessionData.audioChunks.push(entry);
+  sendToRenderer('realtime:status', { text: 'Audio chunk received' });
+  await broadcastAudioChunkStatus(entry);
+
+  try {
+    const download = await client.storage.from('session-audio').download(payload.storagePath);
+    if (download.error) throw new Error(download.error.message);
+
+    const buffer = await blobToBuffer(download.data);
+    fs.writeFileSync(localPath, buffer);
+
+    const audioRisk = LocalRisk.analyzeAudio(entry);
+    entry.aiScore = audioRisk.score;
+    entry.flags = audioRisk.flags || [];
+    entry.reasoning = audioRisk.reasoning;
+    entry.status = 'transcribing';
+
+    await updateAudioChunkRow(entry.chunkId, {
+      status: 'transcribing',
+      score: entry.aiScore,
+      reasoning: entry.reasoning,
+      flags: entry.flags
+    });
+    await broadcastAudioChunkStatus(entry);
+
+    processAudioTranscription(entry).catch((err) => {
+      console.error('[Local transcription]', err);
+    });
+  } catch (err) {
+    entry.status = 'failed';
+    entry.reasoning = `Audio download failed: ${err.message}`;
+    entry.flags = ['Audio chunk download failed'];
+    await updateAudioChunkRow(entry.chunkId, {
+      status: 'failed',
+      reasoning: entry.reasoning,
+      flags: entry.flags
+    });
+    await broadcastAudioChunkStatus(entry);
+  }
+}
+
+async function processAudioTranscription(entry) {
+  try {
+    sendToRenderer('realtime:audio-status', {
+      state: 'transcribing',
+      message: `Transcribing chunk ${entry.sequence}`,
+      chunkId: entry.chunkId,
+      timestamp: Date.now()
+    });
+
+    const result = await getLocalTranscriber().transcribeQueued(entry.localPath, entry);
+    const text = String(result.text || '').trim();
+    entry.status = text ? 'transcribed' : 'received';
+    entry.transcript = text;
+
+    if (text) {
+      const analysis = LocalRisk.analyzeTranscript(text, {
+        durationMs: entry.durationMs,
+        sequence: entry.sequence
+      });
+      entry.aiScore = analysis.score;
+      entry.flags = analysis.flags || [];
+      entry.reasoning = analysis.reasoning;
+
+      const transcriptEntry = {
+        text,
+        timestamp: entry.timestamp,
+        aiScore: entry.aiScore,
+        confidence: analysis.confidence,
+        flags: entry.flags,
+        reasoning: entry.reasoning,
+        source: 'local-whisper',
+        chunkId: entry.chunkId
+      };
+
+      sessionData.transcripts.push(transcriptEntry);
+      sessionData.scores.push(entry.aiScore);
+      entry.flags.forEach(flagText => {
+        sessionData.flags.push({
+          text: flagText,
+          timestamp: entry.timestamp,
+          severity: entry.aiScore >= 70 ? 'high' : 'medium'
+        });
+      });
+      sendToRenderer('realtime:transcript', transcriptEntry);
+    } else {
+      entry.reasoning = 'Local speech engine did not detect clear speech in this audio chunk.';
+    }
+
+    await updateAudioChunkRow(entry.chunkId, {
+      status: entry.status,
+      transcript: entry.transcript || null,
+      score: entry.aiScore,
+      reasoning: entry.reasoning,
+      flags: entry.flags || [],
+      transcribed_at: new Date().toISOString()
+    });
+    await broadcastAudioChunkStatus(entry);
+  } catch (err) {
+    entry.status = 'failed';
+    entry.reasoning = `Local transcription unavailable: ${err.message}`;
+    entry.flags = [...(entry.flags || []), 'Local transcription unavailable'].slice(0, 4);
+    await updateAudioChunkRow(entry.chunkId, {
+      status: 'failed',
+      score: entry.aiScore,
+      reasoning: entry.reasoning,
+      flags: entry.flags
+    });
+    await broadcastAudioChunkStatus(entry);
+    sendToRenderer('realtime:audio-status', {
+      state: 'error',
+      message: entry.reasoning,
+      chunkId: entry.chunkId,
+      timestamp: Date.now()
+    });
   }
 }
 
@@ -253,6 +468,7 @@ function handleCandidateEvent(payload = {}) {
     focus_gained: 'Candidate returned to Truveil Secure',
     shortcut_blocked: 'Candidate attempted a blocked shortcut',
     blocking_warning: 'Candidate opened a disallowed app or tab',
+    audio_upload_failed: 'Candidate audio upload failed',
     overlay_detected: 'Potential hidden overlay or AI assistant detected',
     candidate_interrupted: 'Candidate ended or closed the secure session',
     candidate_completed: 'Candidate completed the secure session',
@@ -301,7 +517,9 @@ async function persistCompletedSession() {
     timestamp: entry.timestamp,
     score: entry.aiScore,
     reasoning: entry.reasoning,
-    flags: entry.flags || []
+    flags: entry.flags || [],
+    source: entry.source || 'local',
+    chunkId: entry.chunkId || null
   }));
 
   await client.from('sessions').update({
@@ -310,6 +528,27 @@ async function persistCompletedSession() {
     flags: sessionData.flags,
     ended_at: new Date(sessionData.endedAt || Date.now()).toISOString()
   }).eq('id', sessionData.session.sessionId);
+}
+
+async function cleanupRemoteAudioChunks() {
+  if (!sessionData?.audioChunks?.length) return;
+  const client = getSupabase();
+  if (!client) return;
+
+  const paths = Array.from(new Set(sessionData.audioChunks.map(chunk => chunk.storagePath).filter(Boolean)));
+  if (paths.length) {
+    const { error } = await client.storage.from('session-audio').remove(paths);
+    if (error) console.warn('[Supabase] remote audio cleanup failed:', error.message);
+  }
+
+  const ids = sessionData.audioChunks.map(chunk => chunk.chunkId).filter(Boolean);
+  if (ids.length) {
+    const { error } = await client
+      .from('audio_chunks')
+      .update({ status: 'deleted', cleaned_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) console.warn('[Supabase] audio metadata cleanup failed:', error.message);
+  }
 }
 
 function createWindow() {
@@ -369,6 +608,7 @@ ipcMain.handle('settings:save', (_, patch) => SettingsStore.save(patch));
 
 // Session lifecycle
 ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
+  LocalRisk.resetHistory();
   const session = SessionManager.create({ candidateName, role });
   session.policy = normalizePolicy(policy);
   const remoteReady = await ensureRemoteSession(session);
@@ -387,7 +627,8 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
     endedAt: null,
     transcripts: [],
     flags: [],
-    scores: []
+    scores: [],
+    audioChunks: []
   };
   return session;
 });
@@ -421,23 +662,7 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
   if (!sessionData) return null;
   if (!text || text.trim().length < 4) return null;
 
-  const settings = SettingsStore.getAll();
-  const apiKey = settings.openrouterKey || process.env.OPENROUTER_API_KEY;
-
-  let analysis;
-  try {
-    analysis = await AIDetector.analyze(text, apiKey);
-  } catch (err) {
-    console.error('[AI Detector]', err.message);
-    return {
-      text,
-      timestamp,
-      aiScore: null,
-      flags: [],
-      reasoning: 'AI analysis unavailable — ' + err.message,
-      error: true
-    };
-  }
+  const analysis = LocalRisk.analyzeTranscript(text);
 
   const entry = {
     text,
@@ -445,7 +670,8 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
     aiScore: analysis.score,
     confidence: analysis.confidence,
     flags: analysis.flags || [],
-    reasoning: analysis.reasoning
+    reasoning: analysis.reasoning,
+    source: 'local'
   };
   sessionData.transcripts.push(entry);
   sessionData.scores.push(analysis.score);
@@ -461,6 +687,21 @@ ipcMain.handle('flag:add', (_, { text, severity, timestamp }) => {
   sessionData.flags.push({ text, severity, timestamp });
 });
 
+ipcMain.handle('audio:get', (_, { chunkId }) => {
+  if (!sessionData || !chunkId) return { ok: false, error: 'No active audio session.' };
+  const chunk = sessionData.audioChunks.find(item => item.chunkId === chunkId);
+  if (!chunk || !chunk.localPath || !fs.existsSync(chunk.localPath)) {
+    return { ok: false, error: 'Audio chunk is not available locally yet.' };
+  }
+  const base64 = fs.readFileSync(chunk.localPath).toString('base64');
+  return {
+    ok: true,
+    chunkId,
+    mimeType: chunk.mimeType || 'audio/webm',
+    dataUrl: `data:${chunk.mimeType || 'audio/webm'};base64,${base64}`
+  };
+});
+
 // End session — generate + open report
 ipcMain.handle('session:end', async () => {
   if (!sessionData) return { ended: false };
@@ -469,6 +710,7 @@ ipcMain.handle('session:end', async () => {
   try {
     await closeRealtimeSession({ notifyCandidate: true });
     await persistCompletedSession();
+    await cleanupRemoteAudioChunks();
     const reportPath = await ReportGenerator.generate(sessionData);
     shell.openPath(reportPath);
     const finalData = { ...sessionData, reportPath };

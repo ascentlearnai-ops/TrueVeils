@@ -1,12 +1,11 @@
 const OpenAI = require('openai');
 
-const DEFAULT_KEY = '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';
-
 let cachedClient = null;
 let cachedKey = null;
 
 function getClient(apiKey) {
-  const key = apiKey || DEFAULT_KEY;
+  const key = apiKey || '';
+  if (!key) throw new Error('OpenRouter key is not configured. Local risk scoring does not require one.');
   if (cachedClient && cachedKey === key) return cachedClient;
   cachedKey = key;
   cachedClient = new OpenAI({

@@ -8,6 +8,8 @@ files:
   - package.json
   - src/config/runtime-config.json
   - src/**/*
+asarUnpack:
+  - node_modules/ffmpeg-static/ffmpeg.exe
 mac:
   category: public.app-category.business
   target:

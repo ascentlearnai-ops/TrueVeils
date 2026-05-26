@@ -19,16 +19,12 @@ let sessionStartTime = null;
 let timerInterval = null;
 let totalFlags = 0;
 let totalResponses = 0;
+let totalAudioChunks = 0;
 let scoreSum = 0;
 let scoreCount = 0;
 let latestScore = null;
 let hasFirstTranscript = false;
-let recognition = null;
-let recognitionActive = false;
-let recognitionShouldRun = false;
-let audioSource = 'microphone';
 let currentSession = null;
-let mediaStream = null;
 
 // ─── Elements ──────────────────────────────────────────────────────────
 const statusDot = $('statusDot');
@@ -48,8 +44,15 @@ const flagsList = $('flagsList');
 const statsScore = $('statsScore');
 const statsFlags = $('statsFlags');
 const statsResponses = $('statsResponses');
+const statsAudio = $('statsAudio');
 const flagCount = $('flagCount');
 const transcriptCount = $('transcriptCount');
+const audioCount = $('audioCount');
+const audioQueue = $('audioQueue');
+const audioModelStatus = $('audioModelStatus');
+const audioHealth = $('audioHealth');
+const audioLevelFill = $('audioLevelFill');
+const audioLevelValue = $('audioLevelValue');
 const candidateNameInput = $('candidateNameInput');
 const roleInput = $('roleInput');
 const allowedAppsInput = $('allowedAppsInput');
@@ -131,17 +134,6 @@ $('cancelSetupBtn').addEventListener('click', () => {
   showScreen('idle');
 });
 
-document.querySelectorAll('.seg-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    audioSource = btn.dataset.source;
-    $('audioHint').textContent = audioSource === 'system'
-      ? 'Captures system audio directly (Zoom, Meet, Teams). You will be asked to share your screen with audio.'
-      : 'Captures your microphone. Works anywhere — put your interview audio on speakers.';
-  });
-});
-
 $('startMonitoringBtn').addEventListener('click', startMonitoring);
 
 async function startMonitoring() {
@@ -166,72 +158,6 @@ async function startMonitoring() {
   statusDot.className = 'status-dot active';
   statusText.textContent = 'Waiting for candidate';
   showScreen('dashboard');
-}
-
-// ─── Web Speech API wrapper ───────────────────────────────────────────
-function startRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    toast('Speech recognition not available in this runtime.', 'error');
-    return;
-  }
-  recognition = new SR();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
-  recognitionShouldRun = true;
-
-  let currentInterimEl = null;
-
-  recognition.onresult = (event) => {
-    let interim = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const res = event.results[i];
-      const text = res[0].transcript;
-      if (res.isFinal) {
-        commitFinalTranscript(text);
-      } else {
-        interim += text;
-      }
-    }
-    updateInterim(interim);
-  };
-
-  recognition.onend = () => {
-    recognitionActive = false;
-    if (recognitionShouldRun) {
-      // auto-restart after natural timeout
-      setTimeout(() => {
-        try { recognition.start(); recognitionActive = true; }
-        catch (e) { /* already started */ }
-      }, 250);
-    }
-  };
-
-  recognition.onerror = (e) => {
-    console.warn('[Speech error]', e.error);
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      toast('Microphone access was blocked. Reload and allow mic.', 'error');
-      recognitionShouldRun = false;
-    }
-  };
-
-  try {
-    recognition.start();
-    recognitionActive = true;
-  } catch (e) {
-    console.warn(e);
-  }
-}
-
-function stopRecognition() {
-  recognitionShouldRun = false;
-  try { recognition && recognition.stop(); } catch {}
-  recognitionActive = false;
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(t => t.stop());
-    mediaStream = null;
-  }
 }
 
 // ─── Interim / final transcript ───────────────────────────────────────
@@ -337,15 +263,15 @@ function updateScoreRing(avgScore, latest, reasoning) {
   let color, label;
   if (latest >= 70) {
     color = '#ef4444';
-    label = 'High Interference';
+    label = 'High Risk';
     scoreSection.classList.add('high-risk');
   } else if (latest >= 40) {
     color = '#f59e0b';
-    label = 'Moderate Signal';
+    label = 'Elevated Risk';
     scoreSection.classList.add('medium-risk');
   } else {
     color = '#22c55e';
-    label = 'Low Signal';
+    label = 'Low Risk';
   }
   scoreRing.setAttribute('stroke', color);
   scoreValue.textContent = `${latest}%`;
@@ -357,6 +283,89 @@ function updateScoreRing(avgScore, latest, reasoning) {
   statsScore.className = 'mm-val ' + (avgScore >= 70 ? 'risk-high' : avgScore >= 40 ? 'risk-med' : 'risk-low');
   scoreTrendEl.textContent = `${latest}%`;
   scoreTrendEl.className = 'mm-val mm-trend ' + (latest >= 70 ? 'rising' : latest < 40 ? 'falling' : '');
+}
+
+function audioStatusLabel(status) {
+  const labels = {
+    received: 'Received',
+    transcribing: 'Transcribing',
+    transcribed: 'Transcribed',
+    failed: 'Needs attention',
+    deleted: 'Cleaned'
+  };
+  return labels[status] || status || 'Received';
+}
+
+function renderAudioChunk(chunk = {}) {
+  if (!audioQueue || !chunk.chunkId) return;
+
+  if (audioQueue.querySelector('.empty-state')) audioQueue.innerHTML = '';
+  let el = audioQueue.querySelector(`[data-audio-chunk="${chunk.chunkId}"]`);
+  const isNew = !el;
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'audio-item';
+    el.dataset.audioChunk = chunk.chunkId;
+    audioQueue.prepend(el);
+  }
+
+  if (isNew) {
+    totalAudioChunks++;
+    if (audioCount) audioCount.textContent = totalAudioChunks;
+    if (statsAudio) statsAudio.textContent = totalAudioChunks;
+  }
+
+  const status = audioStatusLabel(chunk.status);
+  const cls = chunk.status === 'failed' ? 'bad' : chunk.status === 'transcribed' ? 'ok' : 'busy';
+  const duration = chunk.durationMs ? `${Math.round(chunk.durationMs / 1000)}s` : 'live';
+  el.className = `audio-item ${cls}`;
+  el.innerHTML = `
+    <button class="audio-play" data-play-audio="${esc(chunk.chunkId)}" title="Replay audio chunk">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <div class="audio-item-main">
+      <div class="audio-item-top">
+        <strong>Chunk ${Number(chunk.sequence || 0) + 1}</strong>
+        <span class="audio-chip ${cls}">${esc(status)}</span>
+      </div>
+      <div class="audio-item-meta">${fmtTime(chunk.timestamp || Date.now())} - ${duration}</div>
+      ${chunk.transcript ? `<div class="audio-mini-transcript">${esc(chunk.transcript)}</div>` : ''}
+      ${chunk.reasoning ? `<div class="audio-reason">${esc(chunk.reasoning)}</div>` : ''}
+    </div>`;
+}
+
+function updateAudioLevel(level = {}) {
+  const rms = Math.max(0, Math.min(1, Number(level.rms) || 0));
+  const peak = Math.max(0, Math.min(1, Number(level.peak) || 0));
+  const visual = Math.max(rms * 4, peak * .8);
+  if (audioLevelFill) audioLevelFill.style.width = `${Math.round(Math.min(1, visual) * 100)}%`;
+  if (audioLevelValue) audioLevelValue.textContent = `${Math.round(Math.min(1, visual) * 100)}%`;
+  if (audioHealth) audioHealth.textContent = visual > .02 ? 'Candidate mic live' : 'Waiting for speech';
+}
+
+function updateAudioStatus(status = {}) {
+  if (!audioModelStatus) return;
+  audioModelStatus.textContent = status.message || 'Local speech engine ready';
+  audioModelStatus.className = `audio-model-status ${status.state === 'error' ? 'error' : status.state === 'ready' ? 'ready' : 'busy'}`;
+}
+
+if (audioQueue) {
+  audioQueue.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-play-audio]');
+    if (!button) return;
+    const chunkId = button.getAttribute('data-play-audio');
+    button.disabled = true;
+    try {
+      const result = await window.truveil.getAudioChunk({ chunkId });
+      if (!result?.ok) throw new Error(result?.error || 'Audio not ready yet');
+      const audio = new Audio(result.dataUrl);
+      await audio.play();
+    } catch (err) {
+      toast('Replay failed: ' + err.message, 'error');
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
 
 // ─── Flags ────────────────────────────────────────────────────────────
@@ -425,6 +434,20 @@ window.truveil.onRealtimeStatus((status) => {
   if (status?.text) statusText.textContent = status.text;
 });
 
+window.truveil.onRealtimeAudioChunk((chunk) => {
+  statusDot.className = 'status-dot recording';
+  statusText.textContent = chunk?.status === 'transcribing' ? 'Transcribing audio' : 'Audio streaming';
+  renderAudioChunk(chunk);
+});
+
+window.truveil.onRealtimeAudioLevel((level) => {
+  updateAudioLevel(level);
+});
+
+window.truveil.onRealtimeAudioStatus((status) => {
+  updateAudioStatus(status);
+});
+
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
@@ -441,7 +464,6 @@ $('endSessionBtn').addEventListener('click', endSession);
 
 async function endSession() {
   clearInterval(timerInterval);
-  stopRecognition();
   statusDot.className = 'status-dot';
   statusText.textContent = 'Complete';
 
@@ -449,6 +471,7 @@ async function endSession() {
   $('endedStats').innerHTML = `
     <div class="es-item"><span>${avg}%</span>Avg Risk</div>
     <div class="es-item"><span>${totalResponses}</span>Responses</div>
+    <div class="es-item"><span>${totalAudioChunks}</span>Audio Chunks</div>
     <div class="es-item"><span>${totalFlags}</span>Flags</div>`;
 
   try {
@@ -473,6 +496,7 @@ $('openReportsFolderBtn').addEventListener('click', () => {
 function resetState() {
   totalFlags = 0;
   totalResponses = 0;
+  totalAudioChunks = 0;
   scoreSum = 0;
   scoreCount = 0;
   latestScore = null;
@@ -486,6 +510,16 @@ function resetState() {
   statsScore.className = 'mm-val risk-low';
   statsFlags.textContent = '0';
   statsResponses.textContent = '0';
+  if (statsAudio) statsAudio.textContent = '0';
+  if (audioCount) audioCount.textContent = '0';
+  if (audioQueue) audioQueue.innerHTML = '<div class="empty-state">Waiting for candidate audio chunks</div>';
+  if (audioModelStatus) {
+    audioModelStatus.textContent = 'Local speech model will prepare on first audio chunk';
+    audioModelStatus.className = 'audio-model-status busy';
+  }
+  if (audioHealth) audioHealth.textContent = 'No signal yet';
+  if (audioLevelFill) audioLevelFill.style.width = '0%';
+  if (audioLevelValue) audioLevelValue.textContent = '0%';
   scoreTrendEl.textContent = '—';
   scoreTrendEl.className = 'mm-val mm-trend';
   scoreValue.textContent = '—';
