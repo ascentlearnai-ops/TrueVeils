@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, 
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 let runtimeConfig = {};
@@ -62,7 +63,10 @@ function getSupabase() {
   if (!url || !key) return null;
   supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    realtime: { params: { eventsPerSecond: 10 } }
+    realtime: {
+      transport: WebSocket,
+      params: { eventsPerSecond: 10 }
+    }
   });
   return supabase;
 }
