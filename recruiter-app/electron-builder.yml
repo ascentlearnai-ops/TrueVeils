@@ -2,6 +2,12 @@ appId: com.truveil.recruiter
 productName: Truveil
 directories:
   output: dist
+files:
+  - main.js
+  - preload.js
+  - package.json
+  - src/config/runtime-config.json
+  - src/**/*
 mac:
   category: public.app-category.business
   target:

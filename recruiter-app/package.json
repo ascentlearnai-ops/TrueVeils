@@ -5,10 +5,14 @@
   "main": "main.js",
   "author": "Truveil Inc.",
   "scripts": {
+    "prestart": "node scripts/write-runtime-config.js",
     "start": "electron .",
     "dev": "electron . --dev",
+    "prebuild:mac": "node scripts/write-runtime-config.js --production",
     "build:mac": "electron-builder --mac",
+    "prebuild:win": "node scripts/write-runtime-config.js --production",
     "build:win": "electron-builder --win",
+    "prebuild:all": "node scripts/write-runtime-config.js --production",
     "build:all": "electron-builder --mac --win"
   },
   "dependencies": {

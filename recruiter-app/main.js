@@ -4,6 +4,11 @@ const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+let runtimeConfig = {};
+try {
+  runtimeConfig = require('./src/config/runtime-config.json');
+} catch {}
+
 const SessionManager = require('./src/session/manager');
 const AIDetector = require('./src/ai/detector');
 const ReportGenerator = require('./src/report/generator');
@@ -51,8 +56,8 @@ function normalizePolicy(policy = {}) {
 
 function getSupabase() {
   if (supabase) return supabase;
-  const url = process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY;
+  const url = runtimeConfig.supabaseUrl || process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL;
+  const key = runtimeConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY;
   if (url?.includes('dummy.supabase.co') || key === 'dummy') return null;
   if (!url || !key) return null;
   supabase = createClient(url, key, {
