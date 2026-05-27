@@ -327,7 +327,14 @@ function handleCandidateAudioLevel(payload = {}) {
 }
 
 async function handleCandidateAudioChunk(payload = {}) {
-  if (!sessionData || !payload.chunkId || !payload.storagePath) return;
+  if (!sessionData || !payload.chunkId || !payload.storagePath) {
+    sendToRenderer('realtime:audio-status', {
+      state: 'error',
+      message: 'Received an incomplete fallback audio signal.',
+      timestamp: Date.now()
+    });
+    return;
+  }
   if (!Array.isArray(sessionData.audioChunks)) sessionData.audioChunks = [];
 
   const existing = sessionData.audioChunks.find(chunk => chunk.chunkId === payload.chunkId);
@@ -337,7 +344,15 @@ async function handleCandidateAudioChunk(payload = {}) {
   }
 
   const client = getSupabase();
-  if (!client) return;
+  if (!client) {
+    sendToRenderer('realtime:audio-status', {
+      state: 'error',
+      message: 'Supabase storage is not configured, so fallback audio cannot be transcribed.',
+      chunkId: payload.chunkId,
+      timestamp: Date.now()
+    });
+    return;
+  }
 
   const sessionId = payload.sessionId || activeSession?.sessionId || sessionData.session.sessionId;
   const sessionDir = path.join(app.getPath('userData'), 'sessions', safeFilePart(sessionId), 'audio');
@@ -366,6 +381,12 @@ async function handleCandidateAudioChunk(payload = {}) {
 
   sessionData.audioChunks.push(entry);
   sendToRenderer('realtime:status', { text: 'Audio chunk received' });
+  sendToRenderer('realtime:audio-status', {
+    state: 'received',
+    message: `Fallback audio chunk ${entry.sequence + 1} received`,
+    chunkId: entry.chunkId,
+    timestamp: Date.now()
+  });
   await broadcastAudioChunkStatus(entry);
 
   try {
@@ -412,7 +433,7 @@ async function processAudioTranscription(entry) {
   try {
     sendToRenderer('realtime:audio-status', {
       state: 'transcribing',
-      message: `Transcribing chunk ${entry.sequence}`,
+      message: `Transcribing fallback chunk ${entry.sequence + 1}`,
       chunkId: entry.chunkId,
       timestamp: Date.now()
     });
