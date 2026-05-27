@@ -43,14 +43,19 @@
   <!-- ——— Hero ——— -->
   <header class="hero">
     <div class="hero-content">
-      <div class="trust-badge fade-up d1"><span class="dot"></span> USED BY 500+ RECRUITING TEAMS</div>
-      <h1 class="fade-up d2">Catch interview fraud<br><span class="gradient-text">before it costs you $50K</span></h1>
-      <p class="sub fade-up d3">Live candidate transcript streaming, AI-assistance risk scoring, and blocked-site monitoring — all in one Electron command center for your hiring team, without storing raw audio.</p>
+      <div class="trust-badge fade-up d1"><span class="dot"></span> TRANSCRIPT-FIRST COMMAND CENTER</div>
+      <h1 class="fade-up d2">Run verified interviews<br><span class="gradient-text">without storing raw audio.</span></h1>
+      <p class="sub fade-up d3">Create a session code, choose blocked AI sites, and watch transcript, focus, and policy-risk signals arrive in one premium desktop dashboard.</p>
       <div class="hero-ctas fade-up d4">
         <a href="#" class="btn btn-primary lg" onclick="openDownloadModal(event)">Download for Windows</a>
-        <a href="#" class="btn btn-ghost lg">Download for Mac</a>
+        <a href="#how-it-works" class="btn btn-ghost lg">See workflow</a>
       </div>
       <div class="hero-note fade-up d5">No credit card needed · Works with Zoom, Meet & Teams · No raw audio storage</div>
+      <div class="hero-ledger fade-up d5">
+        <div><span>TRV-482910</span><strong>Shareable code</strong></div>
+        <div><span>Warn + refocus</span><strong>Blocked-site policy</strong></div>
+        <div><span>Likely human</span><strong>Explainable risk labels</strong></div>
+      </div>
     </div>
 
     <!-- Floating Dashboard Mockup -->
@@ -93,7 +98,7 @@
           </div>
         </div>
         <div class="mock-footer">
-          <span><span class="rec-dot"></span> RECORDING</span>
+          <span><span class="rec-dot"></span> LIVE TRANSCRIPT</span>
           <span>SESSION TRV-482910</span>
         </div>
       </div>
@@ -102,10 +107,10 @@
 
   <!-- ——— Logos ——— -->
   <div class="ticker-wrap">
-    <div class="ticker-label">Trusted by recruiting teams at</div>
+    <div class="ticker-label">Built for modern recruiting workflows</div>
     <div class="ticker">
-      <span>Google</span><span>Meta</span><span>Amazon</span><span>Microsoft</span><span>Apple</span><span>Netflix</span><span>Stripe</span><span>Coinbase</span><span>Uber</span><span>Airbnb</span>
-      <span>Google</span><span>Meta</span><span>Amazon</span><span>Microsoft</span><span>Apple</span><span>Netflix</span><span>Stripe</span><span>Coinbase</span><span>Uber</span><span>Airbnb</span>
+      <span>Remote loops</span><span>Technical screens</span><span>Agency hiring</span><span>Panel interviews</span><span>Contract roles</span><span>High-signal reports</span>
+      <span>Remote loops</span><span>Technical screens</span><span>Agency hiring</span><span>Panel interviews</span><span>Contract roles</span><span>High-signal reports</span>
     </div>
   </div>
 
@@ -183,24 +188,19 @@
       <!-- Feature 4 -->
       <div class="feature-row reverse reveal">
         <div class="feature-text">
-          <div class="card-label">04 — GAZE & PRESENCE TRACKING</div>
-          <h3>Reading off a second screen? We see it.</h3>
-          <p>MediaPipe runs at 10fps in the candidate's Electron app. Tracks gaze direction, head pose, and sustained off-center attention. All data flows to the recruiter's live dashboard.</p>
+          <div class="card-label">04 — POLICY + REFOCUS</div>
+          <h3>Blocked AI sites trigger an immediate warning.</h3>
+          <p>Set the allowed interview tools before the session starts. If the candidate opens a blocked AI site or disallowed window, Truveil warns them, refocuses the secure app, and flags the event for your report.</p>
         </div>
         <div class="feature-visual">
           <div class="mini-app large">
-            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span><span class="mini-title">Gaze Tracker</span></div>
-            <div class="mini-body gaze-mock">
-              <div class="gaze-grid">
-                <div class="gaze-zone left">LEFT<br><span>12 events</span></div>
-                <div class="gaze-zone center active">CENTER<br><span>Active</span></div>
-                <div class="gaze-zone right">RIGHT<br><span>3 events</span></div>
-              </div>
-              <div class="gaze-stats">
-                <div class="gs"><span class="gs-label">Head Yaw</span><span class="gs-val">-4.2&deg;</span></div>
-                <div class="gs"><span class="gs-label">Gaze X</span><span class="gs-val">0.08</span></div>
-                <div class="gs"><span class="gs-label">Attention</span><span class="gs-val good">Focused</span></div>
-              </div>
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span><span class="mini-title">Session Policy</span></div>
+            <div class="mini-body policy-mock">
+              <div class="policy-pill good">Allowed: Zoom, Meet, Teams</div>
+              <div class="policy-pill good">Allowed: meet.google.com</div>
+              <div class="policy-pill danger">Blocked: chatgpt.com</div>
+              <div class="policy-pill danger">Blocked: claude.ai</div>
+              <div class="policy-action">Candidate warning sent · Admin flag created</div>
             </div>
           </div>
         </div>
@@ -223,7 +223,7 @@
     <div class="section-header">
       <div class="section-badge reveal"><span class="dot"></span> HOW IT WORKS</div>
       <h2 class="section-title reveal">Three steps. Under three minutes.</h2>
-      <p class="section-sub reveal">No browser extensions. No Zoom plugins. Just two Electron apps connected via WebSocket.</p>
+      <p class="section-sub reveal">No browser extensions. No Zoom plugins. Two Electron apps connected through Supabase Realtime.</p>
     </div>
 
     <div class="steps-timeline">
@@ -249,7 +249,7 @@
         <div class="step-number">02</div>
         <div class="step-content">
           <h3>Candidate installs Truveil Secure</h3>
-          <p>Email the download link and session code. Candidate opens the app, enters the code, grants mic + camera. Done.</p>
+          <p>Email the download link and session code. Candidate opens the app, enters the code, consents to mic transcription and focus monitoring. Done.</p>
         </div>
         <div class="step-visual">
           <div class="mini-app light">
@@ -262,7 +262,7 @@
               <div style="font-size:10px;color:rgba(255,255,255,.3)">Connected · Monitoring</div>
               <div style="margin-top:8px;display:flex;gap:4px;justify-content:center">
                 <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(34,197,94,.1);color:rgba(34,197,94,.7)">MIC ON</span>
-                <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(59,130,246,.1);color:rgba(59,130,246,.7)">CAM ON</span>
+                <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(59,130,246,.1);color:rgba(59,130,246,.7)">TEXT LIVE</span>
                 <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.3)">SECURE</span>
               </div>
             </div>
