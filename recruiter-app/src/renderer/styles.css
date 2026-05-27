@@ -732,6 +732,39 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 10.5px;
   line-height: 1.4;
 }
+.setup-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 22px;
+  text-align: left;
+}
+.setup-flow div {
+  padding: 13px 12px;
+  min-height: 92px;
+  border: 1px solid rgba(96,165,250,.14);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(96,165,250,.07), rgba(255,255,255,.018));
+}
+.setup-flow span {
+  display: block;
+  margin-bottom: 9px;
+  color: #93c5fd;
+  font: 800 10px/1 var(--font-mono);
+  letter-spacing: 1px;
+}
+.setup-flow strong {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.setup-flow small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
 .session-arm-badge {
   color: #bfdbfe;
   background: rgba(96,165,250,.08);
@@ -933,5 +966,6 @@ button { font-family: inherit; cursor: pointer; }
   .idle-card { padding: 36px 24px; }
   .idle-card h1, .idle-card h2 { font-size: 26px; }
   .policy-grid { grid-template-columns: 1fr; }
+  .setup-flow { grid-template-columns: 1fr; }
   .blocked-site-grid { grid-template-columns: repeat(2, 1fr); }
 }

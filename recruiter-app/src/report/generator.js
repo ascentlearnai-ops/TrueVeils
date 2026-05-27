@@ -192,7 +192,7 @@ function buildHtml(ctx) {
       <div class="stat"><div class="stat-label">Average Score</div><div class="stat-val">${avg}%</div></div>
       <div class="stat"><div class="stat-label">Peak Score</div><div class="stat-val">${max}%</div></div>
       <div class="stat"><div class="stat-label">Responses</div><div class="stat-val">${totalResponses}</div></div>
-      <div class="stat"><div class="stat-label">Audio Chunks</div><div class="stat-val">${audioChunks.length}</div></div>
+      <div class="stat"><div class="stat-label">Text Signals</div><div class="stat-val">${totalResponses}</div></div>
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>
     </div>
 

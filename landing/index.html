@@ -45,12 +45,12 @@
     <div class="hero-content">
       <div class="trust-badge fade-up d1"><span class="dot"></span> USED BY 500+ RECRUITING TEAMS</div>
       <h1 class="fade-up d2">Catch interview fraud<br><span class="gradient-text">before it costs you $50K</span></h1>
-      <p class="sub fade-up d3">Real candidate mic audio, local transcription, audio replay, AI-assistance risk scoring, and blocked-site monitoring — all in one Electron command center for your hiring team.</p>
+      <p class="sub fade-up d3">Live candidate transcript streaming, AI-assistance risk scoring, and blocked-site monitoring — all in one Electron command center for your hiring team, without storing raw audio.</p>
       <div class="hero-ctas fade-up d4">
         <a href="#" class="btn btn-primary lg" onclick="openDownloadModal(event)">Download for Windows</a>
         <a href="#" class="btn btn-ghost lg">Download for Mac</a>
       </div>
-      <div class="hero-note fade-up d5">No credit card needed · Works with Zoom, Meet & Teams · Session audio auto-cleans</div>
+      <div class="hero-note fade-up d5">No credit card needed · Works with Zoom, Meet & Teams · No raw audio storage</div>
     </div>
 
     <!-- Floating Dashboard Mockup -->
@@ -67,7 +67,7 @@
           <div class="mm"><div class="mm-label">OVERALL RISK</div><div class="mm-val risk-high" id="mockRisk">71%</div></div>
           <div class="mm"><div class="mm-label">FLAGS</div><div class="mm-val">5</div></div>
           <div class="mm"><div class="mm-label">RESPONSES</div><div class="mm-val">8</div></div>
-          <div class="mm"><div class="mm-label">AUDIO</div><div class="mm-val">24</div></div>
+          <div class="mm"><div class="mm-label">TEXT</div><div class="mm-val">24</div></div>
         </div>
         <!-- Two-column body -->
         <div class="mock-body">
@@ -121,9 +121,9 @@
       <!-- Feature 1 -->
       <div class="feature-row reveal">
         <div class="feature-text">
-          <div class="card-label">01 — AUDIO-FIRST RISK ANALYSIS</div>
-          <h3>Real mic audio, local transcription, live risk signals</h3>
-          <p>The candidate app uploads short encrypted mic chunks. Your Command Center downloads them, transcribes locally with Whisper, replays audio, scores AI-assistance risk without a paid API key, and cleans remote audio after the session window.</p>
+          <div class="card-label">01 — TRANSCRIPT-FIRST RISK ANALYSIS</div>
+          <h3>Live transcript, local scoring, no stored audio</h3>
+          <p>The candidate app turns spoken answers into live transcript text after consent. Your Command Center scores AI-assistance risk locally, shows why each response was flagged, and keeps raw audio off storage.</p>
         </div>
         <div class="feature-visual">
           <div class="mini-app large">
@@ -349,7 +349,7 @@
       <div class="p-card reveal">
         <div class="p-name">Free</div><div class="p-price">$0<span>/mo</span></div>
         <div class="p-desc">Try it before you buy</div>
-        <ul class="p-list"><li>1 interview session</li><li>Audio replay + local transcript</li><li>Digital session report</li><li>No credit card required</li></ul>
+        <ul class="p-list"><li>1 interview session</li><li>Live transcript + risk score</li><li>Digital session report</li><li>No credit card required</li></ul>
         <button class="btn btn-ghost p-btn">Start Free</button>
       </div>
       <div class="p-card pop reveal">
@@ -375,8 +375,8 @@
       <h2 class="section-title reveal">Frequently asked questions</h2>
     </div>
     <div class="faq-list">
-      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How does Truveil detect AI-assisted answers?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil uses real mic audio from the candidate app, local Whisper transcription in the recruiter app, and local heuristics for filler density, hesitation, answer uniformity, cadence, and generic structure. Scores are advisory risk signals, not guarantees.</p></div></div></div>
-      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long is candidate audio retained?<span class="arr">+</span></button><div class="faq-a"><div><p>Remote audio chunks are session-scoped and cleaned automatically after the interview cleanup window. The recruiter app keeps the active-session replay copy locally only for the report workflow.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How does Truveil detect AI-assisted answers?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil uses live transcript text from the candidate app and local heuristics for filler density, self-correction, answer uniformity, concrete detail, repeated phrasing, and generic structure. Scores are advisory risk signals, not guarantees.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long is candidate audio retained?<span class="arr">+</span></button><div class="faq-a"><div><p>Raw candidate audio is not uploaded or stored in the transcript-first flow. The recruiter report keeps transcript text, risk scores, policy events, and flags.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does the candidate know they're being monitored?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Candidates install Truveil Secure and explicitly consent to monitoring. On every flag, a warning overlay appears on their screen. Truveil is about transparency and deterrence.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What interview platforms does it work with?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil works alongside Zoom, Google Meet, Microsoft Teams, and any video call platform. It runs as a separate app — no plugins or extensions needed.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try it for free?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Your first interview session is completely free — no credit card required. Download the app, create a session, and see it in action.</p></div></div></div>

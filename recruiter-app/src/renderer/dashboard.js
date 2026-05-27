@@ -19,7 +19,7 @@ let sessionStartTime = null;
 let timerInterval = null;
 let totalFlags = 0;
 let totalResponses = 0;
-let totalAudioChunks = 0;
+let totalTranscriptSignals = 0;
 let scoreSum = 0;
 let scoreCount = 0;
 let latestScore = null;
@@ -219,7 +219,7 @@ async function commitFinalTranscript(text) {
 }
 
 function renderAnalysis(entryEl, result) {
-  const { aiScore, reasoning, flags, error } = result;
+  const { aiScore, reasoning, flags, error, displayLabel } = result;
   const scoreEl = entryEl.querySelector('.entry-score');
   const reasoningEl = entryEl.querySelector('.entry-reasoning');
 
@@ -232,7 +232,7 @@ function renderAnalysis(entryEl, result) {
   }
 
   const cls = aiScore >= 70 ? 'high' : aiScore >= 40 ? 'medium' : 'low';
-  scoreEl.textContent = `${aiScore}%`;
+  scoreEl.textContent = displayLabel ? `${displayLabel} · ${aiScore}%` : `${aiScore}%`;
   scoreEl.className = `entry-score ${cls}`;
 
   if (reasoning) {
@@ -245,7 +245,7 @@ function renderAnalysis(entryEl, result) {
   scoreCount++;
   const avg = Math.round(scoreSum / scoreCount);
   latestScore = aiScore;
-  updateScoreRing(avg, latestScore, reasoning);
+  updateScoreRing(avg, latestScore, reasoning, displayLabel);
 
   // Add flags
   if (flags && flags.length) {
@@ -253,7 +253,7 @@ function renderAnalysis(entryEl, result) {
   }
 }
 
-function updateScoreRing(avgScore, latest, reasoning) {
+function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
   const circumference = 175.9;
   const offset = circumference - (latest / 100) * circumference;
   scoreRing.style.strokeDashoffset = offset;
@@ -263,15 +263,15 @@ function updateScoreRing(avgScore, latest, reasoning) {
   let color, label;
   if (latest >= 70) {
     color = '#ef4444';
-    label = 'High Risk';
+    label = displayLabel || 'High AI Risk';
     scoreSection.classList.add('high-risk');
   } else if (latest >= 40) {
     color = '#f59e0b';
-    label = 'Elevated Risk';
+    label = displayLabel || 'Elevated AI Risk';
     scoreSection.classList.add('medium-risk');
   } else {
     color = '#22c55e';
-    label = 'Low Risk';
+    label = displayLabel || 'Likely Human';
   }
   scoreRing.setAttribute('stroke', color);
   scoreValue.textContent = `${latest}%`;
@@ -310,9 +310,9 @@ function renderAudioChunk(chunk = {}) {
   }
 
   if (isNew) {
-    totalAudioChunks++;
-    if (audioCount) audioCount.textContent = totalAudioChunks;
-    if (statsAudio) statsAudio.textContent = totalAudioChunks;
+    totalTranscriptSignals++;
+    if (audioCount) audioCount.textContent = totalTranscriptSignals;
+    if (statsAudio) statsAudio.textContent = totalTranscriptSignals;
   }
 
   const status = audioStatusLabel(chunk.status);
@@ -320,12 +320,9 @@ function renderAudioChunk(chunk = {}) {
   const duration = chunk.durationMs ? `${Math.round(chunk.durationMs / 1000)}s` : 'live';
   el.className = `audio-item ${cls}`;
   el.innerHTML = `
-    <button class="audio-play" data-play-audio="${esc(chunk.chunkId)}" title="Replay audio chunk">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-    </button>
     <div class="audio-item-main">
       <div class="audio-item-top">
-        <strong>Chunk ${Number(chunk.sequence || 0) + 1}</strong>
+        <strong>Transcript signal ${Number(chunk.sequence || 0) + 1}</strong>
         <span class="audio-chip ${cls}">${esc(status)}</span>
       </div>
       <div class="audio-item-meta">${fmtTime(chunk.timestamp || Date.now())} - ${duration}</div>
@@ -402,8 +399,11 @@ function renderRealtimeTranscript(result) {
   }
 
   totalResponses++;
+  totalTranscriptSignals++;
   transcriptCount.textContent = totalResponses;
   statsResponses.textContent = totalResponses;
+  if (audioCount) audioCount.textContent = totalTranscriptSignals;
+  if (statsAudio) statsAudio.textContent = totalTranscriptSignals;
 
   const timestamp = result.timestamp || Date.now();
   const entryEl = document.createElement('div');
@@ -422,7 +422,7 @@ function renderRealtimeTranscript(result) {
 
 window.truveil.onRealtimeTranscript((entry) => {
   statusDot.className = 'status-dot recording';
-  statusText.textContent = 'Recording';
+  statusText.textContent = 'Transcript live';
   renderRealtimeTranscript(entry);
 });
 
@@ -436,7 +436,7 @@ window.truveil.onRealtimeStatus((status) => {
 
 window.truveil.onRealtimeAudioChunk((chunk) => {
   statusDot.className = 'status-dot recording';
-  statusText.textContent = chunk?.status === 'transcribing' ? 'Transcribing audio' : 'Audio streaming';
+  statusText.textContent = chunk?.status === 'transcribing' ? 'Processing transcript' : 'Transcript signal';
   renderAudioChunk(chunk);
 });
 
@@ -471,7 +471,7 @@ async function endSession() {
   $('endedStats').innerHTML = `
     <div class="es-item"><span>${avg}%</span>Avg Risk</div>
     <div class="es-item"><span>${totalResponses}</span>Responses</div>
-    <div class="es-item"><span>${totalAudioChunks}</span>Audio Chunks</div>
+    <div class="es-item"><span>${totalTranscriptSignals}</span>Text Signals</div>
     <div class="es-item"><span>${totalFlags}</span>Flags</div>`;
 
   try {
@@ -496,7 +496,7 @@ $('openReportsFolderBtn').addEventListener('click', () => {
 function resetState() {
   totalFlags = 0;
   totalResponses = 0;
-  totalAudioChunks = 0;
+  totalTranscriptSignals = 0;
   scoreSum = 0;
   scoreCount = 0;
   latestScore = null;
@@ -512,10 +512,10 @@ function resetState() {
   statsResponses.textContent = '0';
   if (statsAudio) statsAudio.textContent = '0';
   if (audioCount) audioCount.textContent = '0';
-  if (audioQueue) audioQueue.innerHTML = '<div class="empty-state">Waiting for candidate audio chunks</div>';
+  if (audioQueue) audioQueue.innerHTML = '<div class="empty-state">Waiting for live transcript signals</div>';
   if (audioModelStatus) {
-    audioModelStatus.textContent = 'Local speech model will prepare on first audio chunk';
-    audioModelStatus.className = 'audio-model-status busy';
+    audioModelStatus.textContent = 'Transcript-only mode: raw audio is not stored';
+    audioModelStatus.className = 'audio-model-status ready';
   }
   if (audioHealth) audioHealth.textContent = 'No signal yet';
   if (audioLevelFill) audioLevelFill.style.width = '0%';

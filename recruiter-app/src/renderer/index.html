@@ -47,7 +47,7 @@
       </div>
       <div class="trust-badge"><span class="dot"></span>READY · LIVE TRANSCRIPTION + AI ANALYSIS</div>
       <h1>Catch interview fraud<br><span class="gradient-text">in real time.</span></h1>
-      <p class="idle-sub">Start a session, capture the interview audio, and Truveil will score every response, flag AI patterns, and deliver a full report when you're done.</p>
+      <p class="idle-sub">Start a session, receive live transcript text from the candidate app, and Truveil will score each response for AI-assistance risk without storing raw audio.</p>
       <button class="btn btn-primary lg" id="newSessionBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
         New Interview Session
@@ -59,9 +59,9 @@
         <div class="if"><span class="if-dot"></span> Instant HTML Report</div>
       </div>
       <div class="ops-strip">
-        <div><span>LOCAL STT</span><strong>Whisper</strong></div>
+        <div><span>MODE</span><strong>Transcript</strong></div>
         <div><span>RELAY</span><strong>Supabase</strong></div>
-        <div><span>RETENTION</span><strong>Auto-clean</strong></div>
+        <div><span>RETENTION</span><strong>No audio files</strong></div>
       </div>
     </div>
   </div>
@@ -81,7 +81,13 @@
       <div class="session-code-card">
         <label>SESSION ID</label>
         <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
-        <p>Candidate enters this code in Truveil Secure. Audio starts only after their consent.</p>
+        <p>Candidate enters this code in Truveil Secure. Transcript streaming starts only after their consent.</p>
+      </div>
+
+      <div class="setup-flow">
+        <div><span>01</span><strong>Share code</strong><small>Send the TRV code to the candidate.</small></div>
+        <div><span>02</span><strong>Set policy</strong><small>Check which AI sites should trigger warn + refocus.</small></div>
+        <div><span>03</span><strong>Arm session</strong><small>Wait here while transcript and risk signals arrive.</small></div>
       </div>
 
       <div class="form">
@@ -94,10 +100,10 @@
           <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
         </div>
         <div class="field">
-          <label>Audio relay</label>
+          <label>Transcript relay</label>
           <div class="relay-note">
             <span class="relay-dot"></span>
-            Candidate mic audio streams from Truveil Secure in 6-8 second encrypted chunks. The Command Center downloads each chunk, transcribes locally, and gives you replay controls.
+            Candidate speech is converted to transcript text inside Truveil Secure and streamed here over Supabase Realtime. Raw audio is not uploaded or stored.
           </div>
         </div>
         <div class="policy-grid">
@@ -153,7 +159,7 @@ teams.microsoft.com</textarea>
         <div class="gb-left">
           <span class="gb-logo-dot"></span>
           <span class="glass-title" id="glassTitle">Truveil Command Center</span>
-          <span class="session-arm-badge">Audio-first verification</span>
+          <span class="session-arm-badge">Transcript-first verification</span>
         </div>
         <div class="gb-right">
           <span class="gb-live"><span class="gb-live-dot"></span>LIVE</span>
@@ -175,7 +181,7 @@ teams.microsoft.com</textarea>
           <div class="mm-val" id="statsResponses">0</div>
         </div>
         <div class="mm">
-          <div class="mm-label">AUDIO</div>
+          <div class="mm-label">TEXT</div>
           <div class="mm-val" id="statsAudio">0</div>
         </div>
         <div class="mm">
@@ -226,14 +232,14 @@ teams.microsoft.com</textarea>
             <div class="panel-header">
               <div class="panel-label">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12h3l3-7 4 14 4-10 3 3h3"/></svg>
-                LIVE AUDIO
+                LIVE MIC + TRANSCRIPT
               </div>
               <span class="panel-count" id="audioCount">0</span>
             </div>
             <div class="audio-live-strip">
               <div>
                 <strong id="audioHealth">No signal yet</strong>
-                <span id="audioModelStatus" class="audio-model-status busy">Local speech model will prepare on first audio chunk</span>
+                <span id="audioModelStatus" class="audio-model-status ready">Transcript-only mode: raw audio is not stored</span>
               </div>
               <div class="audio-level-shell">
                 <i id="audioLevelFill"></i>
@@ -241,7 +247,7 @@ teams.microsoft.com</textarea>
               <span class="audio-level-value" id="audioLevelValue">0%</span>
             </div>
             <div class="audio-queue" id="audioQueue">
-              <div class="empty-state">Waiting for candidate audio chunks</div>
+              <div class="empty-state">Waiting for live transcript signals</div>
             </div>
           </div>
           <div class="panel panel-flags">
@@ -262,7 +268,7 @@ teams.microsoft.com</textarea>
       <div class="glass-footer">
         <div class="gf-left">
           <span class="rec-dot"></span>
-          <span class="rec-label">RECORDING</span>
+          <span class="rec-label">LIVE TRANSCRIPT</span>
           <span class="gf-divider"></span>
           <span class="mono" id="sessionId">SESSION: —</span>
         </div>

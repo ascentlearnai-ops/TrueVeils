@@ -204,9 +204,6 @@ async function joinRealtimeSession(sessionId) {
     .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
       analyzeCandidateTranscript(payload);
     })
-    .on('broadcast', { event: 'candidate_audio_chunk' }, ({ payload }) => {
-      handleCandidateAudioChunk(payload);
-    })
     .on('broadcast', { event: 'candidate_audio_level' }, ({ payload }) => {
       handleCandidateAudioLevel(payload);
     })
@@ -247,10 +244,14 @@ async function analyzeCandidateTranscript(payload = {}) {
     text,
     timestamp,
     aiScore: analysis.score,
+    label: analysis.label,
+    displayLabel: analysis.displayLabel,
     confidence: analysis.confidence,
     flags: analysis.flags || [],
     reasoning: analysis.reasoning,
-    source: payload.source || 'local'
+    aiSignals: analysis.aiSignals || [],
+    humanSignals: analysis.humanSignals || [],
+    source: payload.source || 'candidate-transcript'
   };
 
   sessionData.transcripts.push(entry);
