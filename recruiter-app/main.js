@@ -204,6 +204,9 @@ async function joinRealtimeSession(sessionId) {
     .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
       analyzeCandidateTranscript(payload);
     })
+    .on('broadcast', { event: 'candidate_audio_chunk' }, ({ payload }) => {
+      handleCandidateAudioChunk(payload);
+    })
     .on('broadcast', { event: 'candidate_audio_level' }, ({ payload }) => {
       handleCandidateAudioLevel(payload);
     })

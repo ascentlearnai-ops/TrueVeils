@@ -44,13 +44,13 @@
   <header class="hero">
     <div class="hero-content">
       <div class="trust-badge fade-up d1"><span class="dot"></span> TRANSCRIPT-FIRST COMMAND CENTER</div>
-      <h1 class="fade-up d2">Run verified interviews<br><span class="gradient-text">without storing raw audio.</span></h1>
-      <p class="sub fade-up d3">Create a session code, choose blocked AI sites, and watch transcript, focus, and policy-risk signals arrive in one premium desktop dashboard.</p>
+      <h1 class="fade-up d2">Run verified interviews<br><span class="gradient-text">with transcript-first monitoring.</span></h1>
+      <p class="sub fade-up d3">Create a session code, choose blocked AI sites, and watch transcript, focus, fallback audio transcription, and policy-risk signals arrive in one premium desktop dashboard.</p>
       <div class="hero-ctas fade-up d4">
         <a href="#" class="btn btn-primary lg" onclick="openDownloadModal(event)">Download for Windows</a>
         <a href="#how-it-works" class="btn btn-ghost lg">See workflow</a>
       </div>
-      <div class="hero-note fade-up d5">No credit card needed · Works with Zoom, Meet & Teams · No raw audio storage</div>
+      <div class="hero-note fade-up d5">No credit card needed · Works with Zoom, Meet & Teams · Admin-side audio fallback</div>
       <div class="hero-ledger fade-up d5">
         <div><span>TRV-482910</span><strong>Shareable code</strong></div>
         <div><span>Warn + refocus</span><strong>Blocked-site policy</strong></div>
@@ -127,8 +127,8 @@
       <div class="feature-row reveal">
         <div class="feature-text">
           <div class="card-label">01 — TRANSCRIPT-FIRST RISK ANALYSIS</div>
-          <h3>Live transcript, local scoring, no stored audio</h3>
-          <p>The candidate app turns spoken answers into live transcript text after consent. Your Command Center scores AI-assistance risk locally, shows why each response was flagged, and keeps raw audio off storage.</p>
+          <h3>Live transcript, local scoring, audio fallback</h3>
+          <p>The candidate app turns spoken answers into live transcript text after consent. If Electron speech recognition fails, Truveil relays short audio chunks so your Command Center can transcribe locally and keep the interview moving.</p>
         </div>
         <div class="feature-visual">
           <div class="mini-app large">
@@ -376,7 +376,7 @@
     </div>
     <div class="faq-list">
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How does Truveil detect AI-assisted answers?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil uses live transcript text from the candidate app and local heuristics for filler density, self-correction, answer uniformity, concrete detail, repeated phrasing, and generic structure. Scores are advisory risk signals, not guarantees.</p></div></div></div>
-      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long is candidate audio retained?<span class="arr">+</span></button><div class="faq-a"><div><p>Raw candidate audio is not uploaded or stored in the transcript-first flow. The recruiter report keeps transcript text, risk scores, policy events, and flags.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long is fallback audio retained?<span class="arr">+</span></button><div class="faq-a"><div><p>The required path is transcript-first. If fallback audio is needed, short session-scoped chunks are used for local admin transcription and cleaned up when the session ends.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does the candidate know they're being monitored?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Candidates install Truveil Secure and explicitly consent to monitoring. On every flag, a warning overlay appears on their screen. Truveil is about transparency and deterrence.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What interview platforms does it work with?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil works alongside Zoom, Google Meet, Microsoft Teams, and any video call platform. It runs as a separate app — no plugins or extensions needed.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try it for free?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Your first interview session is completely free — no credit card required. Download the app, create a session, and see it in action.</p></div></div></div>

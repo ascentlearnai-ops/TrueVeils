@@ -512,9 +512,9 @@ function resetState() {
   statsResponses.textContent = '0';
   if (statsAudio) statsAudio.textContent = '0';
   if (audioCount) audioCount.textContent = '0';
-  if (audioQueue) audioQueue.innerHTML = '<div class="empty-state">Waiting for live transcript signals</div>';
+  if (audioQueue) audioQueue.innerHTML = '<div class="empty-state">Waiting for live transcript or audio fallback signals</div>';
   if (audioModelStatus) {
-    audioModelStatus.textContent = 'Transcript-only mode: raw audio is not stored';
+    audioModelStatus.textContent = 'Ready for live text or audio fallback transcription';
     audioModelStatus.className = 'audio-model-status ready';
   }
   if (audioHealth) audioHealth.textContent = 'No signal yet';

@@ -47,7 +47,7 @@
       </div>
       <div class="trust-badge"><span class="dot"></span>READY · LIVE TRANSCRIPTION + AI ANALYSIS</div>
       <h1>Catch interview fraud<br><span class="gradient-text">in real time.</span></h1>
-      <p class="idle-sub">Start a session, receive live transcript text from the candidate app, and Truveil will score each response for AI-assistance risk without storing raw audio.</p>
+      <p class="idle-sub">Start a session, receive live transcript text from the candidate app, and fall back to admin-side audio transcription if Electron speech recognition fails.</p>
       <button class="btn btn-primary lg" id="newSessionBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
         New Interview Session
@@ -239,7 +239,7 @@ teams.microsoft.com</textarea>
             <div class="audio-live-strip">
               <div>
                 <strong id="audioHealth">No signal yet</strong>
-                <span id="audioModelStatus" class="audio-model-status ready">Transcript-only mode: raw audio is not stored</span>
+                <span id="audioModelStatus" class="audio-model-status ready">Ready for live text or audio fallback transcription</span>
               </div>
               <div class="audio-level-shell">
                 <i id="audioLevelFill"></i>
@@ -247,7 +247,7 @@ teams.microsoft.com</textarea>
               <span class="audio-level-value" id="audioLevelValue">0%</span>
             </div>
             <div class="audio-queue" id="audioQueue">
-              <div class="empty-state">Waiting for live transcript signals</div>
+              <div class="empty-state">Waiting for live transcript or audio fallback signals</div>
             </div>
           </div>
           <div class="panel panel-flags">
