@@ -8,6 +8,8 @@ const outputPath = path.join(__dirname, '..', 'src', 'config', 'runtime-config.j
 const config = {
   supabaseUrl: process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL || '',
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY || '',
+  deepgramApiKey: process.env.DEEPGRAM_API_KEY || process.env.TRUVEIL_DEEPGRAM_API_KEY || '',
+  groqApiKey: process.env.GROQ_API_KEY || process.env.TRUVEIL_GROQ_API_KEY || '',
   candidateAppUrl: process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app'
 };
 

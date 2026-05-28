@@ -15,6 +15,8 @@ const LocalRisk = require('./src/ai/local-risk');
 const ReportGenerator = require('./src/report/generator');
 const SettingsStore = require('./src/settings/store');
 const { LocalTranscriber } = require('./src/audio/local-transcriber');
+const { DeepgramTranscriber } = require('./src/audio/deepgram-transcriber');
+const { GroqTranscriber } = require('./src/audio/groq-transcriber');
 
 let mainWindow;
 let tray;
@@ -23,6 +25,8 @@ let sessionData = null; // in-memory log for report
 let supabase = null;
 let realtimeChannel = null;
 let localTranscriber = null;
+let deepgramTranscriber = null;
+let groqTranscriber = null;
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -103,6 +107,69 @@ function getLocalTranscriber() {
     onStatus: (status) => sendToRenderer('realtime:audio-status', status)
   });
   return localTranscriber;
+}
+
+function getGroqTranscriber() {
+  if (groqTranscriber) return groqTranscriber;
+  groqTranscriber = new GroqTranscriber({
+    apiKey: runtimeConfig.groqApiKey || process.env.GROQ_API_KEY || process.env.TRUVEIL_GROQ_API_KEY || '',
+    onStatus: (status) => sendToRenderer('realtime:audio-status', status)
+  });
+  return groqTranscriber;
+}
+
+function getDeepgramTranscriber() {
+  if (deepgramTranscriber) return deepgramTranscriber;
+  deepgramTranscriber = new DeepgramTranscriber({
+    apiKey: runtimeConfig.deepgramApiKey || process.env.DEEPGRAM_API_KEY || process.env.TRUVEIL_DEEPGRAM_API_KEY || '',
+    onStatus: (status) => sendToRenderer('realtime:audio-status', status)
+  });
+  return deepgramTranscriber;
+}
+
+async function transcribeAudioEntry(entry) {
+  let localError = null;
+  try {
+    const result = await getLocalTranscriber().transcribeQueued(entry.localPath, entry);
+    const text = String(result.text || '').trim();
+    if (text) return { text, source: 'local-whisper', result };
+    localError = new Error('Local speech engine did not detect clear speech in this audio chunk.');
+  } catch (err) {
+    localError = err;
+  }
+
+  const deepgram = getDeepgramTranscriber();
+  if (deepgram.isConfigured()) {
+    try {
+      sendToRenderer('realtime:audio-status', {
+        state: 'transcribing',
+        message: 'Local transcription failed; trying Deepgram fallback',
+        chunkId: entry.chunkId,
+        timestamp: Date.now()
+      });
+      const result = await deepgram.transcribe(entry.localPath, entry);
+      const text = String(result.text || '').trim();
+      if (text) return { text, source: 'deepgram-nova-3', result };
+      localError = new Error('Deepgram did not detect clear speech in this audio chunk.');
+    } catch (err) {
+      localError = err;
+    }
+  }
+
+  const groq = getGroqTranscriber();
+  if (!groq.isConfigured()) throw localError;
+
+  sendToRenderer('realtime:audio-status', {
+    state: 'transcribing',
+    message: 'Trying Groq fallback transcription',
+    chunkId: entry.chunkId,
+    timestamp: Date.now()
+  });
+
+  const result = await groq.transcribe(entry.localPath, entry);
+  const text = String(result.text || '').trim();
+  if (!text) throw localError;
+  return { text, source: 'groq-whisper', result };
 }
 
 function sessionChannelName(sessionId) {
@@ -438,8 +505,8 @@ async function processAudioTranscription(entry) {
       timestamp: Date.now()
     });
 
-    const result = await getLocalTranscriber().transcribeQueued(entry.localPath, entry);
-    const text = String(result.text || '').trim();
+    const transcription = await transcribeAudioEntry(entry);
+    const text = transcription.text;
     entry.status = text ? 'transcribed' : 'received';
     entry.transcript = text;
 
@@ -459,7 +526,7 @@ async function processAudioTranscription(entry) {
         confidence: analysis.confidence,
         flags: entry.flags,
         reasoning: entry.reasoning,
-        source: 'local-whisper',
+        source: transcription.source,
         chunkId: entry.chunkId
       };
 
