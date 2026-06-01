@@ -22,6 +22,7 @@ let totalResponses = 0;
 let totalTranscriptSignals = 0;
 let scoreSum = 0;
 let scoreCount = 0;
+let scoreWeightSum = 0;
 let latestScore = null;
 let hasFirstTranscript = false;
 let currentSession = null;
@@ -219,7 +220,7 @@ async function commitFinalTranscript(text) {
 }
 
 function renderAnalysis(entryEl, result) {
-  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], humanSignals = [], source } = result;
+  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], humanSignals = [], source, scorable, scoreWeight } = result;
   const scoreEl = entryEl.querySelector('.entry-score');
   const reasoningEl = entryEl.querySelector('.entry-reasoning');
 
@@ -243,12 +244,17 @@ function renderAnalysis(entryEl, result) {
     reasoningEl.classList.remove('hidden');
   }
 
-  // Update aggregate
-  scoreSum += aiScore;
-  scoreCount++;
-  const avg = Math.round(scoreSum / scoreCount);
-  latestScore = aiScore;
-  updateScoreRing(avg, latestScore, reasoning, displayLabel);
+  // Update aggregate. Inconclusive short fragments do not count as low-risk evidence.
+  const canScore = typeof aiScore === 'number' && scorable !== false;
+  if (canScore) {
+    const weight = typeof scoreWeight === 'number' && scoreWeight > 0 ? scoreWeight : 1;
+    scoreSum += aiScore * weight;
+    scoreWeightSum += weight;
+    scoreCount++;
+    latestScore = aiScore;
+  }
+  const avg = scoreWeightSum ? Math.round(scoreSum / scoreWeightSum) : 0;
+  updateScoreRing(avg, canScore ? latestScore : null, reasoning, displayLabel);
 
   // Add flags
   if (flags && flags.length) {
@@ -258,13 +264,17 @@ function renderAnalysis(entryEl, result) {
 
 function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
   const circumference = 175.9;
-  const offset = circumference - (latest / 100) * circumference;
+  const visibleScore = typeof latest === 'number' ? latest : avgScore;
+  const offset = circumference - (visibleScore / 100) * circumference;
   scoreRing.style.strokeDashoffset = offset;
 
   // Clear risk classes then reapply
   scoreSection.classList.remove('high-risk', 'medium-risk');
   let color, label;
-  if (latest >= 70) {
+  if (typeof latest !== 'number') {
+    color = '#64748b';
+    label = displayLabel || 'Inconclusive';
+  } else if (latest >= 70) {
     color = '#ef4444';
     label = displayLabel || 'High AI Risk';
     scoreSection.classList.add('high-risk');
@@ -274,18 +284,18 @@ function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
     scoreSection.classList.add('medium-risk');
   } else {
     color = '#22c55e';
-    label = displayLabel || 'Likely Human';
+    label = displayLabel || 'Low AI-assistance risk';
   }
   scoreRing.setAttribute('stroke', color);
-  scoreValue.textContent = `${latest}%`;
+  scoreValue.textContent = typeof latest === 'number' ? `${latest}%` : '—';
   scoreLabel.textContent = label;
   if (reasoning) scoreReasoning.textContent = reasoning;
 
   // Metrics
   statsScore.textContent = `${avgScore}%`;
   statsScore.className = 'mm-val ' + (avgScore >= 70 ? 'risk-high' : avgScore >= 40 ? 'risk-med' : 'risk-low');
-  scoreTrendEl.textContent = `${latest}%`;
-  scoreTrendEl.className = 'mm-val mm-trend ' + (latest >= 70 ? 'rising' : latest < 40 ? 'falling' : '');
+  scoreTrendEl.textContent = typeof latest === 'number' ? `${latest}%` : '—';
+  scoreTrendEl.className = 'mm-val mm-trend ' + (typeof latest === 'number' && latest >= 70 ? 'rising' : typeof latest === 'number' && latest < 40 ? 'falling' : '');
 }
 
 function audioStatusLabel(status) {
@@ -480,7 +490,7 @@ async function endSession() {
   statusDot.className = 'status-dot';
   statusText.textContent = 'Complete';
 
-  const avg = scoreCount ? Math.round(scoreSum / scoreCount) : 0;
+  const avg = scoreWeightSum ? Math.round(scoreSum / scoreWeightSum) : 0;
   $('endedStats').innerHTML = `
     <div class="es-item"><span>${avg}%</span>Avg Risk</div>
     <div class="es-item"><span>${totalResponses}</span>Responses</div>
@@ -512,6 +522,7 @@ function resetState() {
   totalTranscriptSignals = 0;
   scoreSum = 0;
   scoreCount = 0;
+  scoreWeightSum = 0;
   latestScore = null;
   hasFirstTranscript = false;
   interimBubble = null;

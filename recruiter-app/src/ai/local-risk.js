@@ -31,7 +31,10 @@ const SPECIFICITY = [
   /\b\d+(?:\.\d+)?\b/g, /\bapi\b/g, /\bdatabase\b/g, /\bsql\b/g, /\bbug\b/g,
   /\bdebug(?:ged|ging)?\b/g, /\bshipped\b/g, /\bdeployed\b/g,
   /\bcustomer\b/g, /\bteam\b/g, /\bproject\b/g, /\bdeadline\b/g,
-  /\bproduction\b/g, /\bincident\b/g, /\btest(?:ed|ing)?\b/g
+  /\bproduction\b/g, /\bincident\b/g, /\btest(?:ed|ing)?\b/g,
+  /\bschool\b/g, /\bclub\b/g, /\bstudents?\b/g, /\bclass\b/g,
+  /\bfinance\b/g, /\bfinancial\b/g, /\bjava\b/g, /\bjavascript\b/g,
+  /\bchrome\b/g, /\badmin\b/g, /\bdashboard\b/g, /\bwebsite\b/g
 ];
 
 const HEDGES = [
@@ -42,6 +45,31 @@ const HEDGES = [
 const HYPOTHETICALS = [
   /\bi would\b/g, /\bi'd start\b/g, /\bi'd make sure\b/g, /\btypically\b/g,
   /\bgenerally\b/g, /\bone approach would be\b/g
+];
+
+const DIRECT_AI_USE = [
+  /\bi am ai\b/g,
+  /\bi'?m ai\b/g,
+  /\bchatgpt\b/g,
+  /\bclaude\b/g,
+  /\bgemini\b/g,
+  /\bcopilot\b/g,
+  /\bperplexity\b/g,
+  /\buse(?:d|s|ing)? ai\b/g,
+  /\bai tools?\b/g,
+  /\bllm\b/g,
+  /\blarge language model\b/g
+];
+
+const ASSISTANT_STYLE_PHRASES = [
+  /\bi can help\b/g,
+  /\bi'?d be happy to\b/g,
+  /\bhere(?:'s| is) how\b/g,
+  /\blet'?s break (?:it|this) down\b/g,
+  /\bdoes that make sense\b/g,
+  /\bfrom this perspective\b/g,
+  /\bcomfortable learning new technical tools\b/g,
+  /\bfinding ways to make tasks? more efficient\b/g
 ];
 
 function clamp(n, min = 0, max = 100) {
@@ -123,7 +151,7 @@ function labelFor(score) {
   if (score >= 76) return 'high_ai_assistance_risk';
   if (score >= 54) return 'elevated_ai_assistance_risk';
   if (score >= 34) return 'uncertain';
-  return 'likely_human';
+  return 'low_ai_assistance_risk';
 }
 
 function humanLabel(label) {
@@ -131,7 +159,7 @@ function humanLabel(label) {
     high_ai_assistance_risk: 'High AI-assistance risk',
     elevated_ai_assistance_risk: 'Elevated AI-assistance risk',
     uncertain: 'Uncertain',
-    likely_human: 'Likely human'
+    low_ai_assistance_risk: 'Low AI-assistance risk'
   }[label] || 'Uncertain';
 }
 
@@ -149,16 +177,37 @@ function analyzeTranscript(text, context = {}) {
   const tokens = words(text);
   const parts = sentences(text);
   const wordCount = tokens.length;
+  const directAiCount = countMatches(text, DIRECT_AI_USE);
+  const assistantStyleCount = countMatches(text, ASSISTANT_STYLE_PHRASES);
+  const repeatedShortPhrase = wordCount >= 6 && (ngramRepetition(tokens, 2) > 0.18 || ngramRepetition(tokens, 3) > 0.1);
+
   if (wordCount < 8) {
     return {
-      score: 0,
+      score: null,
       label: 'uncertain',
       displayLabel: humanLabel('uncertain'),
-      confidence: 'low',
+      confidence: 'insufficient',
       flags: [],
       reasoning: 'Transcript is too short for a meaningful AI-assistance estimate.',
       aiSignals: [],
-      humanSignals: []
+      humanSignals: [],
+      scorable: false,
+      scoreWeight: 0
+    };
+  }
+
+  if (directAiCount >= 1 && repeatedShortPhrase) {
+    return {
+      score: 88,
+      label: 'high_ai_assistance_risk',
+      displayLabel: humanLabel('high_ai_assistance_risk'),
+      confidence: 'medium',
+      flags: ['Direct AI mention repeated in the answer', 'Repeated phrase cadence'],
+      reasoning: `High AI-assistance risk. Main signal: direct AI mention repeated in a short response. Words: ${wordCount}; direct AI mentions: ${directAiCount}.`,
+      aiSignals: ['Direct AI mention repeated in the answer', 'Repeated phrase cadence'],
+      humanSignals: [],
+      scorable: true,
+      scoreWeight: 0.8
     };
   }
 
@@ -187,19 +236,22 @@ function analyzeTranscript(text, context = {}) {
     ? 1 - Math.min(1, Math.abs(wordCount - historyAvg) / historyAvg)
     : 0;
 
-  let score = 24;
+  let score = wordCount >= 18 ? 31 : 25;
   const aiSignals = [];
   const humanSignals = [];
 
-  addSignal(aiSignals, wordCount >= 35 && fillerDensity < 0.006, 16, 'Long answer with almost no spoken fillers', fillerDensity);
-  addSignal(aiSignals, correctionCount === 0 && wordCount >= 45, 10, 'No self-correction in a long spoken answer', correctionCount);
+  addSignal(aiSignals, directAiCount >= 2, 18, 'Repeated direct AI or AI-tool mention', directAiCount);
+  addSignal(aiSignals, assistantStyleCount >= 1, wordCount >= 25 ? 14 : 8, 'Assistant-like phrasing in spoken answer', assistantStyleCount);
+  addSignal(aiSignals, wordCount >= 30 && fillerDensity < 0.006, 20, 'Long answer with almost no spoken fillers', fillerDensity);
+  addSignal(aiSignals, correctionCount === 0 && wordCount >= 35, 12, 'No self-correction in a long spoken answer', correctionCount);
   addSignal(aiSignals, structuredCount >= 3, 15, 'Highly packaged answer structure', structuredCount);
-  addSignal(aiSignals, cannedCount >= 2, 15, 'Generic interview or corporate phrasing', cannedCount);
+  addSignal(aiSignals, cannedCount >= 2, 16, 'Generic interview or corporate phrasing', cannedCount);
+  addSignal(aiSignals, cannedCount >= 1 && assistantStyleCount >= 1, 10, 'Generic assistant-style answer framing', cannedCount + assistantStyleCount);
   addSignal(aiSignals, hypotheticalCount >= 2 && concreteDensity < 0.08, 12, 'Hypothetical answer with little lived detail', hypotheticalCount);
-  addSignal(aiSignals, wordCount >= 28 && concreteDensity < 0.035, 10, 'Low concrete project detail for the answer length', concreteDensity);
-  addSignal(aiSignals, uniqueRatio > 0.78 && wordCount >= 35, 8, 'Unusually polished vocabulary spread', uniqueRatio);
+  addSignal(aiSignals, wordCount >= 24 && concreteDensity < 0.035, 15, 'Low concrete project detail for the answer length', concreteDensity);
+  addSignal(aiSignals, uniqueRatio > 0.74 && wordCount >= 28, 10, 'Unusually polished vocabulary spread', uniqueRatio);
   addSignal(aiSignals, uniqueRatio < 0.42 && wordCount >= 45, 8, 'Repetitive vocabulary pattern', uniqueRatio);
-  addSignal(aiSignals, entropy > 0.92 && fillerDensity < 0.01 && wordCount >= 45, 8, 'High lexical cleanliness without natural disfluency', entropy);
+  addSignal(aiSignals, entropy > 0.9 && fillerDensity < 0.01 && wordCount >= 32, 10, 'High lexical cleanliness without natural disfluency', entropy);
   addSignal(aiSignals, bigramRepeat > 0.08 || trigramRepeat > 0.035, 9, 'Repeated phrase cadence', Math.max(bigramRepeat, trigramRepeat));
   addSignal(aiSignals, sentenceMad < 3.1 && sentenceLengths.length >= 4, 8, 'Sentence lengths are unusually even', sentenceMad);
   addSignal(aiSignals, burstiness < 0.22 && sentenceLengths.length >= 4, 7, 'Low burstiness across sentences', burstiness);
@@ -207,9 +259,9 @@ function analyzeTranscript(text, context = {}) {
   addSignal(aiSignals, lengthUniformity > 0.82, 10, 'Response length is unusually uniform across the session', lengthUniformity);
   addSignal(aiSignals, similarity > 0.68 && wordCount >= 25, 9, 'Answer resembles earlier phrasing too closely', similarity);
 
-  addSignal(humanSignals, fillerDensity > 0.025, -12, 'Natural fillers and pauses', fillerDensity);
+  addSignal(humanSignals, fillerDensity > 0.025 && directAiCount === 0, -9, 'Natural fillers and pauses', fillerDensity);
   addSignal(humanSignals, correctionDensity > 0.018 || correctionCount >= 2, -10, 'Self-corrections and rephrasing', correctionCount);
-  addSignal(humanSignals, concreteDensity > 0.09, -12, 'Concrete first-person or project detail', concreteDensity);
+  addSignal(humanSignals, concreteDensity > 0.09, -14, 'Concrete first-person or project detail', concreteDensity);
   addSignal(humanSignals, hedgeCount >= 2, -6, 'Natural uncertainty markers', hedgeCount);
   addSignal(humanSignals, sentenceMad > 8 && sentenceLengths.length >= 3, -6, 'Uneven spoken sentence rhythm', sentenceMad);
   addSignal(humanSignals, burstiness > 0.48 && sentenceLengths.length >= 3, -5, 'High spoken burstiness', burstiness);
@@ -218,7 +270,7 @@ function analyzeTranscript(text, context = {}) {
     const wordsPerMinute = wordCount / Math.max(context.durationMs / 60000, 0.1);
     addSignal(aiSignals, wordsPerMinute > 205 && wordCount >= 20, 9, 'Very fast delivery for the transcript length', wordsPerMinute);
     addSignal(humanSignals, wordsPerMinute >= 85 && wordsPerMinute <= 175 && wordCount >= 18, -4, 'Natural speech rate', wordsPerMinute);
-    addSignal(humanSignals, wordsPerMinute < 75 && wordCount >= 12, -5, 'Slow spoken delivery', wordsPerMinute);
+    addSignal(humanSignals, wordsPerMinute < 75 && wordCount >= 12 && directAiCount === 0, -3, 'Slow spoken delivery', wordsPerMinute);
   }
 
   for (const signal of aiSignals) score += signal.points;
@@ -233,8 +285,9 @@ function analyzeTranscript(text, context = {}) {
       : wordCount >= 20
         ? 'low-medium'
         : 'low';
+  const scoreWeight = wordCount >= 45 ? 1 : wordCount >= 20 ? 0.75 : 0.45;
   const topAiSignals = aiSignals.sort((a, b) => Math.abs(b.points) - Math.abs(a.points)).slice(0, 5);
-  const topHumanSignals = humanSignals.sort((a, b) => Math.abs(a.points) - Math.abs(b.points)).slice(0, 4);
+  const topHumanSignals = humanSignals.sort((a, b) => Math.abs(b.points) - Math.abs(a.points)).slice(0, 4);
   const flags = topAiSignals.map(signal => signal.message);
 
   transcriptHistory.push({
@@ -259,7 +312,9 @@ function analyzeTranscript(text, context = {}) {
     flags,
     aiSignals: topAiSignals.map(signal => signal.message),
     humanSignals: topHumanSignals.map(signal => signal.message),
-    reasoning: `${humanLabel(label)}. Main signal: ${signalText.toLowerCase()}. ${metricText}${counterText}`
+    reasoning: `${humanLabel(label)}. Main signal: ${signalText.toLowerCase()}. ${metricText}${counterText}`,
+    scorable: true,
+    scoreWeight
   };
 }
 

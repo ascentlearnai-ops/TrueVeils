@@ -331,6 +331,8 @@ async function analyzeCandidateTranscript(payload = {}) {
     label: analysis.label,
     displayLabel: analysis.displayLabel,
     confidence: analysis.confidence,
+    scorable: analysis.scorable !== false,
+    scoreWeight: analysis.scoreWeight || 0,
     flags: analysis.flags || [],
     reasoning: analysis.reasoning,
     aiSignals: analysis.aiSignals || [],
@@ -339,7 +341,9 @@ async function analyzeCandidateTranscript(payload = {}) {
   };
 
   sessionData.transcripts.push(entry);
-  if (typeof entry.aiScore === 'number') sessionData.scores.push(entry.aiScore);
+  if (typeof entry.aiScore === 'number' && entry.scorable) {
+    sessionData.scores.push({ score: entry.aiScore, weight: entry.scoreWeight || 1 });
+  }
   (entry.flags || []).forEach(flagText => {
     sessionData.flags.push({
       text: flagText,
@@ -563,7 +567,10 @@ async function processAudioTranscription(entry) {
         text,
         timestamp: entry.timestamp,
         aiScore: entry.aiScore,
+        displayLabel: analysis.displayLabel,
         confidence: analysis.confidence,
+        scorable: analysis.scorable !== false,
+        scoreWeight: analysis.scoreWeight || 0,
         flags: entry.flags,
         reasoning: entry.reasoning,
         aiSignals: analysis.aiSignals || [],
@@ -573,7 +580,9 @@ async function processAudioTranscription(entry) {
       };
 
       sessionData.transcripts.push(transcriptEntry);
-      sessionData.scores.push(entry.aiScore);
+      if (typeof entry.aiScore === 'number' && analysis.scorable !== false) {
+        sessionData.scores.push({ score: entry.aiScore, weight: analysis.scoreWeight || 1 });
+      }
       entry.flags.forEach(flagText => {
         sessionData.flags.push({
           text: flagText,
@@ -850,13 +859,18 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
     text,
     timestamp,
     aiScore: analysis.score,
+    displayLabel: analysis.displayLabel,
     confidence: analysis.confidence,
+    scorable: analysis.scorable !== false,
+    scoreWeight: analysis.scoreWeight || 0,
     flags: analysis.flags || [],
     reasoning: analysis.reasoning,
     source: 'local'
   };
   sessionData.transcripts.push(entry);
-  sessionData.scores.push(analysis.score);
+  if (typeof analysis.score === 'number' && analysis.scorable !== false) {
+    sessionData.scores.push({ score: analysis.score, weight: analysis.scoreWeight || 1 });
+  }
   (analysis.flags || []).forEach(f =>
     sessionData.flags.push({ text: f, timestamp, severity: analysis.score >= 70 ? 'high' : 'medium' })
   );

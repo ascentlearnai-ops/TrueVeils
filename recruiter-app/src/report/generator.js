@@ -30,6 +30,50 @@ function riskLabel(avg) {
   return 'INCONCLUSIVE';
 }
 
+function normalizeScore(item) {
+  if (typeof item === 'number') return { score: item, weight: item > 0 ? 1 : 0 };
+  if (item && typeof item.score === 'number') {
+    return {
+      score: item.score,
+      weight: typeof item.weight === 'number' ? item.weight : 1
+    };
+  }
+  return null;
+}
+
+function weightedAverage(items) {
+  const valid = items.map(normalizeScore).filter(item => item && item.weight > 0);
+  const totalWeight = valid.reduce((sum, item) => sum + item.weight, 0);
+  if (!valid.length || totalWeight <= 0) return 0;
+  return valid.reduce((sum, item) => sum + item.score * item.weight, 0) / totalWeight;
+}
+
+function aiSiteFlagCount(flags = []) {
+  const pattern = /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai)\b/i;
+  return flags.filter(flag => {
+    const severity = String(flag.severity || '').toLowerCase();
+    return (severity === 'high' || severity === 'critical') && pattern.test(String(flag.text || ''));
+  }).length;
+}
+
+function sessionRiskSummary({ scores = [], flags = [] }) {
+  const valid = scores.map(normalizeScore).filter(item => item && item.weight > 0);
+  const scoreValues = valid.map(item => item.score);
+  const avg = weightedAverage(scores);
+  const max = scoreValues.length ? Math.max(...scoreValues) : 0;
+  const top = [...scoreValues].sort((a, b) => b - a).slice(0, 3);
+  const topAvg = top.length ? top.reduce((sum, value) => sum + value, 0) / top.length : 0;
+  const behaviorBoost = Math.min(24, aiSiteFlagCount(flags) * 3);
+  const overall = Math.round(Math.min(100, avg * 0.45 + topAvg * 0.22 + max * 0.13 + behaviorBoost));
+  return {
+    avg: overall,
+    transcriptAvg: Math.round(avg),
+    max: Math.round(max),
+    behaviorBoost,
+    scorableCount: valid.length
+  };
+}
+
 async function generate(data) {
   const { session, startedAt, endedAt, transcripts, flags, scores, audioChunks = [] } = data;
   const dir = path.join(app.getPath('userData'), 'reports');
@@ -39,13 +83,13 @@ async function generate(data) {
   const endMs = endedAt || Date.now();
   const duration = durationStr(endMs - startMs);
 
-  const validScores = scores.filter(n => typeof n === 'number');
-  const avg = validScores.length ? Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length) : 0;
-  const max = validScores.length ? Math.max(...validScores) : 0;
+  const risk = sessionRiskSummary({ scores, flags });
+  const avg = risk.avg;
+  const max = risk.max;
   const highFlags = flags.filter(f => f.severity === 'high' || f.severity === 'critical').length;
 
   const html = buildHtml({
-    session, startMs, endMs, duration, avg, max, highFlags,
+    session, startMs, endMs, duration, avg, max, highFlags, risk,
     transcripts, flags, audioChunks, totalResponses: transcripts.length
   });
 
@@ -56,7 +100,7 @@ async function generate(data) {
 }
 
 function buildHtml(ctx) {
-  const { session, startMs, endMs, duration, avg, max, highFlags, transcripts, flags, audioChunks, totalResponses } = ctx;
+  const { session, startMs, endMs, duration, avg, max, highFlags, risk, transcripts, flags, audioChunks, totalResponses } = ctx;
   const riskCls = avg >= 70 ? 'high' : avg >= 40 ? 'med' : 'low';
 
   const transcriptRows = transcripts.length
@@ -184,15 +228,15 @@ function buildHtml(ctx) {
       </div>
       <div class="risk-info">
         <h2>${riskLabel(avg)}</h2>
-        <p>Overall AI-assistance risk across ${totalResponses} analyzed response${totalResponses === 1 ? '' : 's'}.</p>
+        <p>Overall AI-assistance risk from ${risk.scorableCount} scorable transcript response${risk.scorableCount === 1 ? '' : 's'}${risk.behaviorBoost ? ` plus restricted AI-site evidence (+${risk.behaviorBoost})` : ''}. Short fragments are treated as inconclusive, not human evidence.</p>
       </div>
     </div>
 
     <div class="grid4">
-      <div class="stat"><div class="stat-label">Average Score</div><div class="stat-val">${avg}%</div></div>
+      <div class="stat"><div class="stat-label">Overall Risk</div><div class="stat-val">${avg}%</div></div>
+      <div class="stat"><div class="stat-label">Transcript Avg</div><div class="stat-val">${risk.transcriptAvg}%</div></div>
       <div class="stat"><div class="stat-label">Peak Score</div><div class="stat-val">${max}%</div></div>
       <div class="stat"><div class="stat-label">Responses</div><div class="stat-val">${totalResponses}</div></div>
-      <div class="stat"><div class="stat-label">Text Signals</div><div class="stat-val">${totalResponses}</div></div>
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>
     </div>
 
