@@ -3,249 +3,557 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Truveil is an interview command center for session codes, candidate consent, live transcription, restricted-site evidence, and AI-assistance risk review.">
-  <title>Truveil - Interview Command Center</title>
+  <meta name="description" content="Truveil is a command center for verified remote interviews, combining session codes, candidate consent, live transcript review, and AI-assistance risk signals.">
+  <title>Truveil - Verified Interview Command Center</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="page-shell">
-    <nav class="nav">
-      <a class="brand" href="#top"><span class="brand-mark"></span><span>Truveil</span></a>
-      <div class="nav-links">
-        <a href="#product">Product</a>
-        <a href="#workflow">Workflow</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
+
+  <!-- Ambient gradient orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Floating particles -->
+  <div class="particles" id="particles"></div>
+
+  <!-- Cursor follow glow -->
+  <div class="cursor-glow" id="cursorGlow"></div>
+
+  <!-- Noise texture overlay -->
+  <svg class="noise-overlay" xmlns="http://www.w3.org/2000/svg">
+    <filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#noiseFilter)"/>
+  </svg>
+
+  <nav>
+    <div class="nav-logo">Truveil</div>
+    <div class="nav-links">
+      <a href="#detection">Detection</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-right">
+      <a href="#" class="login">Login</a>
+      <a href="#" class="btn btn-primary" onclick="openDownloadModal(event)">Download Free</a>
+    </div>
+  </nav>
+
+  <!-- ——— Hero ——— -->
+  <header class="hero">
+    <div class="hero-content">
+      <div class="trust-badge fade-up d1"><span class="dot"></span> INTERVIEW COMMAND CENTER</div>
+      <h1 class="fade-up d2">Know what happened<br><span class="gradient-text">during the interview.</span></h1>
+      <p class="sub fade-up d3">Create a session code, set allowed tools, and review transcript, focus, audio fallback, and AI-assistance risk signals from one desktop workspace.</p>
+      <div class="hero-ctas fade-up d4">
+        <a href="#" class="btn btn-primary lg" onclick="openDownloadModal(event)">Download Command Center</a>
+        <a href="#how-it-works" class="btn btn-ghost lg">View workflow</a>
       </div>
-      <button class="nav-cta" onclick="openDownloadModal(event)">Download</button>
-    </nav>
+      <div class="hero-note fade-up d5">Works with Zoom, Meet, and Teams · session-code based · explainable risk labels</div>
+      <div class="hero-ledger fade-up d5">
+        <div><span>TRV-482910</span><strong>Shareable code</strong></div>
+        <div><span>Warn + refocus</span><strong>Blocked-site policy</strong></div>
+        <div><span>Likely human</span><strong>Explainable risk labels</strong></div>
+      </div>
+    </div>
 
-    <main id="top">
-      <section class="hero">
-        <div class="hero-copy reveal">
-          <p class="eyebrow">Interview command center</p>
-          <h1>Run verified interviews without turning them into theater.</h1>
-          <p class="lede">Create a session code, set the allowed sites, receive live transcript chunks, and review AI-assistance risk with evidence your team can actually understand.</p>
-          <div class="hero-actions">
-            <button class="button primary" onclick="openDownloadModal(event)">Download Command Center</button>
-            <a class="button secondary" href="#workflow">See workflow</a>
-          </div>
+    <!-- Floating Dashboard Mockup -->
+    <div class="hero-mockup fade-up d6" id="heroMockup">
+      <div class="mockup-glow"></div>
+      <div class="glass-window">
+        <div class="glass-bar">
+          <div class="dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+          <span class="glass-title">Truveil Command Center</span>
+          <span class="glass-title" id="timer">00:04:32</span>
         </div>
-
-        <div class="dashboard-visual reveal" id="heroMockup" aria-label="Truveil admin dashboard preview">
-          <div class="dashboard-window">
-            <div class="window-top">
-              <span class="window-dot"></span>
-              <span>Session TRV-482910</span>
-              <strong>Live</strong>
+        <!-- Top metrics -->
+        <div class="mock-metrics">
+          <div class="mm"><div class="mm-label">OVERALL RISK</div><div class="mm-val risk-high" id="mockRisk">71%</div></div>
+          <div class="mm"><div class="mm-label">FLAGS</div><div class="mm-val">5</div></div>
+          <div class="mm"><div class="mm-label">RESPONSES</div><div class="mm-val">8</div></div>
+          <div class="mm"><div class="mm-label">TEXT</div><div class="mm-val">24</div></div>
+        </div>
+        <!-- Two-column body -->
+        <div class="mock-body">
+          <div class="mock-transcript">
+            <div class="mock-section-label">LIVE TRANSCRIPT</div>
+            <div class="mock-bubble">
+              <div class="mb-meta"><span class="mb-speaker interviewer">INTERVIEWER</span><span class="mb-time">14:02</span></div>
+              <div class="mb-text">Can you tell me about a time you led a technical migration?</div>
             </div>
-            <div class="metric-row">
-              <div><span>Overall risk</span><strong>18%</strong></div>
-              <div><span>Flags</span><strong>2</strong></div>
-              <div><span>Transcript</span><strong>Deepgram</strong></div>
-            </div>
-            <div class="dashboard-body">
-              <section class="transcript-stream">
-                <p class="panel-label">Live transcript</p>
-                <article>
-                  <span>11:42 AM · candidate</span>
-                  <p>I worked on a migration where we had to split billing out first, because it blocked every deploy.</p>
-                  <em>AI-assistance risk 12% · concrete detail and natural cadence</em>
-                </article>
-                <article>
-                  <span>11:43 AM · candidate</span>
-                  <p>The tradeoff was speed versus test coverage. We paused the launch for two days to add contract tests.</p>
-                  <em>AI-assistance risk 16% · self-correction present</em>
-                </article>
-              </section>
-              <aside class="event-feed">
-                <p class="panel-label">Evidence</p>
-                <div class="event ok">Candidate connected</div>
-                <div class="event warn">Opened chatgpt.com in Chrome</div>
-                <div class="event ok">Remote audio deleted after transcription</div>
-              </aside>
+            <div class="mock-bubble">
+              <div class="mb-meta"><span class="mb-speaker candidate">CANDIDATE</span><span class="mb-time">14:02</span><span class="mb-score high">84%</span></div>
+              <div class="mb-text" id="transcript-text"><span class="cursor"></span></div>
+              <div class="mb-reasoning" id="mockReasoning">Zero filler words, perfect structure — consistent with AI-generated text.</div>
             </div>
           </div>
+          <div class="mock-flags">
+            <div class="mock-section-label">FLAGS <span class="flag-count">5</span></div>
+            <div class="mock-flag critical" id="mf1"><span class="mf-time">14:31</span><span class="mf-dot high"></span><span class="mf-text">Opened chatgpt.com</span></div>
+            <div class="mock-flag medium" id="mf2"><span class="mf-time">14:28</span><span class="mf-dot med"></span><span class="mf-text">Tab switch detected</span></div>
+            <div class="mock-flag critical" id="mf3"><span class="mf-time">14:15</span><span class="mf-dot high"></span><span class="mf-text">Overlay window detected</span></div>
+            <div class="mock-flag medium" id="mf4"><span class="mf-time">13:54</span><span class="mf-dot med"></span><span class="mf-text">Gaze left — second screen?</span></div>
+            <div class="mock-flag low" id="mf5"><span class="mf-time">13:12</span><span class="mf-dot lo"></span><span class="mf-text">Clipboard paste detected</span></div>
+          </div>
         </div>
-      </section>
+        <div class="mock-footer">
+          <span><span class="rec-dot"></span> LIVE TRANSCRIPT</span>
+          <span>SESSION TRV-482910</span>
+        </div>
+      </div>
+    </div>
+  </header>
 
-      <section class="product-strip reveal" id="product">
-        <div>
-          <span>Session code</span>
-          <strong>Generate one code and send it to the candidate.</strong>
-        </div>
-        <div>
-          <span>Policy</span>
-          <strong>Choose restricted AI sites before the interview starts.</strong>
-        </div>
-        <div>
-          <span>Transcript</span>
-          <strong>Deepgram first, Groq second, local Whisper last.</strong>
-        </div>
-        <div>
-          <span>Privacy</span>
-          <strong>Audio is deleted after processing; reports keep text evidence.</strong>
-        </div>
-      </section>
-
-      <section class="workflow-section" id="workflow">
-        <div class="section-copy reveal">
-          <p class="eyebrow">Workflow</p>
-          <h2>From setup to report in one desktop surface.</h2>
-          <p>Truveil is built for repeated hiring loops. The flow is predictable, fast, and explicit enough for candidates to understand what is being monitored.</p>
-        </div>
-        <div class="workflow-list reveal">
-          <article>
-            <span>01</span>
-            <h3>Create session</h3>
-            <p>Add candidate name and role, then generate a code like <code>TRV-482910</code>.</p>
-          </article>
-          <article>
-            <span>02</span>
-            <h3>Set policy</h3>
-            <p>Mark restricted sites such as ChatGPT, Claude, Gemini, Copilot, and Perplexity.</p>
-          </article>
-          <article>
-            <span>03</span>
-            <h3>Monitor live</h3>
-            <p>Watch transcript source, current risk, mic status, and exact site/app anomalies.</p>
-          </article>
-          <article>
-            <span>04</span>
-            <h3>End cleanly</h3>
-            <p>The candidate app closes the session and your report keeps text evidence, not raw audio.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="signal-section reveal">
-        <div class="signal-copy">
-          <p class="eyebrow">Explainable risk</p>
-          <h2>Risk labels should read like evidence, not magic.</h2>
-        </div>
-        <div class="signal-grid">
-          <article>
-            <span>Evidence</span>
-            <p>Low filler density, uniform answer structure, generic phrasing, and cadence variance.</p>
-          </article>
-          <article>
-            <span>Counter-signal</span>
-            <p>Self-correction, concrete mistakes, natural hesitation, and specific project detail.</p>
-          </article>
-          <article>
-            <span>Source</span>
-            <p>Every transcript chunk labels Deepgram, Groq, local Whisper, or UI-only fallback.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="pricing-section" id="pricing">
-        <div class="section-copy reveal">
-          <p class="eyebrow">Pricing</p>
-          <h2>Start small. Protect the interviews that matter.</h2>
-        </div>
-        <div class="pricing-row reveal">
-          <article>
-            <span>Free</span>
-            <strong>$0</strong>
-            <p>One session to test the flow.</p>
-          </article>
-          <article class="featured">
-            <span>Pro</span>
-            <strong>$99/mo</strong>
-            <p>For active hiring teams running remote screens weekly.</p>
-          </article>
-          <article>
-            <span>Enterprise</span>
-            <strong>Custom</strong>
-            <p>For agencies, security review, SSO, and larger teams.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="faq-section" id="faq">
-        <div class="section-copy reveal">
-          <p class="eyebrow">FAQ</p>
-          <h2>Plain answers.</h2>
-        </div>
-        <div class="faq-list reveal">
-          <details open>
-            <summary>Does Truveil guarantee someone used AI?</summary>
-            <p>No. It reports AI-assistance risk with evidence signals and human counter-signals. The interviewer makes the decision.</p>
-          </details>
-          <details>
-            <summary>Does it truly block websites?</summary>
-            <p>V1 uses detect, warn, refocus, and report. It does not kill processes, edit firewall rules, or claim browser-extension-level blocking.</p>
-          </details>
-          <details>
-            <summary>Where does audio go?</summary>
-            <p>Short chunks are uploaded for transcription and deleted immediately after processing. Reports contain transcripts and evidence only.</p>
-          </details>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      <span>Truveil</span>
-      <span>Verified remote interview command center</span>
-      <button onclick="openDownloadModal(event)">Download</button>
-    </footer>
+  <!-- ——— Logos ——— -->
+  <div class="ticker-wrap">
+    <div class="ticker-label">Built for modern recruiting workflows</div>
+    <div class="ticker">
+      <span>Remote loops</span><span>Technical screens</span><span>Agency hiring</span><span>Panel interviews</span><span>Contract roles</span><span>High-signal reports</span>
+      <span>Remote loops</span><span>Technical screens</span><span>Agency hiring</span><span>Panel interviews</span><span>Contract roles</span><span>High-signal reports</span>
+    </div>
   </div>
 
-  <div class="modal-overlay" id="downloadModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-top">
-        <h3 id="modalTitle">Download Truveil Command Center</h3>
-        <button class="modal-x" onclick="closeDownloadModal()" aria-label="Close">×</button>
+  <!-- ——— Sticky Detection Showcase ——— -->
+  <div class="section" id="detection">
+    <div class="section-header">
+      <div class="section-badge reveal"><span class="dot"></span> DETECTION</div>
+      <h2 class="section-title reveal">8 layers of protection,<br><span class="gradient-text">zero configuration</span></h2>
+      <p class="section-sub reveal">Every layer works silently in the background. The candidate app monitors, the recruiter app shows results — in real time.</p>
+    </div>
+
+    <div class="features-scroll">
+      <!-- Feature 1 -->
+      <div class="feature-row reveal">
+        <div class="feature-text">
+          <div class="card-label">01 — TRANSCRIPT-FIRST RISK ANALYSIS</div>
+          <h3>Live transcript, local scoring, audio fallback</h3>
+          <p>The candidate app turns spoken answers into live transcript text after consent. If Electron speech recognition fails, Truveil relays short audio chunks so your Command Center can transcribe locally and keep the interview moving.</p>
+        </div>
+        <div class="feature-visual">
+          <div class="mini-app large">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span><span class="mini-title">Response Analysis</span></div>
+            <div class="mini-body">
+              <div class="analysis-row"><span class="ar-text">"Yes, at my previous role I led a team of senior engineers through a complete microservices migration..."</span><div class="ar-right"><span class="ar-score high">82%</span><span class="ar-label">AI likely</span></div></div>
+              <div class="analysis-row"><span class="ar-text">"Um, yeah so basically we, uh, used React for the frontend mostly I think..."</span><div class="ar-right"><span class="ar-score low">12%</span><span class="ar-label">Human</span></div></div>
+              <div class="analysis-row"><span class="ar-text">"I implemented a comprehensive event-driven microservices architecture using..."</span><div class="ar-right"><span class="ar-score high">91%</span><span class="ar-label">AI likely</span></div></div>
+              <div class="analysis-row"><span class="ar-text">"Hmm, let me think... I think we had like, three different services that..."</span><div class="ar-right"><span class="ar-score low">8%</span><span class="ar-label">Human</span></div></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <p>Install the admin Electron app, create a session code, and connect candidates through Truveil Secure.</p>
-      <label class="check-row">
-        <input type="checkbox" id="termsCheck" onchange="toggleDownloadBtn()">
-        <span>I understand Truveil records transcript evidence and immediately deletes processed remote audio chunks.</span>
-      </label>
-      <a class="download-final disabled" id="finalDownload" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Accept and download .exe</a>
+
+      <!-- Feature 2 -->
+      <div class="feature-row reverse reveal">
+        <div class="feature-text">
+          <div class="card-label">02 — OVERLAY DETECTION</div>
+          <h3>Interview Coder doesn't stand a chance</h3>
+          <p>OS-level scanning every 10 seconds. Detects Interview Coder, Ezzi, ShadeCoder, and any transparent or click-through windows invisible to screen share.</p>
+        </div>
+        <div class="feature-visual">
+          <div class="mini-app large">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span><span class="mini-title">Window Scanner</span></div>
+            <div class="mini-body scanner">
+              <div class="scan-line"><span class="scan-status ok">CLEAR</span><span class="scan-name">Zoom.exe</span><span class="scan-detail">PID 4821 · Visible</span></div>
+              <div class="scan-line"><span class="scan-status ok">CLEAR</span><span class="scan-name">Chrome.exe</span><span class="scan-detail">PID 1203 · Visible</span></div>
+              <div class="scan-line alert"><span class="scan-status danger">FLAGGED</span><span class="scan-name">InterviewCoder.exe</span><span class="scan-detail">PID 8891 · Transparent overlay</span></div>
+              <div class="scan-line"><span class="scan-status ok">CLEAR</span><span class="scan-name">Slack.exe</span><span class="scan-detail">PID 3312 · Visible</span></div>
+              <div class="scan-meta"><span class="scan-hz">Scanning at 0.1 Hz</span><span class="scan-total">4 windows · 1 flagged</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-row reveal">
+        <div class="feature-text">
+          <div class="card-label">03 — BROWSER & TAB MONITORING</div>
+          <h3>ChatGPT tab? Flagged instantly.</h3>
+          <p>Tracks active browser tabs via accessibility APIs. Flags chatgpt.com, claude.ai, perplexity.ai, and any AI site. Every tab switch logged with timestamp.</p>
+        </div>
+        <div class="feature-visual">
+          <div class="mini-app large">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span><span class="mini-title">Tab Monitor</span></div>
+            <div class="mini-body scanner">
+              <div class="scan-line"><span class="scan-status ok">SAFE</span><span class="scan-name">leetcode.com</span><span class="scan-detail">Active 2m 14s</span></div>
+              <div class="scan-line alert"><span class="scan-status danger">BLOCKED</span><span class="scan-name">chatgpt.com</span><span class="scan-detail">Opened at 14:31:58</span></div>
+              <div class="scan-line alert"><span class="scan-status danger">BLOCKED</span><span class="scan-name">claude.ai</span><span class="scan-detail">Opened at 14:33:12</span></div>
+              <div class="scan-line"><span class="scan-status ok">SAFE</span><span class="scan-name">github.com</span><span class="scan-detail">Active 8m 02s</span></div>
+              <div class="scan-meta"><span class="scan-hz">Monitoring 4 tabs</span><span class="scan-total">2 flagged · Candidate warned</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-row reverse reveal">
+        <div class="feature-text">
+          <div class="card-label">04 — POLICY + REFOCUS</div>
+          <h3>Blocked AI sites trigger an immediate warning.</h3>
+          <p>Set the allowed interview tools before the session starts. If the candidate opens a blocked AI site or disallowed window, Truveil warns them, refocuses the secure app, and flags the event for your report.</p>
+        </div>
+        <div class="feature-visual">
+          <div class="mini-app large">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span><span class="mini-title">Session Policy</span></div>
+            <div class="mini-body policy-mock">
+              <div class="policy-pill good">Allowed: Zoom, Meet, Teams</div>
+              <div class="policy-pill good">Allowed: meet.google.com</div>
+              <div class="policy-pill danger">Blocked: chatgpt.com</div>
+              <div class="policy-pill danger">Blocked: claude.ai</div>
+              <div class="policy-action">Candidate warning sent · Admin flag created</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— Stats ——— -->
+  <div class="stats-section">
+    <div class="stats-row">
+      <div class="stat-item reveal"><div class="stat-num" data-target="8">0</div><div class="stat-label">Detection layers</div></div>
+      <div class="stat-item reveal"><div class="stat-num" data-target="5" data-prefix="<" data-suffix="s">0</div><div class="stat-label">Flag response time</div></div>
+      <div class="stat-item reveal"><div class="stat-num" data-target="28" data-prefix="$" data-suffix="K">0</div><div class="stat-label">Avg bad hire cost</div></div>
+      <div class="stat-item reveal"><div class="stat-num" data-target="500" data-suffix="+">0</div><div class="stat-label">Teams protected</div></div>
+    </div>
+  </div>
+
+  <!-- ——— How It Works ——— -->
+  <div class="section" id="how-it-works">
+    <div class="section-header">
+      <div class="section-badge reveal"><span class="dot"></span> HOW IT WORKS</div>
+      <h2 class="section-title reveal">Three steps. Under three minutes.</h2>
+      <p class="section-sub reveal">No browser extensions. No Zoom plugins. Two Electron apps connected through Supabase Realtime.</p>
+    </div>
+
+    <div class="steps-timeline">
+      <div class="step-item reveal">
+        <div class="step-number">01</div>
+        <div class="step-content">
+          <h3>Download & create a session</h3>
+          <p>Install the Command Center. Enter candidate name and role. Get a unique session code like <code>TRV-482910</code>.</p>
+        </div>
+        <div class="step-visual">
+          <div class="mini-app">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+            <div class="mini-body" style="padding:14px;text-align:center">
+              <div style="font-size:10px;color:rgba(255,255,255,.3);margin-bottom:8px;letter-spacing:1px">SESSION CODE</div>
+              <div style="font-family:monospace;font-size:20px;font-weight:700;letter-spacing:3px;color:#fff;padding:10px;background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:6px">TRV-482910</div>
+              <div style="margin-top:8px;font-size:9px;color:rgba(255,255,255,.25)">Expires in 48 hours</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-item reveal">
+        <div class="step-number">02</div>
+        <div class="step-content">
+          <h3>Candidate installs Truveil Secure</h3>
+          <p>Email the download link and session code. Candidate opens the app, enters the code, consents to mic transcription and focus monitoring. Done.</p>
+        </div>
+        <div class="step-visual">
+          <div class="mini-app light">
+            <div class="mini-bar light"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+            <div class="mini-body" style="padding:14px;text-align:center;background:rgba(255,255,255,.02)">
+              <div style="margin-bottom:6px">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(34,197,94,.6)" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div style="font-size:11px;font-weight:600;color:#fff;margin-bottom:2px">SESSION ACTIVE</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.3)">Connected · Monitoring</div>
+              <div style="margin-top:8px;display:flex;gap:4px;justify-content:center">
+                <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(34,197,94,.1);color:rgba(34,197,94,.7)">MIC ON</span>
+                <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(59,130,246,.1);color:rgba(59,130,246,.7)">TEXT LIVE</span>
+                <span style="font-size:8px;padding:2px 6px;border-radius:3px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.3)">SECURE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-item reveal">
+        <div class="step-number">03</div>
+        <div class="step-content">
+          <h3>Monitor live, get a report</h3>
+          <p>Watch the transcript, AI scores, and flags update in real time. End the session — a full digital report is ready in minutes.</p>
+        </div>
+        <div class="step-visual">
+          <div class="mini-app">
+            <div class="mini-bar"><span class="mini-dot dot-r"></span><span class="mini-dot dot-y"></span><span class="mini-dot dot-g"></span></div>
+            <div class="mini-body" style="padding:10px">
+              <div class="analysis-row compact"><span class="ar-text">"I architected the entire..."</span><div class="ar-right"><span class="ar-score high">87%</span></div></div>
+              <div class="analysis-row compact"><span class="ar-text">"Um, so we basically..."</span><div class="ar-right"><span class="ar-score low">9%</span></div></div>
+              <div style="margin-top:6px;padding:5px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.1);border-radius:4px;font-size:9px;color:rgba(239,68,68,.7);text-align:center;font-weight:600">5 flags detected · Overall risk: 71%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— Comparison ——— -->
+  <div class="section" id="proof">
+    <div class="section-header">
+      <div class="section-badge reveal"><span class="dot"></span> COMPARISON</div>
+      <h2 class="section-title reveal">What Truveil catches<br><span class="gradient-text">that nobody else can</span></h2>
+    </div>
+    <div class="comparison reveal">
+      <table class="comp-table">
+        <thead><tr><th>Detection Capability</th><th class="hl">Truveil</th><th>Manual Review</th><th>Basic Proctoring</th></tr></thead>
+        <tbody>
+          <tr><td class="feat">AI-generated answer detection</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Hidden overlay scanning (Interview Coder)</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Real-time flag feed</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Browser tab monitoring</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Gaze & head pose tracking</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="chk">&#10003;</td></tr>
+          <tr><td class="feat">Per-response AI-assistance risk score</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Clipboard monitoring</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Instant digital report</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ——— Testimonials ——— -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-badge reveal"><span class="dot"></span> TESTIMONIALS</div>
+      <h2 class="section-title reveal">Trusted by hiring teams<br>at every stage</h2>
+    </div>
+    <div class="test-grid">
+      <div class="t-card reveal">
+        <div class="t-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="t-text">"We caught 3 candidates using Interview Coder in one week. The hidden overlay detection alone is worth the subscription."</div>
+        <div class="t-author"><div class="t-avatar">S</div><div><div class="t-name">Sarah K.</div><div class="t-role">Senior Recruiter, Series B Startup</div></div></div>
+      </div>
+      <div class="t-card reveal">
+        <div class="t-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="t-text">"Candidates who interviewed brilliantly performed poorly on the job. Truveil explained everything. Complete game changer."</div>
+        <div class="t-author"><div class="t-avatar">M</div><div><div class="t-name">Marcus T.</div><div class="t-role">VP Talent Acquisition</div></div></div>
+      </div>
+      <div class="t-card reveal">
+        <div class="t-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <div class="t-text">"Setup was under 5 minutes. Now I send the link before every call. It's part of our standard hiring workflow."</div>
+        <div class="t-author"><div class="t-avatar">P</div><div><div class="t-name">Priya R.</div><div class="t-role">Head of Engineering Hiring</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— Pricing ——— -->
+  <div class="section" id="pricing">
+    <div class="section-header">
+      <div class="section-badge reveal"><span class="dot"></span> PRICING</div>
+      <h2 class="section-title reveal">Simple, transparent pricing</h2>
+      <p class="section-sub reveal">One bad hire costs $28K. One protected interview costs under $2.</p>
+    </div>
+    <div class="price-grid">
+      <div class="p-card reveal">
+        <div class="p-name">Free</div><div class="p-price">$0<span>/mo</span></div>
+        <div class="p-desc">Try it before you buy</div>
+        <ul class="p-list"><li>1 interview session</li><li>Live transcript + risk score</li><li>Digital session report</li><li>No credit card required</li></ul>
+        <button class="btn btn-ghost p-btn">Start Free</button>
+      </div>
+      <div class="p-card pop reveal">
+        <div class="p-badge">MOST POPULAR</div>
+        <div class="p-name">Pro</div><div class="p-price">$99<span>/mo</span></div>
+        <div class="p-desc">For active hiring teams</div>
+        <ul class="p-list"><li>50 interviews / month</li><li>All 8 detection layers</li><li>Live dashboard + flags feed</li><li>30-day report retention</li><li>Priority AI processing</li></ul>
+        <button class="btn btn-primary p-btn">Upgrade to Pro</button>
+      </div>
+      <div class="p-card reveal">
+        <div class="p-name">Enterprise</div><div class="p-price">Custom</div>
+        <div class="p-desc">For agencies & large teams</div>
+        <ul class="p-list"><li>Unlimited interviews</li><li>Unlimited recruiters</li><li>SSO / SAML</li><li>SLA guarantee</li><li>Dedicated support</li></ul>
+        <button class="btn btn-ghost p-btn">Talk to Sales</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ——— FAQ ——— -->
+  <div class="section" id="faq">
+    <div class="section-header">
+      <div class="section-badge reveal"><span class="dot"></span> FAQ</div>
+      <h2 class="section-title reveal">Frequently asked questions</h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How does Truveil detect AI-assisted answers?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil uses live transcript text from the candidate app and local heuristics for filler density, self-correction, answer uniformity, concrete detail, repeated phrasing, and generic structure. Scores are advisory risk signals, not guarantees.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long is fallback audio retained?<span class="arr">+</span></button><div class="faq-a"><div><p>The required path is transcript-first. If fallback audio is needed, short session-scoped chunks are used for local admin transcription and cleaned up when the session ends.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does the candidate know they're being monitored?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Candidates install Truveil Secure and explicitly consent to monitoring. On every flag, a warning overlay appears on their screen. Truveil is about transparency and deterrence.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What interview platforms does it work with?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil works alongside Zoom, Google Meet, Microsoft Teams, and any video call platform. It runs as a separate app — no plugins or extensions needed.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try it for free?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Your first interview session is completely free — no credit card required. Download the app, create a session, and see it in action.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What about false positives?<span class="arr">+</span></button><div class="faq-a"><div><p>Every flag includes a confidence score and detailed AI reasoning. Scores are advisory, never definitive. We give you data and context — you make the hiring decision.</p></div></div></div>
+    </div>
+  </div>
+
+  <!-- ——— CTA ——— -->
+  <div class="final-cta">
+    <h2 class="reveal">Ready to protect your<br><span class="gradient-text">next interview?</span></h2>
+    <p class="reveal">Start your first session free. No credit card. No commitment.</p>
+    <a href="#" class="btn btn-primary lg reveal" onclick="openDownloadModal(event)">Download Truveil Free</a>
+    <div class="hero-note reveal" style="margin-top:14px">Works on Mac & Windows</div>
+  </div>
+
+  <footer>
+    <div class="footer-col">
+      <div class="nav-logo" style="margin-bottom:8px;-webkit-text-fill-color:#fff">Truveil</div>
+      <p>Real answers only.</p>
+      <p style="font-size:9px;color:rgba(255,255,255,.1);margin-top:10px">&copy; 2026 Truveil Inc.</p>
+    </div>
+    <div class="footer-col"><h5>Product</h5><ul><li><a href="#detection">Detection</a></li><li><a href="#how-it-works">How it works</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#">Download</a></li></ul></div>
+    <div class="footer-col"><h5>Company</h5><ul><li><a href="#">About</a></li><li><a href="#">Blog</a></li><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li></ul></div>
+    <div class="footer-col"><h5>Support</h5><ul><li><a href="#">Help Center</a></li><li><a href="#faq">FAQ</a></li><li><a href="#">Contact</a></li></ul></div>
+  </footer>
+
+  <!-- Download Modal -->
+  <div class="modal-overlay" id="dlModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Truveil Terms & Conditions</h3>
+        <button class="modal-close" onclick="closeDownloadModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>By downloading Truveil, you agree to our Terms of Service and Privacy Policy. The software employs device-level monitoring and AI inference to detect interview anomalies.</p>
+        <div class="terms-check">
+          <input type="checkbox" id="termsCheck" onchange="toggleDownloadBtn()">
+          <label for="termsCheck">I have read and agree to the Terms & Conditions.</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" class="btn btn-primary btn-dl-final" id="finalDlBtn" download onclick="closeDownloadModal()">Accept & Download</a>
+      </div>
     </div>
   </div>
 
   <script>
-    const revealObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) entry.target.classList.add('visible');
+    // ——— Scroll reveal with stagger ———
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(x => {
+        if (x.isIntersecting) { x.target.classList.add('visible'); obs.unobserve(x.target); }
       });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+    }, { threshold: 0.06, rootMargin: '0px 0px -60px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
-    const nav = document.querySelector('.nav');
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 18);
-    }, { passive: true });
-
+    // ——— Parallax on hero mockup ———
     const heroMockup = document.getElementById('heroMockup');
+    let ticking = false;
     window.addEventListener('scroll', () => {
-      if (!heroMockup || window.scrollY > 900) return;
-      heroMockup.style.transform = `translateY(${window.scrollY * 0.08}px)`;
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const y = window.scrollY;
+          if (heroMockup && y < 1200) {
+            heroMockup.style.transform = `translateY(${y * 0.12}px) scale(${1 - y * 0.00015})`;
+            heroMockup.style.opacity = Math.max(0, 1 - y / 900);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     }, { passive: true });
 
-    const modal = document.getElementById('downloadModal');
-    const terms = document.getElementById('termsCheck');
-    const finalDownload = document.getElementById('finalDownload');
-    function openDownloadModal(event) {
-      event.preventDefault();
-      modal.classList.add('active');
-      modal.setAttribute('aria-hidden', 'false');
-      terms.checked = false;
-      toggleDownloadBtn();
+    // ——— Counter animation ———
+    const counterObs = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const target = parseInt(el.dataset.target);
+          const prefix = el.dataset.prefix || '';
+          const suffix = el.dataset.suffix || '';
+          let current = 0;
+          const step = Math.max(1, Math.floor(target / 40));
+          const iv = setInterval(() => {
+            current += step;
+            if (current >= target) { current = target; clearInterval(iv); }
+            el.textContent = prefix + current + suffix;
+          }, 25);
+          counterObs.unobserve(el);
+        }
+      });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.stat-num[data-target]').forEach(el => counterObs.observe(el));
+
+    // ——— Nav state ———
+    const navEl = document.querySelector('nav');
+    const onScroll = () => navEl.classList.toggle('scrolled', window.scrollY > 12);
+    window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+    // ——— Hero dashboard typing ———
+    const phrases = [
+      { text: 'Sure. I\'m a software engineer with 6 years of experience. At my previous company, I successfully led a migration from a monolithic to microservices architecture...', score: 84 },
+      { text: 'Hmm, so like... we mostly used Java I think? And um, we had this monolith that was kind of a pain to work with honestly...', score: 14 },
+      { text: 'I designed and implemented a comprehensive CI/CD pipeline utilizing Kubernetes orchestration, Terraform infrastructure-as-code, and GitOps principles...', score: 94 }
+    ];
+    let pi = 0, ci = 0;
+    const tt = document.getElementById('transcript-text');
+    const mr = document.getElementById('mockReasoning');
+    const rsk = document.getElementById('mockRisk');
+    const tm = document.getElementById('timer');
+    let ts = 272;
+    setInterval(() => { ts++; tm.textContent = `00:${String(Math.floor(ts/60)).padStart(2,'0')}:${String(ts%60).padStart(2,'0')}`; }, 1000);
+
+    const reasonings = [
+      'Zero filler words, perfect structure — consistent with AI-generated text.',
+      'Natural filler words, self-corrections — consistent with spontaneous human speech.',
+      'Robotic cadence, generic phrasing, zero hesitation — almost certainly AI-generated.'
+    ];
+
+    function resetTyping() {
+      tt.innerHTML = '<span class="cursor"></span>';
+      mr.style.opacity = '0';
+      ci = 0; setTimeout(typeChar, 600);
     }
-    function closeDownloadModal() {
-      modal.classList.remove('active');
-      modal.setAttribute('aria-hidden', 'true');
+    function typeChar() {
+      const p = phrases[pi];
+      if (ci < p.text.length) {
+        const cur = tt.querySelector('.cursor');
+        tt.insertBefore(document.createTextNode(p.text.charAt(ci)), cur);
+        ci++;
+        if (ci === Math.floor(p.text.length * 0.6)) {
+          mr.textContent = reasonings[pi];
+          mr.style.opacity = '1';
+          const v = p.score;
+          rsk.textContent = v + '%';
+          rsk.className = 'mm-val ' + (v > 60 ? 'risk-high' : 'risk-low');
+        }
+        setTimeout(typeChar, 16 + Math.random() * 12);
+      } else {
+        setTimeout(() => { pi = (pi + 1) % phrases.length; resetTyping(); }, 4000);
+      }
     }
-    function toggleDownloadBtn() {
-      finalDownload.classList.toggle('disabled', !terms.checked);
-    }
-    modal.addEventListener('click', (event) => {
-      if (event.target === modal) closeDownloadModal();
+    setTimeout(typeChar, 800);
+
+    // ——— Floating Particles ———
+    (function() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 30; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.top = Math.random() * 100 + '%';
+        p.style.width = (1 + Math.random() * 2) + 'px';
+        p.style.height = p.style.width;
+        p.style.animationDuration = (12 + Math.random() * 18) + 's';
+        p.style.animationDelay = (Math.random() * 10) + 's';
+        p.style.opacity = (.15 + Math.random() * .35);
+        container.appendChild(p);
+      }
+    })();
+
+    // ——— Cursor Glow ———
+    const cursorGlow = document.getElementById('cursorGlow');
+    let glowActive = false;
+    document.addEventListener('mousemove', (e) => {
+      if (!glowActive) { cursorGlow.classList.add('active'); glowActive = true; }
+      cursorGlow.style.left = e.clientX + 'px';
+      cursorGlow.style.top = e.clientY + 'px';
     });
+    document.addEventListener('mouseleave', () => { cursorGlow.classList.remove('active'); glowActive = false; });
+
+    // ——— Modal ———
+    const dlModal = document.getElementById('dlModal');
+    const termsCheck = document.getElementById('termsCheck');
+    const finalDlBtn = document.getElementById('finalDlBtn');
+    function openDownloadModal(e) { e.preventDefault(); dlModal.classList.add('active'); termsCheck.checked = false; finalDlBtn.style.opacity = '0.5'; finalDlBtn.style.pointerEvents = 'none'; }
+    function closeDownloadModal() { dlModal.classList.remove('active'); }
+    function toggleDownloadBtn() { const ok = termsCheck.checked; finalDlBtn.style.opacity = ok ? '1' : '0.5'; finalDlBtn.style.pointerEvents = ok ? 'all' : 'none'; }
   </script>
 </body>
 </html>
