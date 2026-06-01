@@ -16,13 +16,24 @@ create table if not exists public.audio_chunks (
   score integer,
   reasoning text,
   flags jsonb not null default '[]'::jsonb,
+  source text,
   created_at timestamptz not null default now(),
   transcribed_at timestamptz,
   cleaned_at timestamptz,
   constraint audio_chunks_storage_path_session_check check (storage_path like session_id || '/%'),
-  constraint audio_chunks_status_check check (status in ('uploading','uploaded','received','transcribing','transcribed','failed','deleted')),
+  constraint audio_chunks_status_check check (status in ('uploading','uploaded','received','transcribing','transcribed','failed','deleted','transcribed_deleted','failed_deleted')),
   constraint audio_chunks_score_check check (score is null or (score >= 0 and score <= 100))
 );
+
+alter table public.audio_chunks
+  add column if not exists source text;
+
+alter table public.audio_chunks
+  drop constraint if exists audio_chunks_status_check;
+
+alter table public.audio_chunks
+  add constraint audio_chunks_status_check
+  check (status in ('uploading','uploaded','received','transcribing','transcribed','failed','deleted','transcribed_deleted','failed_deleted'));
 
 create index if not exists audio_chunks_session_sequence_idx on public.audio_chunks(session_id, sequence);
 create index if not exists audio_chunks_created_idx on public.audio_chunks(created_at desc);

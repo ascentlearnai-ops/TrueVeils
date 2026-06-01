@@ -128,48 +128,62 @@ function getDeepgramTranscriber() {
 }
 
 async function transcribeAudioEntry(entry) {
-  let localError = null;
-  try {
-    const result = await getLocalTranscriber().transcribeQueued(entry.localPath, entry);
-    const text = String(result.text || '').trim();
-    if (text) return { text, source: 'local-whisper', result };
-    localError = new Error('Local speech engine did not detect clear speech in this audio chunk.');
-  } catch (err) {
-    localError = err;
-  }
+  const errors = [];
 
   const deepgram = getDeepgramTranscriber();
   if (deepgram.isConfigured()) {
     try {
       sendToRenderer('realtime:audio-status', {
         state: 'transcribing',
-        message: 'Local transcription failed; trying Deepgram fallback',
+        message: 'Transcribing with Deepgram',
         chunkId: entry.chunkId,
         timestamp: Date.now()
       });
       const result = await deepgram.transcribe(entry.localPath, entry);
       const text = String(result.text || '').trim();
       if (text) return { text, source: 'deepgram-nova-3', result };
-      localError = new Error('Deepgram did not detect clear speech in this audio chunk.');
+      errors.push(new Error('Deepgram did not detect clear speech in this audio chunk.'));
     } catch (err) {
-      localError = err;
+      errors.push(err);
     }
   }
 
   const groq = getGroqTranscriber();
-  if (!groq.isConfigured()) throw localError;
+  if (groq.isConfigured()) {
+    try {
+      sendToRenderer('realtime:audio-status', {
+        state: 'transcribing',
+        message: 'Deepgram unavailable; trying Groq Whisper',
+        chunkId: entry.chunkId,
+        timestamp: Date.now()
+      });
 
-  sendToRenderer('realtime:audio-status', {
-    state: 'transcribing',
-    message: 'Trying Groq fallback transcription',
-    chunkId: entry.chunkId,
-    timestamp: Date.now()
-  });
+      const result = await groq.transcribe(entry.localPath, entry);
+      const text = String(result.text || '').trim();
+      if (text) return { text, source: 'groq-whisper', result };
+      errors.push(new Error('Groq did not detect clear speech in this audio chunk.'));
+    } catch (err) {
+      errors.push(err);
+    }
+  }
 
-  const result = await groq.transcribe(entry.localPath, entry);
-  const text = String(result.text || '').trim();
-  if (!text) throw localError;
-  return { text, source: 'groq-whisper', result };
+  try {
+    sendToRenderer('realtime:audio-status', {
+      state: 'transcribing',
+      message: 'Cloud transcription unavailable; trying local Whisper',
+      chunkId: entry.chunkId,
+      timestamp: Date.now()
+    });
+    const result = await getLocalTranscriber().transcribeQueued(entry.localPath, entry);
+    const text = String(result.text || '').trim();
+    if (text) return { text, source: 'local-whisper', result };
+    errors.push(new Error('Local speech engine did not detect clear speech in this audio chunk.'));
+  } catch (err) {
+    errors.push(err);
+  }
+
+  const message = errors.map(err => err?.message).filter(Boolean).slice(-2).join(' | ');
+  throw new Error(message || 'No transcription provider returned text.');
 }
 
 function sessionChannelName(sessionId) {
@@ -369,6 +383,8 @@ async function broadcastAudioChunkStatus(entry, patch = {}) {
     aiScore: entry.aiScore,
     flags: entry.flags || [],
     reasoning: entry.reasoning || '',
+    source: entry.source || '',
+    remoteDeleted: Boolean(entry.remoteDeleted),
     timestamp: Date.now(),
     ...patch
   };
@@ -380,6 +396,28 @@ async function broadcastAudioChunkStatus(entry, patch = {}) {
     } catch (err) {
       console.warn('[Realtime] audio status broadcast failed:', err.message);
     }
+  }
+}
+
+async function deleteRemoteAudioChunk(entry, finalStatus) {
+  if (!entry || entry.remoteDeleted) return;
+  const client = getSupabase();
+  const storagePath = entry.storagePath;
+  if (!client || !storagePath) return;
+
+  try {
+    const { error } = await client.storage.from('session-audio').remove([storagePath]);
+    if (error) throw new Error(error.message);
+    entry.remoteDeleted = true;
+    entry.status = finalStatus;
+    entry.storagePath = '';
+    await updateAudioChunkRow(entry.chunkId, {
+      status: finalStatus,
+      cleaned_at: new Date().toISOString()
+    });
+    await broadcastAudioChunkStatus(entry, { status: finalStatus, remoteDeleted: true });
+  } catch (err) {
+    console.warn('[Supabase] immediate audio cleanup failed:', err.message);
   }
 }
 
@@ -493,6 +531,7 @@ async function handleCandidateAudioChunk(payload = {}) {
       flags: entry.flags
     });
     await broadcastAudioChunkStatus(entry);
+    await deleteRemoteAudioChunk(entry, 'failed_deleted');
   }
 }
 
@@ -509,6 +548,7 @@ async function processAudioTranscription(entry) {
     const text = transcription.text;
     entry.status = text ? 'transcribed' : 'received';
     entry.transcript = text;
+    entry.source = transcription.source;
 
     if (text) {
       const analysis = LocalRisk.analyzeTranscript(text, {
@@ -526,6 +566,8 @@ async function processAudioTranscription(entry) {
         confidence: analysis.confidence,
         flags: entry.flags,
         reasoning: entry.reasoning,
+        aiSignals: analysis.aiSignals || [],
+        humanSignals: analysis.humanSignals || [],
         source: transcription.source,
         chunkId: entry.chunkId
       };
@@ -550,13 +592,15 @@ async function processAudioTranscription(entry) {
       score: entry.aiScore,
       reasoning: entry.reasoning,
       flags: entry.flags || [],
+      source: entry.source || null,
       transcribed_at: new Date().toISOString()
     });
     await broadcastAudioChunkStatus(entry);
+    await deleteRemoteAudioChunk(entry, text ? 'transcribed_deleted' : 'failed_deleted');
   } catch (err) {
     entry.status = 'failed';
-    entry.reasoning = `Local transcription unavailable: ${err.message}`;
-    entry.flags = [...(entry.flags || []), 'Local transcription unavailable'].slice(0, 4);
+    entry.reasoning = `Transcription unavailable: ${err.message}`;
+    entry.flags = [...(entry.flags || []), 'Transcription unavailable'].slice(0, 4);
     await updateAudioChunkRow(entry.chunkId, {
       status: 'failed',
       score: entry.aiScore,
@@ -570,6 +614,7 @@ async function processAudioTranscription(entry) {
       chunkId: entry.chunkId,
       timestamp: Date.now()
     });
+    await deleteRemoteAudioChunk(entry, 'failed_deleted');
   }
 }
 
@@ -580,12 +625,25 @@ function handleCandidateEvent(payload = {}) {
     broadcastSessionPolicy();
   }
 
+  const describeBlockingWarning = () => {
+    const host = String(payload.detectedHost || '').trim();
+    const url = String(payload.detectedUrl || '').trim();
+    const processName = String(payload.processName || '').trim();
+    const title = String(payload.windowTitle || '').trim();
+    const rule = payload.matchedRule ? ` (matched ${payload.matchedRule})` : '';
+    if (host) return `Candidate opened ${host} in ${processName || 'a browser'}${rule}`;
+    if (url) return `Candidate opened ${url} in ${processName || 'a browser'}${rule}`;
+    if (processName && title) return `Candidate switched to ${processName} - ${title}${rule}`;
+    if (processName) return `Candidate switched to ${processName}${rule}`;
+    return 'Candidate opened a disallowed app or tab';
+  };
+
   const labels = {
     candidate_connected: 'Candidate connected to Truveil Secure',
     focus_lost: 'Candidate switched away from Truveil Secure',
     focus_gained: 'Candidate returned to Truveil Secure',
     shortcut_blocked: 'Candidate attempted a blocked shortcut',
-    blocking_warning: 'Candidate opened a disallowed app or tab',
+    blocking_warning: describeBlockingWarning(),
     audio_upload_failed: 'Candidate audio upload failed',
     overlay_detected: 'Potential hidden overlay or AI assistant detected',
     candidate_interrupted: 'Candidate ended or closed the secure session',
@@ -653,13 +711,19 @@ async function cleanupRemoteAudioChunks() {
   const client = getSupabase();
   if (!client) return;
 
-  const paths = Array.from(new Set(sessionData.audioChunks.map(chunk => chunk.storagePath).filter(Boolean)));
+  const paths = Array.from(new Set(sessionData.audioChunks
+    .filter(chunk => !chunk.remoteDeleted)
+    .map(chunk => chunk.storagePath)
+    .filter(Boolean)));
   if (paths.length) {
     const { error } = await client.storage.from('session-audio').remove(paths);
     if (error) console.warn('[Supabase] remote audio cleanup failed:', error.message);
   }
 
-  const ids = sessionData.audioChunks.map(chunk => chunk.chunkId).filter(Boolean);
+  const ids = sessionData.audioChunks
+    .filter(chunk => !chunk.remoteDeleted && chunk.status !== 'transcribed_deleted' && chunk.status !== 'failed_deleted')
+    .map(chunk => chunk.chunkId)
+    .filter(Boolean);
   if (ids.length) {
     const { error } = await client
       .from('audio_chunks')

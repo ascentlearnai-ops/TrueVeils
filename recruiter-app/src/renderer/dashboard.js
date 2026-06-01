@@ -219,7 +219,7 @@ async function commitFinalTranscript(text) {
 }
 
 function renderAnalysis(entryEl, result) {
-  const { aiScore, reasoning, flags, error, displayLabel } = result;
+  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], humanSignals = [], source } = result;
   const scoreEl = entryEl.querySelector('.entry-score');
   const reasoningEl = entryEl.querySelector('.entry-reasoning');
 
@@ -236,7 +236,10 @@ function renderAnalysis(entryEl, result) {
   scoreEl.className = `entry-score ${cls}`;
 
   if (reasoning) {
-    reasoningEl.textContent = reasoning;
+    const evidence = aiSignals.length ? ` Evidence: ${aiSignals.slice(0, 3).join('; ')}.` : '';
+    const counter = humanSignals.length ? ` Human counter-signal: ${humanSignals[0]}.` : '';
+    const sourceText = source ? ` Source: ${source}.` : '';
+    reasoningEl.textContent = `${reasoning}${evidence}${counter}${sourceText}`;
     reasoningEl.classList.remove('hidden');
   }
 
@@ -290,10 +293,18 @@ function audioStatusLabel(status) {
     received: 'Received',
     transcribing: 'Transcribing',
     transcribed: 'Transcribed',
+    transcribed_deleted: 'Transcribed + deleted',
     failed: 'Needs attention',
+    failed_deleted: 'Failed + deleted',
     deleted: 'Cleaned'
   };
   return labels[status] || status || 'Received';
+}
+
+function audioStatusClass(status) {
+  if (status === 'failed' || status === 'failed_deleted') return 'bad';
+  if (status === 'transcribed' || status === 'transcribed_deleted' || status === 'deleted') return 'ok';
+  return 'busy';
 }
 
 function renderAudioChunk(chunk = {}) {
@@ -316,8 +327,9 @@ function renderAudioChunk(chunk = {}) {
   }
 
   const status = audioStatusLabel(chunk.status);
-  const cls = chunk.status === 'failed' ? 'bad' : chunk.status === 'transcribed' ? 'ok' : 'busy';
+  const cls = audioStatusClass(chunk.status);
   const duration = chunk.durationMs ? `${Math.round(chunk.durationMs / 1000)}s` : 'live';
+  const source = chunk.source ? `<div class="audio-item-meta">Source: ${esc(chunk.source)}${chunk.remoteDeleted ? ' - remote audio deleted' : ''}</div>` : '';
   el.className = `audio-item ${cls}`;
   el.innerHTML = `
     <div class="audio-item-main">
@@ -326,6 +338,7 @@ function renderAudioChunk(chunk = {}) {
         <span class="audio-chip ${cls}">${esc(status)}</span>
       </div>
       <div class="audio-item-meta">${fmtTime(chunk.timestamp || Date.now())} - ${duration}</div>
+      ${source}
       ${chunk.transcript ? `<div class="audio-mini-transcript">${esc(chunk.transcript)}</div>` : ''}
       ${chunk.reasoning ? `<div class="audio-reason">${esc(chunk.reasoning)}</div>` : ''}
     </div>`;
