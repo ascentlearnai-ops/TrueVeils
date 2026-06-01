@@ -50,12 +50,12 @@ const HYPOTHETICALS = [
 const DIRECT_AI_USE = [
   /\bi am ai\b/g,
   /\bi'?m ai\b/g,
+  /\bam ai\b/g,
   /\bchatgpt\b/g,
   /\bclaude\b/g,
   /\bgemini\b/g,
   /\bcopilot\b/g,
   /\bperplexity\b/g,
-  /\buse(?:d|s|ing)? ai\b/g,
   /\bai tools?\b/g,
   /\bllm\b/g,
   /\blarge language model\b/g
@@ -70,6 +70,26 @@ const ASSISTANT_STYLE_PHRASES = [
   /\bfrom this perspective\b/g,
   /\bcomfortable learning new technical tools\b/g,
   /\bfinding ways to make tasks? more efficient\b/g
+];
+
+const CODE_ASSISTANCE_PHRASES = [
+  /\bsolve(?:d|s|ing)? (?:the )?(?:problem|leetcode|coding challenge)\b/g,
+  /\btime complexity\b/g,
+  /\bspace complexity\b/g,
+  /\bedge cases?\b/g,
+  /\bbrute force\b/g,
+  /\boptimized solution\b/g,
+  /\bwalk(?:ed)? through the code\b/g,
+  /\bcopy(?:ing)? (?:the )?(?:answer|solution|code)\b/g,
+  /\bpaste(?:d|ing)? (?:the )?(?:answer|solution|code)\b/g
+];
+
+const DISCOURSE_MARKERS = [
+  /\bso\b/g,
+  /\band\b/g,
+  /\bbut\b/g,
+  /\bbecause\b/g,
+  /\bthen\b/g
 ];
 
 function clamp(n, min = 0, max = 100) {
@@ -179,6 +199,7 @@ function analyzeTranscript(text, context = {}) {
   const wordCount = tokens.length;
   const directAiCount = countMatches(text, DIRECT_AI_USE);
   const assistantStyleCount = countMatches(text, ASSISTANT_STYLE_PHRASES);
+  const codeAssistanceCount = countMatches(text, CODE_ASSISTANCE_PHRASES);
   const repeatedShortPhrase = wordCount >= 6 && (ngramRepetition(tokens, 2) > 0.18 || ngramRepetition(tokens, 3) > 0.1);
 
   if (wordCount < 8) {
@@ -196,18 +217,18 @@ function analyzeTranscript(text, context = {}) {
     };
   }
 
-  if (directAiCount >= 1 && repeatedShortPhrase) {
+  if (directAiCount >= 1 && (repeatedShortPhrase || wordCount <= 14)) {
     return {
-      score: 88,
+      score: 94,
       label: 'high_ai_assistance_risk',
       displayLabel: humanLabel('high_ai_assistance_risk'),
-      confidence: 'medium',
+      confidence: 'medium-high',
       flags: ['Direct AI mention repeated in the answer', 'Repeated phrase cadence'],
-      reasoning: `High AI-assistance risk. Main signal: direct AI mention repeated in a short response. Words: ${wordCount}; direct AI mentions: ${directAiCount}.`,
+      reasoning: `High AI-assistance risk. Main signal: direct AI mention inside a short or repeated response. Words: ${wordCount}; direct AI mentions: ${directAiCount}.`,
       aiSignals: ['Direct AI mention repeated in the answer', 'Repeated phrase cadence'],
       humanSignals: [],
       scorable: true,
-      scoreWeight: 0.8
+      scoreWeight: 0.9
     };
   }
 
@@ -218,10 +239,12 @@ function analyzeTranscript(text, context = {}) {
   const concreteCount = countMatches(text, SPECIFICITY);
   const hedgeCount = countMatches(text, HEDGES);
   const hypotheticalCount = countMatches(text, HYPOTHETICALS);
+  const discourseCount = countMatches(text, DISCOURSE_MARKERS);
   const uniqueRatio = new Set(tokens).size / wordCount;
   const fillerDensity = fillerCount / wordCount;
   const correctionDensity = correctionCount / wordCount;
   const concreteDensity = concreteCount / wordCount;
+  const discourseDensity = discourseCount / wordCount;
   const sentenceLengths = parts.map(part => words(part).length).filter(Boolean);
   const avgSentenceLength = sentenceLengths.length ? mean(sentenceLengths) : wordCount;
   const sentenceMad = mad(sentenceLengths);
@@ -240,8 +263,10 @@ function analyzeTranscript(text, context = {}) {
   const aiSignals = [];
   const humanSignals = [];
 
-  addSignal(aiSignals, directAiCount >= 2, 18, 'Repeated direct AI or AI-tool mention', directAiCount);
-  addSignal(aiSignals, assistantStyleCount >= 1, wordCount >= 25 ? 14 : 8, 'Assistant-like phrasing in spoken answer', assistantStyleCount);
+  addSignal(aiSignals, directAiCount >= 1, directAiCount >= 2 ? 28 : 18, 'Direct AI or AI-tool mention inside the answer', directAiCount);
+  addSignal(aiSignals, codeAssistanceCount >= 2, 14, 'Coding-assistant answer pattern', codeAssistanceCount);
+  addSignal(aiSignals, assistantStyleCount >= 1, wordCount >= 25 ? 20 : 12, 'Assistant-like phrasing in spoken answer', assistantStyleCount);
+  addSignal(aiSignals, assistantStyleCount >= 1 && directAiCount >= 1, 12, 'Assistant phrasing plus AI-tool mention', assistantStyleCount + directAiCount);
   addSignal(aiSignals, wordCount >= 30 && fillerDensity < 0.006, 20, 'Long answer with almost no spoken fillers', fillerDensity);
   addSignal(aiSignals, correctionCount === 0 && wordCount >= 35, 12, 'No self-correction in a long spoken answer', correctionCount);
   addSignal(aiSignals, structuredCount >= 3, 15, 'Highly packaged answer structure', structuredCount);
@@ -258,11 +283,14 @@ function analyzeTranscript(text, context = {}) {
   addSignal(aiSignals, avgSentenceLength > 24 && fillerDensity < 0.012, 8, 'Long clean sentences in a spoken answer', avgSentenceLength);
   addSignal(aiSignals, lengthUniformity > 0.82, 10, 'Response length is unusually uniform across the session', lengthUniformity);
   addSignal(aiSignals, similarity > 0.68 && wordCount >= 25, 9, 'Answer resembles earlier phrasing too closely', similarity);
+  addSignal(aiSignals, wordCount >= 28 && discourseDensity < 0.035 && fillerDensity < 0.01, 7, 'Low conversational glue for spoken answer length', discourseDensity);
 
   addSignal(humanSignals, fillerDensity > 0.025 && directAiCount === 0, -9, 'Natural fillers and pauses', fillerDensity);
   addSignal(humanSignals, correctionDensity > 0.018 || correctionCount >= 2, -10, 'Self-corrections and rephrasing', correctionCount);
-  addSignal(humanSignals, concreteDensity > 0.09, -14, 'Concrete first-person or project detail', concreteDensity);
+  addSignal(humanSignals, concreteDensity > 0.09 && directAiCount === 0, -14, 'Concrete first-person or project detail', concreteDensity);
+  addSignal(humanSignals, concreteDensity > 0.055 && wordCount >= 28 && directAiCount === 0, -7, 'Some concrete role or project detail', concreteDensity);
   addSignal(humanSignals, hedgeCount >= 2, -6, 'Natural uncertainty markers', hedgeCount);
+  addSignal(humanSignals, discourseDensity > 0.12 && directAiCount === 0, -5, 'Conversational connective language', discourseDensity);
   addSignal(humanSignals, sentenceMad > 8 && sentenceLengths.length >= 3, -6, 'Uneven spoken sentence rhythm', sentenceMad);
   addSignal(humanSignals, burstiness > 0.48 && sentenceLengths.length >= 3, -5, 'High spoken burstiness', burstiness);
 

@@ -46,6 +46,25 @@ async function runWithRetry(operation, { attempts = 3, baseDelayMs = 650 } = {})
 }
 
 function normalizePolicy(policy = {}) {
+  const defaultBlockedSites = [
+    'chatgpt.com',
+    'claude.ai',
+    'gemini.google.com',
+    'copilot.microsoft.com',
+    'perplexity.ai',
+    'poe.com',
+    'you.com',
+    'phind.com',
+    'interviewcoder',
+    'interview coder',
+    'cluely',
+    'finalround',
+    'lockedin',
+    'parakeet',
+    'leetcode wizard',
+    'ultracode',
+    'interview copilot'
+  ];
   const toList = (value, fallback = []) => {
     const items = Array.isArray(value)
       ? value
@@ -67,13 +86,7 @@ function normalizePolicy(policy = {}) {
       'zoom.us',
       'teams.microsoft.com'
     ]),
-    blocked_sites: toList(policy.blocked_sites || policy.blockedSites, [
-      'chatgpt.com',
-      'claude.ai',
-      'gemini.google.com',
-      'copilot.microsoft.com',
-      'perplexity.ai'
-    ]),
+    blocked_sites: toList(policy.blocked_sites || policy.blockedSites, defaultBlockedSites),
     blocking_mode: policy.blocking_mode || policy.blockingMode || 'warn_refocus'
   };
 }

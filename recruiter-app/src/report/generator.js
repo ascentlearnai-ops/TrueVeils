@@ -49,11 +49,44 @@ function weightedAverage(items) {
 }
 
 function aiSiteFlagCount(flags = []) {
-  const pattern = /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai)\b/i;
+  const pattern = /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i;
   return flags.filter(flag => {
     const severity = String(flag.severity || '').toLowerCase();
     return (severity === 'high' || severity === 'critical') && pattern.test(String(flag.text || ''));
   }).length;
+}
+
+function behavioralEvidence(flags = []) {
+  const evidence = {
+    aiToolHits: 0,
+    overlayHits: 0,
+    focusSwitches: 0,
+    unlistedAppHits: 0,
+    criticalHits: 0,
+    highHits: 0
+  };
+
+  for (const flag of flags) {
+    const text = String(flag.text || '').toLowerCase();
+    const severity = String(flag.severity || '').toLowerCase();
+    if (severity === 'critical') evidence.criticalHits++;
+    if (severity === 'high' || severity === 'critical') evidence.highHits++;
+    if (/\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) evidence.aiToolHits++;
+    if (/\b(hidden overlay|overlay detected|exclude.?from.?capture|interview coder|interviewcoder|cluely|lockedin|finalround|parakeet)\b/.test(text)) evidence.overlayHits++;
+    if (/\bswitched away\b/.test(text)) evidence.focusSwitches++;
+    if (/\bunlisted app\/site\b/.test(text)) evidence.unlistedAppHits++;
+  }
+
+  const boost = Math.min(
+    42,
+    evidence.aiToolHits * 4
+      + evidence.overlayHits * 14
+      + evidence.criticalHits * 8
+      + Math.min(10, evidence.focusSwitches * 1.5)
+      + Math.min(8, evidence.unlistedAppHits * 2)
+  );
+
+  return { ...evidence, boost: Math.round(boost) };
 }
 
 function sessionRiskSummary({ scores = [], flags = [] }) {
@@ -63,13 +96,18 @@ function sessionRiskSummary({ scores = [], flags = [] }) {
   const max = scoreValues.length ? Math.max(...scoreValues) : 0;
   const top = [...scoreValues].sort((a, b) => b - a).slice(0, 3);
   const topAvg = top.length ? top.reduce((sum, value) => sum + value, 0) / top.length : 0;
-  const behaviorBoost = Math.min(24, aiSiteFlagCount(flags) * 3);
-  const overall = Math.round(Math.min(100, avg * 0.45 + topAvg * 0.22 + max * 0.13 + behaviorBoost));
+  const behavior = behavioralEvidence(flags);
+  const behaviorBoost = Math.max(Math.min(24, aiSiteFlagCount(flags) * 3), behavior.boost);
+  const transcriptEvidence = valid.length >= 3
+    ? avg * 0.36 + topAvg * 0.26 + max * 0.16
+    : avg * 0.24 + topAvg * 0.18 + max * 0.14;
+  const overall = Math.round(Math.min(100, transcriptEvidence + behaviorBoost));
   return {
     avg: overall,
     transcriptAvg: Math.round(avg),
     max: Math.round(max),
     behaviorBoost,
+    behavior,
     scorableCount: valid.length
   };
 }
@@ -228,7 +266,8 @@ function buildHtml(ctx) {
       </div>
       <div class="risk-info">
         <h2>${riskLabel(avg)}</h2>
-        <p>Overall AI-assistance risk from ${risk.scorableCount} scorable transcript response${risk.scorableCount === 1 ? '' : 's'}${risk.behaviorBoost ? ` plus restricted AI-site evidence (+${risk.behaviorBoost})` : ''}. Short fragments are treated as inconclusive, not human evidence.</p>
+        <p>Overall AI-assistance risk from ${risk.scorableCount} scorable transcript response${risk.scorableCount === 1 ? '' : 's'}${risk.behaviorBoost ? ` plus behavioral evidence (+${risk.behaviorBoost})` : ''}. Short fragments are treated as inconclusive, not human evidence.</p>
+        ${risk.behaviorBoost ? `<p>Behavioral evidence: ${risk.behavior.aiToolHits} AI-tool/site hit${risk.behavior.aiToolHits === 1 ? '' : 's'}, ${risk.behavior.overlayHits} overlay signal${risk.behavior.overlayHits === 1 ? '' : 's'}, ${risk.behavior.focusSwitches} focus switch${risk.behavior.focusSwitches === 1 ? '' : 'es'}.</p>` : ''}
       </div>
     </div>
 
@@ -268,4 +307,4 @@ function buildHtml(ctx) {
 </html>`;
 }
 
-module.exports = { generate };
+module.exports = { generate, sessionRiskSummary, behavioralEvidence };

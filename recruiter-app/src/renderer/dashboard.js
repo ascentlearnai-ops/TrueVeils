@@ -26,6 +26,7 @@ let scoreWeightSum = 0;
 let latestScore = null;
 let hasFirstTranscript = false;
 let currentSession = null;
+let flagEvidence = [];
 
 // ─── Elements ──────────────────────────────────────────────────────────
 const statusDot = $('statusDot');
@@ -95,6 +96,44 @@ function getAllowedPolicy() {
   };
 }
 
+function behaviorBoostFromFlags(flags = []) {
+  let aiToolHits = 0;
+  let overlayHits = 0;
+  let focusSwitches = 0;
+  let unlistedAppHits = 0;
+  let criticalHits = 0;
+  for (const flag of flags) {
+    const text = String(flag.text || '').toLowerCase();
+    const severity = String(flag.severity || '').toLowerCase();
+    if (severity === 'critical') criticalHits++;
+    if (/\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) aiToolHits++;
+    if (/\b(hidden overlay|overlay detected|exclude.?from.?capture|interview coder|interviewcoder|cluely|lockedin|finalround|parakeet)\b/.test(text)) overlayHits++;
+    if (/\bswitched away\b/.test(text)) focusSwitches++;
+    if (/\bunlisted app\/site\b/.test(text)) unlistedAppHits++;
+  }
+  return Math.min(42, Math.round(
+    aiToolHits * 4
+    + overlayHits * 14
+    + criticalHits * 8
+    + Math.min(10, focusSwitches * 1.5)
+    + Math.min(8, unlistedAppHits * 2)
+  ));
+}
+
+function currentTranscriptAverage() {
+  return scoreWeightSum ? Math.round(scoreSum / scoreWeightSum) : 0;
+}
+
+function currentOverallRisk() {
+  return Math.min(100, Math.round(currentTranscriptAverage() + behaviorBoostFromFlags(flagEvidence)));
+}
+
+function refreshOverallRiskMetric() {
+  const overall = currentOverallRisk();
+  statsScore.textContent = `${overall}%`;
+  statsScore.className = 'mm-val ' + (overall >= 70 ? 'risk-high' : overall >= 40 ? 'risk-med' : 'risk-low');
+}
+
 // ─── Idle: New Session ────────────────────────────────────────────────
 $('newSessionBtn').addEventListener('click', onNewSession);
 $('newSessionBtn2').addEventListener('click', onNewSession);
@@ -116,7 +155,20 @@ async function onNewSession() {
     allowedSitesInput.value = ['meet.google.com', 'zoom.us', 'teams.microsoft.com'].join('\n');
     customBlockedSitesInput.value = '';
     document.querySelectorAll('[data-blocked-site]').forEach(input => {
-      input.checked = ['chatgpt.com', 'claude.ai', 'gemini.google.com', 'copilot.microsoft.com', 'perplexity.ai']
+      input.checked = [
+        'chatgpt.com',
+        'claude.ai',
+        'gemini.google.com',
+        'copilot.microsoft.com',
+        'perplexity.ai',
+        'poe.com',
+        'you.com',
+        'phind.com',
+        'interviewcoder',
+        'cluely',
+        'finalround',
+        'lockedin'
+      ]
         .includes(input.getAttribute('data-blocked-site'));
     });
     showScreen('setup');
@@ -253,7 +305,7 @@ function renderAnalysis(entryEl, result) {
     scoreCount++;
     latestScore = aiScore;
   }
-  const avg = scoreWeightSum ? Math.round(scoreSum / scoreWeightSum) : 0;
+  const avg = currentOverallRisk();
   updateScoreRing(avg, canScore ? latestScore : null, reasoning, displayLabel);
 
   // Add flags
@@ -292,8 +344,7 @@ function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
   if (reasoning) scoreReasoning.textContent = reasoning;
 
   // Metrics
-  statsScore.textContent = `${avgScore}%`;
-  statsScore.className = 'mm-val ' + (avgScore >= 70 ? 'risk-high' : avgScore >= 40 ? 'risk-med' : 'risk-low');
+  refreshOverallRiskMetric();
   scoreTrendEl.textContent = typeof latest === 'number' ? `${latest}%` : '—';
   scoreTrendEl.className = 'mm-val mm-trend ' + (typeof latest === 'number' && latest >= 70 ? 'rising' : typeof latest === 'number' && latest < 40 ? 'falling' : '');
 }
@@ -393,6 +444,8 @@ function addFlag(text, timestamp, severity = 'medium', persist = true) {
   totalFlags++;
   flagCount.textContent = totalFlags;
   statsFlags.textContent = totalFlags;
+  flagEvidence.push({ text, severity, timestamp: timestamp || Date.now() });
+  refreshOverallRiskMetric();
 
   if (flagsList.querySelector('.empty-state')) flagsList.innerHTML = '';
 
@@ -490,7 +543,7 @@ async function endSession() {
   statusDot.className = 'status-dot';
   statusText.textContent = 'Complete';
 
-  const avg = scoreWeightSum ? Math.round(scoreSum / scoreWeightSum) : 0;
+  const avg = currentOverallRisk();
   $('endedStats').innerHTML = `
     <div class="es-item"><span>${avg}%</span>Avg Risk</div>
     <div class="es-item"><span>${totalResponses}</span>Responses</div>
@@ -524,6 +577,7 @@ function resetState() {
   scoreCount = 0;
   scoreWeightSum = 0;
   latestScore = null;
+  flagEvidence = [];
   hasFirstTranscript = false;
   interimBubble = null;
   transcriptList.innerHTML = '<div class="empty-state"><span class="empty-cursor"></span>Listening for voice signature…</div>';
