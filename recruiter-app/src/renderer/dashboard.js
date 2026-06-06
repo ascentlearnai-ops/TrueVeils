@@ -11,7 +11,7 @@ const screens = {
 
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
-  requestAnimationFrame(() => screens[name].classList.add('active'));
+  screens[name].classList.add('active');
 }
 
 // ─── State ─────────────────────────────────────────────────────────────

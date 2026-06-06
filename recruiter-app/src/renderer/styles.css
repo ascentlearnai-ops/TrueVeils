@@ -1021,3 +1021,119 @@ button { font-family: inherit; cursor: pointer; }
   .setup-flow { grid-template-columns: 1fr; }
   .blocked-site-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Usable session setup: compact, scroll-safe, and always actionable. */
+#setup-screen {
+  padding: 20px;
+}
+
+#setup-screen.active {
+  align-items: stretch;
+  justify-content: center;
+}
+
+#setup-screen .waiting-card {
+  display: flex;
+  flex-direction: column;
+  max-width: 1320px;
+  width: 100%;
+  height: calc(100vh - 84px);
+  min-height: 0;
+  padding: 26px 32px 20px;
+  overflow: hidden;
+  text-align: left;
+}
+
+#setup-screen .waiting-pulse {
+  display: none;
+}
+
+#setup-screen .trust-badge {
+  align-self: flex-start;
+  margin-bottom: 10px;
+}
+
+#setup-screen h2 {
+  margin-bottom: 5px;
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1;
+  letter-spacing: -1.8px;
+}
+
+#setup-screen .idle-sub {
+  max-width: none;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+#setup-screen .session-code-card {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+}
+
+#setup-screen .session-code {
+  font-size: 20px;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+}
+
+#setup-screen .session-code-card p {
+  margin-top: 4px;
+}
+
+#setup-screen .setup-flow {
+  margin: 0 0 12px;
+}
+
+#setup-screen .setup-flow div {
+  min-height: 66px;
+  padding: 9px 10px;
+}
+
+#setup-screen .setup-flow span {
+  margin-bottom: 5px;
+}
+
+#setup-screen .form {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 2px 8px 12px 0;
+  gap: 13px;
+}
+
+#setup-screen .field textarea {
+  min-height: 72px;
+}
+
+#setup-screen .blocked-site-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#setup-screen .check-tile {
+  min-height: 48px;
+  padding: 8px;
+}
+
+#setup-screen .setup-actions {
+  flex-shrink: 0;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(10,10,16,.96);
+}
+
+#setup-screen .setup-actions .btn {
+  min-width: 160px;
+}
+
+@media (max-width: 900px) {
+  #setup-screen .waiting-card {
+    height: calc(100vh - 76px);
+    padding: 22px 20px 16px;
+  }
+  #setup-screen .blocked-site-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

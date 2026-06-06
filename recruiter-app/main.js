@@ -825,11 +825,9 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
   session.policy = normalizePolicy(policy);
   const remoteReady = await ensureRemoteSession(session);
   if (remoteReady) {
-    try {
-      await joinRealtimeSession(session.sessionId);
-    } catch (err) {
+    joinRealtimeSession(session.sessionId).catch((err) => {
       console.warn('[Realtime]', err.message);
-    }
+    });
   }
 
   activeSession = session;
