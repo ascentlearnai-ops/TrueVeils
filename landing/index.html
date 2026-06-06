@@ -554,14 +554,6 @@
     function openDownloadModal(e) { e.preventDefault(); dlModal.classList.add('active'); termsCheck.checked = false; finalDlBtn.style.opacity = '0.5'; finalDlBtn.style.pointerEvents = 'none'; }
     function closeDownloadModal() { dlModal.classList.remove('active'); }
     function toggleDownloadBtn() { const ok = termsCheck.checked; finalDlBtn.style.opacity = ok ? '1' : '0.5'; finalDlBtn.style.pointerEvents = ok ? 'all' : 'none'; }
-
-    document.querySelectorAll('.glass-window, .mini-app, .t-card, .p-card, .feature-row, .stat-item, .faq-item').forEach(card => {
-      card.addEventListener('pointermove', event => {
-        const rect = card.getBoundingClientRect();
-        card.style.setProperty('--mx', `${event.clientX - rect.left}px`);
-        card.style.setProperty('--my', `${event.clientY - rect.top}px`);
-      });
-    });
   </script>
 </body>
 </html>
