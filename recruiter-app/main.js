@@ -296,6 +296,14 @@ async function joinRealtimeSession(sessionId) {
       config: { broadcast: { self: false }, presence: { key: 'recruiter' } }
     })
     .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
+      if (payload?.interim) {
+        sendToRenderer('realtime:transcript-interim', {
+          text: payload.text,
+          timestamp: payload.timestamp || Date.now(),
+          source: payload.source || 'candidate-web-speech-interim'
+        });
+        return;
+      }
       analyzeCandidateTranscript(payload);
     })
     .on('broadcast', { event: 'candidate_audio_chunk' }, ({ payload }) => {

@@ -45,16 +45,16 @@
           <polyline points="9 12 11 14 15 10"/>
         </svg>
       </div>
-      <div class="trust-badge"><span class="dot"></span>READY · LIVE TRANSCRIPTION + AI ANALYSIS</div>
-      <h1>Catch interview fraud<br><span class="gradient-text">in real time.</span></h1>
-      <p class="idle-sub">Start a session, receive live transcript text from the candidate app, and fall back to admin-side audio transcription if Electron speech recognition fails.</p>
+      <div class="trust-badge"><span class="dot"></span>READY</div>
+      <h1>Run verified interviews<br><span class="gradient-text">in real time.</span></h1>
+      <p class="idle-sub">Create a session code, watch live transcript text, and review concise flags when restricted tools or unusual answer patterns appear.</p>
       <button class="btn btn-primary lg" id="newSessionBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
         New Interview Session
       </button>
       <div class="idle-features">
         <div class="if"><span class="if-dot"></span> Live Transcription</div>
-        <div class="if"><span class="if-dot"></span> AI Response Scoring</div>
+        <div class="if"><span class="if-dot"></span> Response Review</div>
         <div class="if"><span class="if-dot"></span> Forensic Flag Feed</div>
         <div class="if"><span class="if-dot"></span> Instant HTML Report</div>
       </div>
@@ -76,7 +76,7 @@
       </div>
       <div class="trust-badge"><span class="dot"></span>SESSION READY</div>
       <h2>Configure this session</h2>
-      <p class="idle-sub">Quick details for your report — then we'll start listening.</p>
+      <p class="idle-sub">Share the code, choose restricted sites, then wait for the candidate to connect.</p>
 
       <div class="session-code-card">
         <label>SESSION ID</label>
@@ -103,7 +103,7 @@
           <label>Transcript relay</label>
           <div class="relay-note">
             <span class="relay-dot"></span>
-            Candidate speech is converted to transcript text inside Truveil Secure and streamed here over Supabase Realtime. Raw audio is not uploaded or stored.
+            Candidate speech appears here as live transcript text. Fallback audio is temporary and deleted after transcription.
           </div>
         </div>
         <div class="policy-grid">
@@ -208,7 +208,7 @@ teams.microsoft.com</textarea>
               <div class="score-value" id="scoreValue">—</div>
             </div>
             <div class="score-info">
-              <div class="score-label-tag">AI-ASSISTANCE RISK</div>
+              <div class="score-label-tag">RESPONSE REVIEW</div>
               <h3 id="scoreLabel">Listening</h3>
               <p id="scoreReasoning">Waiting for first response…</p>
             </div>

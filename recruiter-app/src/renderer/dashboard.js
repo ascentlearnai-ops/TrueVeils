@@ -272,12 +272,12 @@ async function commitFinalTranscript(text) {
 }
 
 function renderAnalysis(entryEl, result) {
-  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], humanSignals = [], source, scorable, scoreWeight } = result;
+  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], source, scorable, scoreWeight } = result;
   const scoreEl = entryEl.querySelector('.entry-score');
   const reasoningEl = entryEl.querySelector('.entry-reasoning');
 
   if (error || aiScore == null) {
-    scoreEl.textContent = '—';
+    scoreEl.textContent = '-';
     scoreEl.className = 'entry-score';
     reasoningEl.textContent = reasoning || 'Analysis unavailable';
     reasoningEl.classList.remove('hidden');
@@ -285,18 +285,16 @@ function renderAnalysis(entryEl, result) {
   }
 
   const cls = aiScore >= 70 ? 'high' : aiScore >= 40 ? 'medium' : 'low';
-  scoreEl.textContent = displayLabel ? `${displayLabel} · ${aiScore}%` : `${aiScore}%`;
+  scoreEl.textContent = riskChipLabel(aiScore);
   scoreEl.className = `entry-score ${cls}`;
 
   if (reasoning) {
-    const evidence = aiSignals.length ? ` Evidence: ${aiSignals.slice(0, 3).join('; ')}.` : '';
-    const counter = humanSignals.length ? ` Human counter-signal: ${humanSignals[0]}.` : '';
-    const sourceText = source ? ` Source: ${source}.` : '';
-    reasoningEl.textContent = `${reasoning}${evidence}${counter}${sourceText}`;
+    const evidence = aiSignals.length ? aiSignals.slice(0, 2).join(' + ') : 'No strong signal';
+    const sourceText = source ? `Source: ${source}` : 'Source: live transcript';
+    reasoningEl.textContent = `${evidence}. ${sourceText}.`;
     reasoningEl.classList.remove('hidden');
   }
 
-  // Update aggregate. Inconclusive short fragments do not count as low-risk evidence.
   const canScore = typeof aiScore === 'number' && scorable !== false;
   if (canScore) {
     const weight = typeof scoreWeight === 'number' && scoreWeight > 0 ? scoreWeight : 1;
@@ -308,12 +306,16 @@ function renderAnalysis(entryEl, result) {
   const avg = currentOverallRisk();
   updateScoreRing(avg, canScore ? latestScore : null, reasoning, displayLabel);
 
-  // Add flags
   if (flags && flags.length) {
     flags.forEach(f => addFlag(f, result.timestamp, aiScore >= 70 ? 'high' : 'medium', false));
   }
 }
 
+function riskChipLabel(score) {
+  if (score >= 70) return 'Review';
+  if (score >= 40) return 'Watch';
+  return 'Clear';
+}
 function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
   const circumference = 175.9;
   const visibleScore = typeof latest === 'number' ? latest : avgScore;
@@ -328,20 +330,20 @@ function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
     label = displayLabel || 'Inconclusive';
   } else if (latest >= 70) {
     color = '#ef4444';
-    label = displayLabel || 'High AI Risk';
+    label = 'Review recommended';
     scoreSection.classList.add('high-risk');
   } else if (latest >= 40) {
     color = '#f59e0b';
-    label = displayLabel || 'Elevated AI Risk';
+    label = 'Watch closely';
     scoreSection.classList.add('medium-risk');
   } else {
     color = '#22c55e';
-    label = displayLabel || 'Low AI-assistance risk';
+    label = 'No strong signal';
   }
   scoreRing.setAttribute('stroke', color);
   scoreValue.textContent = typeof latest === 'number' ? `${latest}%` : '—';
   scoreLabel.textContent = label;
-  if (reasoning) scoreReasoning.textContent = reasoning;
+  if (reasoning) scoreReasoning.textContent = 'Use transcript and flags together. Scores are a triage signal, not a verdict.';
 
   // Metrics
   refreshOverallRiskMetric();
@@ -501,6 +503,14 @@ window.truveil.onRealtimeTranscript((entry) => {
   statusText.textContent = 'Transcript live';
   renderRealtimeTranscript(entry);
 });
+
+if (window.truveil.onRealtimeInterimTranscript) {
+  window.truveil.onRealtimeInterimTranscript((entry) => {
+    statusDot.className = 'status-dot recording';
+    statusText.textContent = 'Listening live';
+    updateInterim(entry?.text || '');
+  });
+}
 
 window.truveil.onRealtimeFlag((flag) => {
   addFlag(flag.text, flag.timestamp, flag.severity || 'medium', false);
