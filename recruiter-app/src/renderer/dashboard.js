@@ -442,23 +442,39 @@ if (audioQueue) {
 }
 
 // ─── Flags ────────────────────────────────────────────────────────────
-function addFlag(text, timestamp, severity = 'medium', persist = true) {
+function addFlag(text, timestamp, severity = 'medium', persist = true, evidence = {}) {
   totalFlags++;
   flagCount.textContent = totalFlags;
   statsFlags.textContent = totalFlags;
-  flagEvidence.push({ text, severity, timestamp: timestamp || Date.now() });
+  flagEvidence.push({ text, severity, timestamp: timestamp || Date.now(), ...evidence });
   refreshOverallRiskMetric();
 
   if (flagsList.querySelector('.empty-state')) flagsList.innerHTML = '';
 
   const icons = { critical: '●', high: '●', medium: '●', low: '○' };
+  const target = {
+    processName: evidence.processName || '',
+    windowTitle: evidence.windowTitle || '',
+    detectedHost: evidence.detectedHost || '',
+    detectedUrl: evidence.detectedUrl || '',
+    matchedRule: evidence.matchedRule || ''
+  };
+  const hasTarget = Object.values(target).some(Boolean);
+  const controls = hasTarget ? `
+    <div class="flag-actions">
+      <button data-candidate-action="allow_target">Allow</button>
+      <button data-candidate-action="close_target">Close / refocus</button>
+      ${(target.detectedUrl || target.detectedHost) ? '<button data-candidate-action="reopen_target">Reopen</button>' : ''}
+    </div>` : '';
   const el = document.createElement('div');
+  el.dataset.target = JSON.stringify(target);
   el.className = `flag-item ${severity}`;
   el.innerHTML = `
     <span class="flag-icon">${icons[severity] || '●'}</span>
     <div style="flex:1;min-width:0">
       <div class="flag-text">${esc(text)}</div>
       <div class="flag-time">${fmtTime(timestamp || Date.now())}</div>
+      ${controls}
     </div>`;
   flagsList.prepend(el);
 
@@ -466,6 +482,30 @@ function addFlag(text, timestamp, severity = 'medium', persist = true) {
     window.truveil.addFlag({ text, severity, timestamp: timestamp || Date.now() });
   }
 }
+
+flagsList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-candidate-action]');
+  if (!button) return;
+
+  const item = button.closest('.flag-item');
+  const target = JSON.parse(item?.dataset.target || '{}');
+  const action = button.dataset.candidateAction;
+  button.disabled = true;
+
+  try {
+    await window.truveil.sendCandidateAction({ action, target });
+    const labels = {
+      allow_target: 'Destination allowed for this session',
+      close_target: 'Close/refocus request sent',
+      reopen_target: 'Reopen request sent'
+    };
+    toast(labels[action] || 'Action sent', 'success');
+  } catch (err) {
+    toast(err.message || 'Could not send action', 'error');
+  } finally {
+    button.disabled = false;
+  }
+});
 
 // ─── Timer ────────────────────────────────────────────────────────────
 function renderRealtimeTranscript(result) {
@@ -513,7 +553,7 @@ if (window.truveil.onRealtimeInterimTranscript) {
 }
 
 window.truveil.onRealtimeFlag((flag) => {
-  addFlag(flag.text, flag.timestamp, flag.severity || 'medium', false);
+  addFlag(flag.text, flag.timestamp, flag.severity || 'medium', false, flag);
 });
 
 window.truveil.onRealtimeStatus((status) => {

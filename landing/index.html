@@ -53,7 +53,7 @@
       <div class="hero-note fade-up d5">Works with Zoom, Meet, and Teams · session-code based · explainable risk labels</div>
       <div class="hero-ledger fade-up d5">
         <div><span>TRV-482910</span><strong>Shareable code</strong></div>
-        <div><span>Warn + refocus</span><strong>Blocked-site policy</strong></div>
+        <div><span>Close + report</span><strong>Restricted AI-site policy</strong></div>
         <div><span>Likely human</span><strong>Explainable risk labels</strong></div>
       </div>
     </div>
@@ -93,8 +93,8 @@
             <div class="mock-flag critical" id="mf1"><span class="mf-time">14:31</span><span class="mf-dot high"></span><span class="mf-text">Opened chatgpt.com</span></div>
             <div class="mock-flag medium" id="mf2"><span class="mf-time">14:28</span><span class="mf-dot med"></span><span class="mf-text">Tab switch detected</span></div>
             <div class="mock-flag critical" id="mf3"><span class="mf-time">14:15</span><span class="mf-dot high"></span><span class="mf-text">Overlay window detected</span></div>
-            <div class="mock-flag medium" id="mf4"><span class="mf-time">13:54</span><span class="mf-dot med"></span><span class="mf-text">Gaze left — second screen?</span></div>
-            <div class="mock-flag low" id="mf5"><span class="mf-time">13:12</span><span class="mf-dot lo"></span><span class="mf-text">Clipboard paste detected</span></div>
+            <div class="mock-flag medium" id="mf4"><span class="mf-time">13:54</span><span class="mf-dot med"></span><span class="mf-text">Opened Slack desktop app</span></div>
+            <div class="mock-flag low" id="mf5"><span class="mf-time">13:12</span><span class="mf-dot lo"></span><span class="mf-text">Returned to interview call</span></div>
           </div>
         </div>
         <div class="mock-footer">
@@ -179,7 +179,7 @@
               <div class="scan-line alert"><span class="scan-status danger">BLOCKED</span><span class="scan-name">chatgpt.com</span><span class="scan-detail">Opened at 14:31:58</span></div>
               <div class="scan-line alert"><span class="scan-status danger">BLOCKED</span><span class="scan-name">claude.ai</span><span class="scan-detail">Opened at 14:33:12</span></div>
               <div class="scan-line"><span class="scan-status ok">SAFE</span><span class="scan-name">github.com</span><span class="scan-detail">Active 8m 02s</span></div>
-              <div class="scan-meta"><span class="scan-hz">Monitoring 4 tabs</span><span class="scan-total">2 flagged · Candidate warned</span></div>
+              <div class="scan-meta"><span class="scan-hz">Monitoring active window</span><span class="scan-total">2 reviewed · 1 restricted tab closed</span></div>
             </div>
           </div>
         </div>
@@ -189,8 +189,8 @@
       <div class="feature-row reverse reveal">
         <div class="feature-text">
           <div class="card-label">04 — POLICY + REFOCUS</div>
-          <h3>Blocked AI sites trigger an immediate warning.</h3>
-          <p>Set the allowed interview tools before the session starts. If the candidate opens a blocked AI site or disallowed window, Truveil warns them, refocuses the secure app, and flags the event for your report.</p>
+          <h3>Restricted AI sites close and become review evidence.</h3>
+          <p>Set allowed interview tools before the session starts. Truveil records each active-window change, closes positively matched restricted AI tabs, and lets the interviewer allow, reopen, or close reviewed destinations.</p>
         </div>
         <div class="feature-visual">
           <div class="mini-app large">
@@ -200,7 +200,7 @@
               <div class="policy-pill good">Allowed: meet.google.com</div>
               <div class="policy-pill danger">Blocked: chatgpt.com</div>
               <div class="policy-pill danger">Blocked: claude.ai</div>
-              <div class="policy-action">Candidate warning sent · Admin flag created</div>
+              <div class="policy-action">Restricted tab closed · Admin review event created</div>
             </div>
           </div>
         </div>
@@ -304,9 +304,9 @@
           <tr><td class="feat">Hidden overlay scanning (Interview Coder)</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
           <tr><td class="feat">Real-time flag feed</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
           <tr><td class="feat">Browser tab monitoring</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
-          <tr><td class="feat">Gaze & head pose tracking</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="chk">&#10003;</td></tr>
+          <tr><td class="feat">Active app and browser evidence</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="chk">&#10003;</td></tr>
           <tr><td class="feat">Per-response AI-assistance risk score</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
-          <tr><td class="feat">Clipboard monitoring</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
+          <tr><td class="feat">Interviewer allow / close controls</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
           <tr><td class="feat">Instant digital report</td><td class="chk">&#10003;</td><td class="x">&#10005;</td><td class="x">&#10005;</td></tr>
         </tbody>
       </table>
@@ -377,7 +377,7 @@
     <div class="faq-list">
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How does Truveil detect AI-assisted answers?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil uses live transcript text from the candidate app and local heuristics for filler density, self-correction, answer uniformity, concrete detail, repeated phrasing, and generic structure. Scores are advisory risk signals, not guarantees.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">How long is fallback audio retained?<span class="arr">+</span></button><div class="faq-a"><div><p>The required path is transcript-first. If fallback audio is needed, short session-scoped chunks are used for local admin transcription and cleaned up when the session ends.</p></div></div></div>
-      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does the candidate know they're being monitored?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Candidates install Truveil Secure and explicitly consent to monitoring. On every flag, a warning overlay appears on their screen. Truveil is about transparency and deterrence.</p></div></div></div>
+      <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Does the candidate know they're being monitored?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Candidates install Truveil Secure and explicitly consent before monitoring begins. The active client stays visible, while detailed review evidence remains in the interviewer command center.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What interview platforms does it work with?<span class="arr">+</span></button><div class="faq-a"><div><p>Truveil works alongside Zoom, Google Meet, Microsoft Teams, and any video call platform. It runs as a separate app — no plugins or extensions needed.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">Can I try it for free?<span class="arr">+</span></button><div class="faq-a"><div><p>Yes. Your first interview session is completely free — no credit card required. Download the app, create a session, and see it in action.</p></div></div></div>
       <div class="faq-item reveal"><button class="faq-q" onclick="this.parentElement.classList.toggle('open')">What about false positives?<span class="arr">+</span></button><div class="faq-a"><div><p>Every flag includes a confidence score and detailed AI reasoning. Scores are advisory, never definitive. We give you data and context — you make the hiring decision.</p></div></div></div>

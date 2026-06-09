@@ -286,6 +286,18 @@ async function broadcastSessionPolicy() {
   }
 }
 
+async function sendCandidateAction(action, target = {}) {
+  if (!activeSession || !realtimeChannel) throw new Error('No connected candidate session.');
+  const payload = {
+    sessionId: activeSession.sessionId,
+    action,
+    target,
+    timestamp: Date.now()
+  };
+  await realtimeChannel.send({ type: 'broadcast', event: 'recruiter_action', payload });
+  return payload;
+}
+
 async function joinRealtimeSession(sessionId) {
   const client = getSupabase();
   if (!client) return false;
@@ -674,8 +686,13 @@ function handleCandidateEvent(payload = {}) {
     focus_gained: 'Candidate returned to Truveil Secure',
     shortcut_blocked: 'Candidate attempted a blocked shortcut',
     blocking_warning: describeBlockingWarning(),
+    foreground_changed: describeBlockingWarning(),
     audio_upload_failed: 'Candidate audio upload failed',
     overlay_detected: 'Potential hidden overlay or AI assistant detected',
+    recruiter_allowed_target: 'Interviewer allowed the reviewed destination',
+    recruiter_reopened_target: 'Interviewer reopened the reviewed destination',
+    recruiter_closed_target: 'Interviewer closed the active reviewed tab',
+    recruiter_close_target_missed: 'Close request skipped because the candidate had already switched away',
     candidate_interrupted: 'Candidate ended or closed the secure session',
     candidate_completed: 'Candidate completed the secure session',
     session_ended_remote: 'Candidate received recruiter end-session signal'
@@ -683,7 +700,20 @@ function handleCandidateEvent(payload = {}) {
 
   const text = labels[payload.type] || payload.type;
   const severity = payload.severity || (payload.type === 'focus_lost' ? 'medium' : 'low');
-  const flag = { text, severity, timestamp: payload.timestamp || Date.now() };
+  const flag = {
+    text,
+    severity,
+    timestamp: payload.timestamp || Date.now(),
+    eventType: payload.type,
+    processName: payload.processName || '',
+    windowTitle: payload.windowTitle || '',
+    detectedUrl: payload.detectedUrl || '',
+    detectedHost: payload.detectedHost || '',
+    matchedRule: payload.matchedRule || '',
+    detectionSource: payload.detectionSource || '',
+    policyDecision: payload.policyDecision || '',
+    closedRestrictedTarget: Boolean(payload.closedRestrictedTarget)
+  };
   sessionData.flags.push(flag);
 
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -900,6 +930,28 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
 ipcMain.handle('flag:add', (_, { text, severity, timestamp }) => {
   if (!sessionData) return;
   sessionData.flags.push({ text, severity, timestamp });
+});
+
+ipcMain.handle('candidate:action', async (_, { action, target }) => {
+  if (!activeSession || !sessionData) throw new Error('No active session');
+  if (!['allow_target', 'close_target', 'reopen_target'].includes(action)) {
+    throw new Error('Unsupported candidate action');
+  }
+
+  if (action === 'allow_target') {
+    const policy = normalizePolicy(activeSession.policy);
+    const host = String(target?.detectedHost || '').trim();
+    const processName = String(target?.processName || '').trim();
+    if (host && !policy.allowed_sites.includes(host)) policy.allowed_sites.push(host);
+    if (host) policy.blocked_sites = policy.blocked_sites.filter(item => !String(item).toLowerCase().includes(host.toLowerCase()));
+    if (!host && processName && !policy.allowed_apps.includes(processName)) policy.allowed_apps.push(processName);
+    activeSession.policy = policy;
+    sessionData.session = activeSession;
+    await updateRemotePolicy(activeSession.sessionId, policy);
+    await broadcastSessionPolicy();
+  }
+
+  return sendCandidateAction(action, target || {});
 });
 
 ipcMain.handle('audio:get', (_, { chunkId }) => {

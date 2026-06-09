@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('truveil', {
   // Live analysis
   analyzeTranscript: (data) => ipcRenderer.invoke('analyze:transcript', data),
   addFlag: (data) => ipcRenderer.invoke('flag:add', data),
+  sendCandidateAction: (data) => ipcRenderer.invoke('candidate:action', data),
   getAudioChunk: (data) => ipcRenderer.invoke('audio:get', data),
   onRealtimeInterimTranscript: (cb) => ipcRenderer.on('realtime:transcript-interim', (_, data) => cb(data)),
   onRealtimeTranscript: (cb) => ipcRenderer.on('realtime:transcript', (_, data) => cb(data)),

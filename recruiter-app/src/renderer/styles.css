@@ -578,6 +578,26 @@ button { font-family: inherit; cursor: pointer; }
 .flag-icon { font-size: 11px; flex-shrink: 0; line-height: 1.2; }
 .flag-text { font-size: 11.5px; color: rgba(255,255,255,.75); line-height: 1.45; font-weight: 500; }
 .flag-time { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); margin-top: 3px; letter-spacing: .3px; }
+.flag-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.flag-actions button {
+  min-height: 25px;
+  padding: 0 8px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 5px;
+  background: rgba(255,255,255,.035);
+  color: rgba(255,255,255,.68);
+  font: 600 9px/1 var(--font);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.flag-actions button:hover {
+  border-color: rgba(255,255,255,.2);
+  background: rgba(255,255,255,.07);
+  color: #fff;
+}
+.flag-actions button:first-child { border-color: rgba(34,197,94,.22); color: #86efac; }
+.flag-actions button:nth-child(2) { border-color: rgba(239,68,68,.25); color: #fca5a5; }
+.flag-actions button:disabled { opacity: .42; cursor: wait; }
 
 .empty-state {
   padding: 20px 10px; font-size: 11px; color: var(--text-dim);

@@ -182,34 +182,34 @@ function buildHtml(ctx) {
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #050507; color: #fafafa; font-family: 'Inter', sans-serif; line-height: 1.55; padding: 48px 32px; -webkit-font-smoothing: antialiased; }
-  .container { max-width: 900px; margin: 0 auto; }
+  body { background: #080808; color: #f7f7f5; font-family: 'Inter', sans-serif; line-height: 1.55; padding: 56px 32px; -webkit-font-smoothing: antialiased; }
+  .container { max-width: 1040px; margin: 0 auto; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 40px; }
-  .logo { font-size: 20px; font-weight: 800; background: linear-gradient(135deg, #fff 40%, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .logo { font-size: 20px; font-weight: 800; color: #fff; }
   .tag { display: inline-block; margin-top: 6px; font-size: 10px; color: rgba(255,255,255,.3); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
   .sid { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(255,255,255,.5); }
-  h1 { font-size: 42px; font-weight: 900; letter-spacing: -2px; line-height: 1.05; margin-bottom: 12px; }
+  h1 { font-size: 52px; font-weight: 760; letter-spacing: -2px; line-height: 1.02; margin-bottom: 12px; }
   .sub-title { font-size: 15px; color: rgba(255,255,255,.5); margin-bottom: 40px; }
-  .risk-banner { display: flex; align-items: center; gap: 20px; padding: 28px 32px; border-radius: 16px; margin-bottom: 40px; border: 1px solid; }
-  .risk-banner.high { background: rgba(239,68,68,.06); border-color: rgba(239,68,68,.3); }
-  .risk-banner.med { background: rgba(245,158,11,.05); border-color: rgba(245,158,11,.3); }
-  .risk-banner.low { background: rgba(34,197,94,.05); border-color: rgba(34,197,94,.25); }
+  .risk-banner { display: flex; align-items: center; gap: 24px; padding: 30px 32px; border-radius: 10px; margin-bottom: 40px; border: 1px solid rgba(255,255,255,.1); background: #101010; }
+  .risk-banner.high { border-color: rgba(255,81,71,.45); }
+  .risk-banner.med { border-color: rgba(255,154,92,.3); }
+  .risk-banner.low { border-color: rgba(255,255,255,.1); }
   .risk-dial { width: 96px; height: 96px; position: relative; flex-shrink: 0; }
   .risk-dial svg { transform: rotate(-90deg); width: 100%; height: 100%; }
   .risk-dial .bg { fill: none; stroke: rgba(255,255,255,.05); stroke-width: 6; }
   .risk-dial .fill { fill: none; stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 6px currentColor); }
-  .risk-banner.high .fill { stroke: #ef4444; color: #ef4444; }
-  .risk-banner.med .fill { stroke: #f59e0b; color: #f59e0b; }
-  .risk-banner.low .fill { stroke: #22c55e; color: #22c55e; }
+  .risk-banner.high .fill { stroke: #ff5147; color: #ff5147; }
+  .risk-banner.med .fill { stroke: #ff9a5c; color: #ff9a5c; }
+  .risk-banner.low .fill { stroke: #a3a3a3; color: #a3a3a3; }
   .risk-dial .pct { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .risk-info h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; letter-spacing: -.3px; }
   .risk-info p { font-size: 13px; color: rgba(255,255,255,.5); }
   .grid4 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 40px; }
-  .stat { padding: 20px 22px; background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; }
+  .stat { padding: 20px 22px; background: #101010; border: 1px solid rgba(255,255,255,.09); border-radius: 8px; }
   .stat-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.35); letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 8px; }
   .stat-val { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   h3 { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,.4); text-transform: uppercase; margin: 48px 0 18px; }
-  .panel { background: rgba(255,255,255,.015); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 24px; }
+  .panel { background: #0e0e0e; border: 1px solid rgba(255,255,255,.09); border-radius: 8px; padding: 24px; }
   .entry { padding: 16px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
   .entry:last-child { border-bottom: none; }
   .entry-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
@@ -220,7 +220,7 @@ function buildHtml(ctx) {
   .score.low { background: rgba(34,197,94,.12); color: #4ade80; }
   .score.unk { background: rgba(255,255,255,.05); color: rgba(255,255,255,.4); }
   .entry-text { font-size: 14px; color: rgba(255,255,255,.8); line-height: 1.6; }
-  .reasoning { font-size: 12px; color: #93c5fd; margin-top: 10px; padding: 10px 14px; background: rgba(59,130,246,.05); border: 1px solid rgba(59,130,246,.1); border-radius: 6px; line-height: 1.55; }
+  .reasoning { font-size: 12px; color: rgba(255,255,255,.62); margin-top: 10px; padding: 10px 14px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.08); border-radius: 5px; line-height: 1.55; }
   .sub-flags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { font-size: 10px; padding: 3px 9px; background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.15); border-radius: 4px; color: #fca5a5; font-weight: 600; }
   table { width: 100%; border-collapse: collapse; }
@@ -235,7 +235,7 @@ function buildHtml(ctx) {
   footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.06); font-size: 11px; color: rgba(255,255,255,.25); text-align: center; }
   @media print {
     body { background: #fff; color: #111; padding: 24px; }
-    .logo { -webkit-text-fill-color: #0052cc; }
+    .logo { color: #111; }
     .panel, .stat, .risk-banner { background: #fafafa; border-color: #e5e7eb; }
   }
 </style>
@@ -282,7 +282,7 @@ function buildHtml(ctx) {
     <h3>Response Analysis</h3>
     <div class="panel">${transcriptRows}</div>
 
-    <h3>Detected Anomalies</h3>
+    <h3>Session activity and review events</h3>
     <div class="panel" style="padding:0">
       <table>
         <thead><tr><th style="width:110px">TIME</th><th style="width:110px">SEVERITY</th><th>DETAIL</th></tr></thead>
