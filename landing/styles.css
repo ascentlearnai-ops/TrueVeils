@@ -1315,3 +1315,130 @@ nav, nav.scrolled {
   .hero h1 { font-size: 52px; letter-spacing: -2px; }
   .feature-row { padding: 30px 0; }
 }
+
+/* Cluely reference palette: airy white canvas, blue actions, dark product UI */
+:root {
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --surface-2: #f2f6ff;
+  --glass: rgba(255,255,255,.82);
+  --glass-border: #dde2ee;
+  --border: #dde2ee;
+  --border-hover: #b2c2dd;
+  --text: #1c1d22;
+  --text-muted: #5f6675;
+  --text-dim: #898b91;
+  --accent: #3152f4;
+  --accent-soft: #5973f7;
+  --accent-dim: rgba(49,82,244,.09);
+  --accent-glow: rgba(49,82,244,.18);
+}
+
+html, body { background: #f9fafb; }
+body {
+  color: #1c1d22;
+  background:
+    radial-gradient(ellipse 68% 34% at 50% 0%, rgba(49,82,244,.1), transparent 72%),
+    #f9fafb;
+}
+body::before, .noise-overlay { display: none; }
+
+nav, nav.scrolled {
+  border-color: rgba(221,226,238,.9);
+  background: rgba(255,255,255,.88);
+  box-shadow: 0 8px 30px rgba(28,29,34,.06);
+}
+.nav-logo { color: #1c1d22; }
+.nav-logo::before { background: #3152f4; box-shadow: 0 0 0 5px rgba(49,82,244,.1); }
+.nav-links a, .nav-right .login { color: #5f6675; }
+.nav-links a:hover, .nav-right .login:hover { color: #1c1d22; }
+.btn-primary, .p-card.pop .btn-primary {
+  color: #fff;
+  background: #3152f4;
+  box-shadow: 0 10px 24px rgba(49,82,244,.2);
+}
+.btn-primary:hover { background: #2948dc; box-shadow: 0 12px 28px rgba(49,82,244,.26); }
+.btn-ghost {
+  color: #2e3038;
+  border-color: #dde2ee;
+  background: #fff;
+}
+
+.hero { background: transparent; }
+.hero::before { background: radial-gradient(ellipse at center, rgba(49,82,244,.1), transparent 66%); }
+.hero::after { opacity: .15; }
+.trust-badge, .section-badge {
+  color: #3152f4;
+  border-color: rgba(49,82,244,.18);
+  background: rgba(49,82,244,.07);
+}
+.trust-badge .dot, .section-badge .dot { background: #3152f4; }
+.hero h1, .section-title, .final-cta h2, .feature-text h3, .step-content h3,
+.p-name, .p-price, .faq-q, .t-name { color: #1c1d22; }
+.gradient-text {
+  color: #3152f4;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.hero .sub, .section-sub, .feature-text p, .step-content p, .p-list li, .faq-a p,
+.t-text, .final-cta p { color: #5f6675; }
+.hero-note, .ticker-label, .ticker span { color: #898b91; }
+
+.hero-ledger {
+  border-color: #dde2ee;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 18px 55px rgba(28,29,34,.06);
+}
+.hero-ledger div { border-color: #dde2ee; }
+.hero-ledger span, .feature-text .card-label, .stat-num, .step-number, .t-stars, .chk { color: #3152f4; }
+.hero-ledger strong { color: #5f6675; }
+
+.hero-mockup { filter: drop-shadow(0 38px 70px rgba(28,29,34,.18)); }
+.mockup-glow { background: radial-gradient(ellipse, rgba(49,82,244,.2), transparent 68%); }
+.glass-window, .mini-app {
+  color: #fff;
+  background: #1c1d22;
+  border-color: rgba(255,255,255,.14);
+  box-shadow: 0 28px 80px rgba(28,29,34,.24);
+}
+.risk-high, .mb-score.high, .ar-score.high, .scan-status.danger { color: #9eb0ff; }
+
+.ticker-wrap, .stats-section {
+  color: #1c1d22;
+  border-color: #dde2ee;
+  background: #fff;
+}
+.feature-row { border-color: #dde2ee; }
+.feature-row:last-child { border-color: #dde2ee; }
+.stat-item, .comp-table, .t-card, .p-card {
+  color: #1c1d22;
+  background: #fff;
+  border-color: #dde2ee;
+  box-shadow: 0 12px 32px rgba(28,29,34,.045);
+}
+.comp-table thead th { color: #1c1d22; background: #f2f6ff; }
+.comp-table tbody td, .t-role { color: #5f6675; }
+.comp-table tbody td.feat { color: #2e3038; }
+.p-card.pop { border-color: rgba(49,82,244,.35); box-shadow: 0 22px 60px rgba(49,82,244,.1); }
+.p-badge { color: #fff; background: #3152f4; }
+.faq-item, footer { border-color: #dde2ee; }
+.faq-q:hover, .footer-col a:hover { color: #3152f4; }
+.final-cta {
+  color: #1c1d22;
+  background: radial-gradient(ellipse at 50% 120%, rgba(49,82,244,.13), transparent 60%), #fff;
+  border-color: #dde2ee;
+  box-shadow: 0 20px 60px rgba(28,29,34,.06);
+}
+footer { color: #898b91; }
+.footer-col h5 { color: #2e3038; }
+
+.modal-overlay { background: rgba(28,29,34,.32); backdrop-filter: blur(12px); }
+.modal-content {
+  color: #1c1d22;
+  background: #fff;
+  border-color: #dde2ee;
+  box-shadow: 0 32px 100px rgba(28,29,34,.18);
+}
+.modal-header, .modal-footer { border-color: #dde2ee; }
+.modal-body p, .terms-check label { color: #5f6675; }
+.terms-check { background: #f2f6ff; border-color: #dde2ee; }
