@@ -4,6 +4,11 @@ contextBridge.exposeInMainWorld('truveil', {
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (patch) => ipcRenderer.invoke('settings:save', patch),
+  getAuth: () => ipcRenderer.invoke('auth:get'),
+  sendSignInLink: (email) => ipcRenderer.invoke('auth:send-link', email),
+  signOut: () => ipcRenderer.invoke('auth:sign-out'),
+  onAuthChanged: (cb) => ipcRenderer.on('auth:changed', (_, data) => cb(data)),
+  onAuthError: (cb) => ipcRenderer.on('auth:error', (_, data) => cb(data)),
 
   // Session
   createSession: (data) => ipcRenderer.invoke('session:create', data),

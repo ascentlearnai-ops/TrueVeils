@@ -1,7 +1,5 @@
 {
-  "supabaseUrl": "",
-  "supabaseAnonKey": "",
-  "deepgramApiKey": "",
-  "groqApiKey": "",
+  "supabaseUrl": "https://kcsrqobajprwpsyjiram.supabase.co",
+  "supabaseAnonKey": "sb_publishable_db4E1_8_hQX1EsC-WS9AtA_znhWqTtO",
   "candidateAppUrl": "https://truveil-client.vercel.app"
 }

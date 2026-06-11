@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, dialog, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
@@ -27,6 +27,45 @@ let realtimeChannel = null;
 let localTranscriber = null;
 let deepgramTranscriber = null;
 let groqTranscriber = null;
+let pendingAuthUrl = null;
+
+function authStoragePath() {
+  return path.join(app.getPath('userData'), 'auth-session.json');
+}
+
+function readAuthStorage() {
+  try { return JSON.parse(fs.readFileSync(authStoragePath(), 'utf8')); } catch { return {}; }
+}
+
+function writeAuthStorage(data) {
+  fs.mkdirSync(path.dirname(authStoragePath()), { recursive: true });
+  fs.writeFileSync(authStoragePath(), JSON.stringify(data));
+}
+
+const authStorage = {
+  getItem(key) {
+    const value = readAuthStorage()[key];
+    if (!value) return null;
+    try {
+      return safeStorage.isEncryptionAvailable()
+        ? safeStorage.decryptString(Buffer.from(value, 'base64'))
+        : Buffer.from(value, 'base64').toString('utf8');
+    } catch {
+      return null;
+    }
+  },
+  setItem(key, value) {
+    const data = readAuthStorage();
+    const buffer = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(value) : Buffer.from(value, 'utf8');
+    data[key] = buffer.toString('base64');
+    writeAuthStorage(data);
+  },
+  removeItem(key) {
+    const data = readAuthStorage();
+    delete data[key];
+    writeAuthStorage(data);
+  }
+};
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -98,13 +137,39 @@ function getSupabase() {
   if (url?.includes('dummy.supabase.co') || key === 'dummy') return null;
   if (!url || !key) return null;
   supabase = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storage: authStorage },
     realtime: {
       transport: WebSocket,
       params: { eventsPerSecond: 10 }
     }
   });
   return supabase;
+}
+
+async function authState() {
+  const client = getSupabase();
+  if (!client) return { configured: false, signedIn: false };
+  const { data } = await client.auth.getSession();
+  return {
+    configured: true,
+    signedIn: Boolean(data.session?.user),
+    user: data.session?.user ? { id: data.session.user.id, email: data.session.user.email } : null
+  };
+}
+
+async function handleAuthUrl(url) {
+  const client = getSupabase();
+  if (!client || !url) return;
+  try {
+    const parsed = new URL(url);
+    const code = parsed.searchParams.get('code');
+    if (!code) return;
+    const { error } = await client.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    sendToRenderer('auth:changed', await authState());
+  } catch (err) {
+    sendToRenderer('auth:error', { message: err.message });
+  }
 }
 
 function sendToRenderer(channel, payload) {
@@ -243,6 +308,23 @@ async function ensureRemoteSession(session) {
     return false;
   }
 
+  const { data: authData } = await client.auth.getSession();
+  if (authData.session?.user) {
+    const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
+    const result = await client.functions.invoke('create-session', {
+      body: {
+        candidateAppUrl: candidateBaseUrl,
+        policy: normalizePolicy(session.policy)
+      }
+    });
+    if (!result.error && result.data?.session) {
+      session.sessionId = result.data.session.join_code || result.data.session.id;
+      session.internalId = result.data.session.internal_id;
+      return true;
+    }
+    if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
+  }
+
   const withPolicy = await client.from('sessions').upsert(buildSessionPayload(session));
   if (!withPolicy.error) return true;
   if (!isPolicySchemaError(withPolicy.error)) throw new Error(withPolicy.error.message);
@@ -355,7 +437,8 @@ async function analyzeCandidateTranscript(payload = {}) {
   const timestamp = payload.timestamp || Date.now();
   const analysis = LocalRisk.analyzeTranscript(text, {
     durationMs: payload.durationMs,
-    sequence: payload.sequence
+    sequence: payload.sequence,
+    transcriptConfidence: payload.transcriptConfidence
   });
   const entry = {
     text,
@@ -370,6 +453,10 @@ async function analyzeCandidateTranscript(payload = {}) {
     reasoning: analysis.reasoning,
     aiSignals: analysis.aiSignals || [],
     humanSignals: analysis.humanSignals || [],
+    evidence: analysis.evidence || [],
+    counterSignal: analysis.counterSignal || null,
+    modelVersion: analysis.modelVersion,
+    unscorableReason: analysis.unscorableReason || null,
     source: payload.source || 'candidate-transcript'
   };
 
@@ -608,6 +695,10 @@ async function processAudioTranscription(entry) {
         reasoning: entry.reasoning,
         aiSignals: analysis.aiSignals || [],
         humanSignals: analysis.humanSignals || [],
+        evidence: analysis.evidence || [],
+        counterSignal: analysis.counterSignal || null,
+        modelVersion: analysis.modelVersion,
+        unscorableReason: analysis.unscorableReason || null,
         source: transcription.source,
         chunkId: entry.chunkId
       };
@@ -833,20 +924,57 @@ function createTray() {
   tray.on('click', () => mainWindow.show());
 }
 
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
 app.whenReady().then(() => {
+  app.setAsDefaultProtocolClient('truveil-recruiter');
   createWindow();
   createTray();
+  if (pendingAuthUrl) handleAuthUrl(pendingAuthUrl);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 app.on('window-all-closed', (e) => e.preventDefault());
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (app.isReady()) handleAuthUrl(url);
+  else pendingAuthUrl = url;
+});
+app.on('second-instance', (_event, argv) => {
+  const url = argv.find(value => String(value).startsWith('truveil-recruiter://'));
+  if (url) handleAuthUrl(url);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 // ─── IPC ───────────────────────────────────────────────────────────────
 
 // Settings
 ipcMain.handle('settings:get', () => SettingsStore.getAll());
 ipcMain.handle('settings:save', (_, patch) => SettingsStore.save(patch));
+ipcMain.handle('auth:get', () => authState());
+ipcMain.handle('auth:send-link', async (_, email) => {
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase is not configured.');
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) throw new Error('Enter a valid work email.');
+  const { error } = await client.auth.signInWithOtp({
+    email: cleanEmail,
+    options: { emailRedirectTo: 'truveil-recruiter://auth/callback' }
+  });
+  if (error) throw error;
+  return { ok: true };
+});
+ipcMain.handle('auth:sign-out', async () => {
+  const client = getSupabase();
+  if (client) await client.auth.signOut();
+  return authState();
+});
 
 // Session lifecycle
 ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {

@@ -1,0 +1,59 @@
+name: Windows paid beta checks
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  recruiter:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: recruiter-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: recruiter-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: node --check main.js
+      - run: node --check preload.js
+      - run: node --check src/renderer/dashboard.js
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/candidate-join/index.ts supabase/functions/create-session/index.ts supabase/functions/transcribe-live/index.ts supabase/functions/transcribe-chunk/index.ts
+        working-directory: .
+      - run: npm run build:win -- --config.win.signAndEditExecutable=true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+      - name: Generate SHA-256 checksum
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem dist/TruveilRecruiter-Setup-*.exe | Select-Object -First 1
+          "$(Get-FileHash $file.FullName -Algorithm SHA256 | Select-Object -ExpandProperty Hash)  $($file.Name)" |
+            Set-Content "$($file.FullName).sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: truveil-recruiter-windows
+          path: |
+            recruiter-app/dist/TruveilRecruiter-Setup-*.exe
+            recruiter-app/dist/TruveilRecruiter-Setup-*.exe.sha256
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            recruiter-app/dist/TruveilRecruiter-Setup-*.exe
+            recruiter-app/dist/TruveilRecruiter-Setup-*.exe.sha256

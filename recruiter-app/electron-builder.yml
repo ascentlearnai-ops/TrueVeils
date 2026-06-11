@@ -1,11 +1,16 @@
 appId: com.truveil.recruiter
 productName: Truveil
+protocols:
+  - name: Truveil Recruiter
+    schemes:
+      - truveil-recruiter
 directories:
   output: dist
 files:
   - main.js
   - preload.js
   - package.json
+  - assets/**/*
   - src/config/runtime-config.json
   - src/**/*
 asarUnpack:
@@ -15,6 +20,7 @@ mac:
   target:
     - dmg
 win:
+  icon: assets/truveil.ico
   target:
     - nsis
   artifactName: TruveilRecruiter-Setup-${version}.${ext}

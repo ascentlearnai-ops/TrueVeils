@@ -1,0 +1,32 @@
+{
+  "version": "truveil-risk-v2.0.0",
+  "intercept": -1.35,
+  "thresholds": {
+    "elevated": 0.58,
+    "high": 0.78
+  },
+  "minimums": {
+    "words": 18,
+    "transcriptConfidence": 0.55,
+    "quality": 0.58
+  },
+  "weights": {
+    "assistantStyleDensity": 2.4,
+    "genericDensity": 1.35,
+    "structuredDensity": 1.05,
+    "hypotheticalDensity": 0.65,
+    "lowSpecificity": 1.3,
+    "lowDisfluency": 0.85,
+    "lowBurstiness": 0.75,
+    "lexicalUniformity": 0.7,
+    "phraseRepetition": 0.8,
+    "historySimilarity": 0.75,
+    "lengthUniformity": 0.55,
+    "directAiMention": 0.12,
+    "naturalDisfluency": -1.15,
+    "selfCorrection": -1.1,
+    "concreteDetail": -1.4,
+    "spokenBurstiness": -0.75,
+    "conversationalFlow": -0.45
+  }
+}

@@ -97,11 +97,8 @@ function sessionRiskSummary({ scores = [], flags = [] }) {
   const top = [...scoreValues].sort((a, b) => b - a).slice(0, 3);
   const topAvg = top.length ? top.reduce((sum, value) => sum + value, 0) / top.length : 0;
   const behavior = behavioralEvidence(flags);
-  const behaviorBoost = Math.max(Math.min(24, aiSiteFlagCount(flags) * 3), behavior.boost);
-  const transcriptEvidence = valid.length >= 3
-    ? avg * 0.36 + topAvg * 0.26 + max * 0.16
-    : avg * 0.24 + topAvg * 0.18 + max * 0.14;
-  const overall = Math.round(Math.min(100, transcriptEvidence + behaviorBoost));
+  const behaviorBoost = 0;
+  const overall = Math.round(avg);
   return {
     avg: overall,
     transcriptAvg: Math.round(avg),
@@ -266,14 +263,14 @@ function buildHtml(ctx) {
       </div>
       <div class="risk-info">
         <h2>${riskLabel(avg)}</h2>
-        <p>Overall AI-assistance risk from ${risk.scorableCount} scorable transcript response${risk.scorableCount === 1 ? '' : 's'}${risk.behaviorBoost ? ` plus behavioral evidence (+${risk.behaviorBoost})` : ''}. Short fragments are treated as inconclusive, not human evidence.</p>
-        ${risk.behaviorBoost ? `<p>Behavioral evidence: ${risk.behavior.aiToolHits} AI-tool/site hit${risk.behavior.aiToolHits === 1 ? '' : 's'}, ${risk.behavior.overlayHits} overlay signal${risk.behavior.overlayHits === 1 ? '' : 's'}, ${risk.behavior.focusSwitches} focus switch${risk.behavior.focusSwitches === 1 ? '' : 'es'}.</p>` : ''}
+        <p>Advisory AI-assistance risk from ${risk.scorableCount} scorable transcript response${risk.scorableCount === 1 ? '' : 's'}. Short or low-confidence fragments are treated as inconclusive, not human evidence.</p>
+        <p>Behavioral events are listed separately and never increase the transcript-risk score.</p>
       </div>
     </div>
 
     <div class="grid4">
       <div class="stat"><div class="stat-label">Overall Risk</div><div class="stat-val">${avg}%</div></div>
-      <div class="stat"><div class="stat-label">Transcript Avg</div><div class="stat-val">${risk.transcriptAvg}%</div></div>
+      <div class="stat"><div class="stat-label">Transcript Risk</div><div class="stat-val">${risk.transcriptAvg}%</div></div>
       <div class="stat"><div class="stat-label">Peak Score</div><div class="stat-val">${max}%</div></div>
       <div class="stat"><div class="stat-label">Responses</div><div class="stat-val">${totalResponses}</div></div>
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>

@@ -3,6 +3,7 @@
 const $ = id => document.getElementById(id);
 
 const screens = {
+  auth: $('auth-screen'),
   idle: $('idle-screen'),
   setup: $('setup-screen'),
   dashboard: $('dashboard-screen'),
@@ -61,6 +62,10 @@ const allowedAppsInput = $('allowedAppsInput');
 const allowedSitesInput = $('allowedSitesInput');
 const customBlockedSitesInput = $('customBlockedSitesInput');
 const toastEl = $('toast');
+const authEmailInput = $('authEmailInput');
+const authMessage = $('authMessage');
+const authUser = $('authUser');
+const signOutBtn = $('signOutBtn');
 
 // ─── Utility ───────────────────────────────────────────────────────────
 function toast(msg, variant = 'info') {
@@ -96,6 +101,38 @@ function getAllowedPolicy() {
   };
 }
 
+async function renderAuthState(state = {}) {
+  const signedIn = Boolean(state.signedIn);
+  authUser.hidden = !signedIn;
+  authUser.textContent = state.user?.email || '';
+  signOutBtn.hidden = !signedIn;
+  showScreen(signedIn || state.configured === false ? 'idle' : 'auth');
+}
+
+$('sendSignInLinkBtn').addEventListener('click', async () => {
+  const button = $('sendSignInLinkBtn');
+  button.disabled = true;
+  authMessage.textContent = 'Sending secure sign-in link...';
+  try {
+    await window.truveil.sendSignInLink(authEmailInput.value);
+    authMessage.textContent = 'Check your email and open the link on this computer.';
+  } catch (err) {
+    authMessage.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+signOutBtn.addEventListener('click', async () => {
+  await renderAuthState(await window.truveil.signOut());
+});
+
+window.truveil.onAuthChanged(renderAuthState);
+window.truveil.onAuthError(error => {
+  authMessage.textContent = error?.message || 'Sign-in failed.';
+  showScreen('auth');
+});
+
 function behaviorBoostFromFlags(flags = []) {
   let aiToolHits = 0;
   let overlayHits = 0;
@@ -125,7 +162,7 @@ function currentTranscriptAverage() {
 }
 
 function currentOverallRisk() {
-  return Math.min(100, Math.round(currentTranscriptAverage() + behaviorBoostFromFlags(flagEvidence)));
+  return currentTranscriptAverage();
 }
 
 function refreshOverallRiskMetric() {
@@ -699,6 +736,7 @@ document.addEventListener('keydown', (e) => {
 // ─── Boot ─────────────────────────────────────────────────────────────
 (async () => {
   try {
+    await renderAuthState(await window.truveil.getAuth());
     const s = await window.truveil.getSettings();
     console.log('[Truveil] settings loaded', !!s);
   } catch (e) {
