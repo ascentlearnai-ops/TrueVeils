@@ -433,12 +433,19 @@ async function analyzeCandidateTranscript(payload = {}) {
 
   const text = String(payload.text || '').trim();
   if (text.length < 4) return;
+  const transcriptConfidence = Number(payload.transcriptConfidence);
+  if (Number.isFinite(transcriptConfidence) && transcriptConfidence > 0 && transcriptConfidence < 0.52) return;
+  const fingerprint = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+  if (!Array.isArray(sessionData.transcriptFingerprints)) sessionData.transcriptFingerprints = [];
+  if (sessionData.transcriptFingerprints.some(item => item.fingerprint === fingerprint && Date.now() - item.timestamp < 45000)) return;
+  sessionData.transcriptFingerprints.push({ fingerprint, timestamp: Date.now() });
+  while (sessionData.transcriptFingerprints.length > 40) sessionData.transcriptFingerprints.shift();
 
   const timestamp = payload.timestamp || Date.now();
   const analysis = LocalRisk.analyzeTranscript(text, {
     durationMs: payload.durationMs,
     sequence: payload.sequence,
-    transcriptConfidence: payload.transcriptConfidence
+    transcriptConfidence
   });
   const entry = {
     text,

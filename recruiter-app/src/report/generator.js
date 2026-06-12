@@ -23,10 +23,11 @@ function scoreClass(n) {
   if (n >= 40) return 'med';
   return 'low';
 }
-function riskLabel(avg) {
-  if (avg >= 70) return 'HIGH RISK';
-  if (avg >= 40) return 'MEDIUM RISK';
-  if (avg > 0) return 'LOW RISK';
+function reviewLabel(avg) {
+  if (avg >= 80) return 'URGENT HUMAN REVIEW';
+  if (avg >= 60) return 'HIGH REVIEW PRIORITY';
+  if (avg >= 35) return 'ELEVATED REVIEW PRIORITY';
+  if (avg > 0) return 'ROUTINE REVIEW';
   return 'INCONCLUSIVE';
 }
 
@@ -63,30 +64,50 @@ function behavioralEvidence(flags = []) {
     focusSwitches: 0,
     unlistedAppHits: 0,
     criticalHits: 0,
-    highHits: 0
+    highHits: 0,
+    destinations: []
   };
+  const destinations = new Set();
+  const assistantPattern = /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/;
 
   for (const flag of flags) {
-    const text = String(flag.text || '').toLowerCase();
+    const text = [
+      flag.text,
+      flag.detectedHost,
+      flag.detectedUrl,
+      flag.matchedRule,
+      flag.processName,
+      flag.windowTitle
+    ].filter(Boolean).join(' ').toLowerCase();
     const severity = String(flag.severity || '').toLowerCase();
     if (severity === 'critical') evidence.criticalHits++;
     if (severity === 'high' || severity === 'critical') evidence.highHits++;
-    if (/\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) evidence.aiToolHits++;
+    const assistantMatch = text.match(assistantPattern);
+    if (assistantMatch) {
+      evidence.aiToolHits++;
+      destinations.add(assistantMatch[1]);
+    }
     if (/\b(hidden overlay|overlay detected|exclude.?from.?capture|interview coder|interviewcoder|cluely|lockedin|finalround|parakeet)\b/.test(text)) evidence.overlayHits++;
     if (/\bswitched away\b/.test(text)) evidence.focusSwitches++;
     if (/\bunlisted app\/site\b/.test(text)) evidence.unlistedAppHits++;
   }
 
-  const boost = Math.min(
-    42,
-    evidence.aiToolHits * 4
-      + evidence.overlayHits * 14
-      + evidence.criticalHits * 8
-      + Math.min(10, evidence.focusSwitches * 1.5)
+  const repeatedAiToolHits = Math.max(0, evidence.aiToolHits - destinations.size);
+  const reviewScore = Math.min(100, Math.round(
+    (evidence.aiToolHits ? 48 + Math.min(34, (evidence.aiToolHits - 1) * 17) : 0)
+      + Math.min(30, evidence.overlayHits * 24)
+      + Math.min(12, evidence.criticalHits * 4)
+      + Math.min(8, evidence.focusSwitches)
       + Math.min(8, evidence.unlistedAppHits * 2)
-  );
+  ));
 
-  return { ...evidence, boost: Math.round(boost) };
+  return {
+    ...evidence,
+    destinations: [...destinations],
+    repeatedAiToolHits,
+    boost: reviewScore,
+    reviewScore
+  };
 }
 
 function sessionRiskSummary({ scores = [], flags = [] }) {
@@ -97,13 +118,27 @@ function sessionRiskSummary({ scores = [], flags = [] }) {
   const top = [...scoreValues].sort((a, b) => b - a).slice(0, 3);
   const topAvg = top.length ? top.reduce((sum, value) => sum + value, 0) / top.length : 0;
   const behavior = behavioralEvidence(flags);
-  const behaviorBoost = 0;
-  const overall = Math.round(avg);
+  const transcriptAvg = Math.round(avg);
+  const reviewScore = Math.max(transcriptAvg, behavior.reviewScore);
+  const destinationText = behavior.destinations.length ? ` (${behavior.destinations.join(', ')})` : '';
+  let reviewSummary = 'Insufficient transcript and behavioral evidence for a meaningful review priority.';
+  if (behavior.aiToolHits >= 2) {
+    reviewSummary = `High-priority review: ${behavior.aiToolHits} restricted AI-assistance destination events were recorded${destinationText}. Repeated AI-tool access is significant behavioral evidence even if transcript-only risk is low.`;
+  } else if (behavior.aiToolHits === 1) {
+    reviewSummary = `Review recommended: a restricted AI-assistance destination was recorded${destinationText}. Compare its timestamp with the surrounding transcript and interview context.`;
+  } else if (behavior.overlayHits) {
+    reviewSummary = `High-priority review: ${behavior.overlayHits} possible hidden-assistant or overlay event${behavior.overlayHits === 1 ? '' : 's'} were recorded.`;
+  } else if (valid.length) {
+    reviewSummary = 'Review priority is based on transcript evidence. No restricted AI-assistance destination was recorded.';
+  }
   return {
-    avg: overall,
-    transcriptAvg: Math.round(avg),
+    avg: reviewScore,
+    reviewScore,
+    reviewLabel: reviewLabel(reviewScore),
+    reviewSummary,
+    transcriptAvg,
     max: Math.round(max),
-    behaviorBoost,
+    behaviorBoost: behavior.reviewScore,
     behavior,
     scorableCount: valid.length
   };
@@ -262,16 +297,16 @@ function buildHtml(ctx) {
         <div class="pct">${avg}%</div>
       </div>
       <div class="risk-info">
-        <h2>${riskLabel(avg)}</h2>
-        <p>Advisory AI-assistance risk from ${risk.scorableCount} scorable transcript response${risk.scorableCount === 1 ? '' : 's'}. Short or low-confidence fragments are treated as inconclusive, not human evidence.</p>
-        <p>Behavioral events are listed separately and never increase the transcript-risk score.</p>
+        <h2>${esc(risk.reviewLabel)}</h2>
+        <p>${esc(risk.reviewSummary)}</p>
+        <p>Transcript-only risk remains ${risk.transcriptAvg}%. Behavioral evidence raises review priority without being represented as a transcript probability.</p>
       </div>
     </div>
 
     <div class="grid4">
-      <div class="stat"><div class="stat-label">Overall Risk</div><div class="stat-val">${avg}%</div></div>
+      <div class="stat"><div class="stat-label">Review Priority</div><div class="stat-val">${risk.reviewScore}%</div></div>
       <div class="stat"><div class="stat-label">Transcript Risk</div><div class="stat-val">${risk.transcriptAvg}%</div></div>
-      <div class="stat"><div class="stat-label">Peak Score</div><div class="stat-val">${max}%</div></div>
+      <div class="stat"><div class="stat-label">AI Tool Events</div><div class="stat-val">${risk.behavior.aiToolHits}</div></div>
       <div class="stat"><div class="stat-label">Responses</div><div class="stat-val">${totalResponses}</div></div>
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>
     </div>

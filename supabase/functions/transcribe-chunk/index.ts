@@ -1,6 +1,14 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { verifySessionToken } from "../_shared/session-token.ts";
 
+const cleanTranscript = (value: unknown) =>
+  String(value || "").replace(/\s+/g, " ").trim();
+const knownHallucination = (text: string) =>
+  /^(?:\[?(?:music|silence|blank audio|inaudible)\]?|thank you for watching|thanks for watching|please subscribe)[\s.!?]*$/i
+    .test(text) ||
+  /^(?:subtitles|captions) by\b/i.test(text) ||
+  /\bamara\.org\b/i.test(text);
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -40,9 +48,11 @@ Deno.serve(async (request) => {
     if (deepgram.ok) {
       const body = await deepgram.json();
       const alternative = body.results?.channels?.[0]?.alternatives?.[0];
+      const text = cleanTranscript(alternative?.transcript);
+      const confidence = Number(alternative?.confidence || 0);
       return Response.json({
-        text: String(alternative?.transcript || "").trim(),
-        confidence: Number(alternative?.confidence || 0),
+        text: confidence >= 0.52 && !knownHallucination(text) ? text : "",
+        confidence,
         source: "deepgram-nova-3-chunk",
       }, { headers: corsHeaders });
     }
@@ -51,6 +61,7 @@ Deno.serve(async (request) => {
   const form = new FormData();
   form.append("model", "whisper-large-v3-turbo");
   form.append("temperature", "0");
+  form.append("language", "en");
   form.append("file", new Blob([audio], { type: contentType }), "segment.webm");
   const groq = await fetch(
     "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -67,8 +78,9 @@ Deno.serve(async (request) => {
     );
   }
   const body = await groq.json();
+  const text = cleanTranscript(body.text);
   return Response.json({
-    text: String(body.text || "").trim(),
+    text: knownHallucination(text) ? "" : text,
     confidence: 0.72,
     source: "groq-whisper-chunk",
   }, { headers: corsHeaders });

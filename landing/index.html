@@ -23,7 +23,7 @@
       <div class="hero-glow"></div>
       <div class="hero-copy reveal">
         <span class="eyebrow">Interview verification for careful teams</span>
-        <h1>Review the interview, not a black-box verdict.</h1>
+        <h1>See the interview as it happens.</h1>
         <p>Live transcript, session events, and explainable AI-assistance risk in one focused recruiter workspace.</p>
         <div class="hero-actions">
           <a class="primary-action" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download Command Center</a>
@@ -35,8 +35,43 @@
           <span>Advisory evidence, not accusations</span>
         </div>
       </div>
-      <div class="hero-product reveal" data-parallax="0.08">
-        <img src="img/dashboard.png" alt="Truveil Command Center showing live transcript and session evidence">
+      <div class="hero-console reveal" data-parallax="0.04" aria-label="Live Truveil Command Center preview">
+        <div class="console-bar">
+          <div class="console-brand"><i></i><strong>Truveil Command Center</strong></div>
+          <span class="console-session">TRV-482910</span>
+          <span class="console-live"><i></i>Live</span>
+        </div>
+        <div class="console-metrics">
+          <div><span>Transcript</span><strong>Streaming</strong></div>
+          <div><span>Evidence</span><strong>3 events</strong></div>
+          <div><span>Source</span><strong>Deepgram live</strong></div>
+        </div>
+        <div class="console-body">
+          <div class="console-transcript">
+            <div class="console-label"><span>Live transcript</span><em>Interim text</em></div>
+            <article class="transcript-question">
+              <span>Interviewer</span>
+              <p>Tell me about a difficult production incident you helped resolve.</p>
+            </article>
+            <article class="transcript-answer">
+              <span>Candidate</span>
+              <p id="liveTypeText" aria-live="off"></p><b class="typing-caret" aria-hidden="true"></b>
+            </article>
+            <div class="risk-note">
+              <span>Advisory review</span>
+              <strong>Grounded example detected</strong>
+              <p>Specific details and self-correction provide a human counter-signal.</p>
+            </div>
+          </div>
+          <aside class="console-evidence">
+            <div class="console-label"><span>Session evidence</span><em>Live</em></div>
+            <div class="evidence-event safe"><i></i><div><strong>Candidate joined</strong><span>11:42:03</span></div></div>
+            <div class="evidence-event alert pulse-event"><i></i><div><strong>Restricted site detected</strong><span>chatgpt.com · Chrome</span></div></div>
+            <div class="evidence-event"><i></i><div><strong>Returned to interview</strong><span>11:44:18</span></div></div>
+            <div class="evidence-event"><i></i><div><strong>Transcript healthy</strong><span>Latency 1.4s</span></div></div>
+          </aside>
+        </div>
+        <div class="console-footer"><span><i></i>Transcript relay healthy</span><span>Human review required</span></div>
       </div>
       <a class="scroll-cue" href="#product">Scroll to inspect</a>
     </section>
@@ -47,10 +82,24 @@
         <h2>Signal arrives live. Context stays attached.</h2>
         <p>Transcript evidence and monitored behavior remain separate, so interviewers can understand what happened without treating a score as truth.</p>
       </div>
-      <div class="product-stage reveal">
-        <img src="img/dashboard.png" alt="Truveil recruiter dashboard">
-        <div class="stage-callout callout-one"><strong>Live transcript</strong><span>Interim text appears as the candidate speaks.</span></div>
-        <div class="stage-callout callout-two"><strong>Reviewable evidence</strong><span>Every risk estimate shows its strongest signals and counter-signal.</span></div>
+      <div class="signal-showcase reveal">
+        <div class="signal-column">
+          <div class="showcase-label">Foreground monitoring</div>
+          <div class="signal-row active"><span>Restricted destination</span><strong>chatgpt.com</strong><em>Closed + reported</em></div>
+          <div class="signal-row"><span>Meeting tool</span><strong>meet.google.com</strong><em>Allowed</em></div>
+          <div class="signal-row"><span>Foreground app</span><strong>Visual Studio Code</strong><em>Review event</em></div>
+          <div class="signal-row"><span>Transcript relay</span><strong>Deepgram streaming</strong><em>Healthy</em></div>
+        </div>
+        <div class="analysis-column">
+          <div class="showcase-label">Reviewable transcript evidence</div>
+          <blockquote>“I first rolled back the release, then realized the queue consumers were still holding the old schema. We drained those, replayed the failed jobs, and added a compatibility check afterward.”</blockquote>
+          <div class="analysis-summary">
+            <span>Latest response</span>
+            <strong>Needs human review</strong>
+            <p>Specific sequence and grounded remediation details are present. Advisory signals remain separate from monitored behavior.</p>
+          </div>
+          <div class="analysis-tags"><span>Specific example</span><span>Natural correction</span><span>Sequence detail</span></div>
+        </div>
       </div>
     </section>
 

@@ -140,7 +140,7 @@ function behaviorBoostFromFlags(flags = []) {
   let unlistedAppHits = 0;
   let criticalHits = 0;
   for (const flag of flags) {
-    const text = String(flag.text || '').toLowerCase();
+    const text = flagEvidenceText(flag);
     const severity = String(flag.severity || '').toLowerCase();
     if (severity === 'critical') criticalHits++;
     if (/\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) aiToolHits++;
@@ -148,13 +148,24 @@ function behaviorBoostFromFlags(flags = []) {
     if (/\bswitched away\b/.test(text)) focusSwitches++;
     if (/\bunlisted app\/site\b/.test(text)) unlistedAppHits++;
   }
-  return Math.min(42, Math.round(
-    aiToolHits * 4
-    + overlayHits * 14
-    + criticalHits * 8
-    + Math.min(10, focusSwitches * 1.5)
+  return Math.min(100, Math.round(
+    (aiToolHits ? 48 + Math.min(34, (aiToolHits - 1) * 17) : 0)
+    + overlayHits * 24
+    + criticalHits * 4
+    + Math.min(8, focusSwitches)
     + Math.min(8, unlistedAppHits * 2)
   ));
+}
+
+function flagEvidenceText(flag = {}) {
+  return [
+    flag.text,
+    flag.detectedHost,
+    flag.detectedUrl,
+    flag.matchedRule,
+    flag.processName,
+    flag.windowTitle
+  ].filter(Boolean).join(' ').toLowerCase();
 }
 
 function currentTranscriptAverage() {
@@ -162,13 +173,30 @@ function currentTranscriptAverage() {
 }
 
 function currentOverallRisk() {
-  return currentTranscriptAverage();
+  return Math.max(currentTranscriptAverage(), behaviorBoostFromFlags(flagEvidence));
 }
 
 function refreshOverallRiskMetric() {
   const overall = currentOverallRisk();
+  const behaviorScore = behaviorBoostFromFlags(flagEvidence);
   statsScore.textContent = `${overall}%`;
   statsScore.className = 'mm-val ' + (overall >= 70 ? 'risk-high' : overall >= 40 ? 'risk-med' : 'risk-low');
+  scoreRing.style.strokeDashoffset = 175.9 - (overall / 100) * 175.9;
+  scoreSection.classList.toggle('high-risk', overall >= 70);
+  scoreSection.classList.toggle('medium-risk', overall >= 40 && overall < 70);
+  scoreRing.setAttribute('stroke', overall >= 70 ? '#ef4444' : overall >= 40 ? '#f59e0b' : '#22c55e');
+  scoreValue.textContent = overall ? `${overall}%` : '—';
+
+  if (behaviorScore >= currentTranscriptAverage() && behaviorScore > 0) {
+    const aiToolHits = flagEvidence.filter(flag => /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i.test(flagEvidenceText(flag))).length;
+    scoreLabel.textContent = aiToolHits > 1 ? 'Repeated AI-tool activity' : 'Behavior review recommended';
+    scoreReasoning.textContent = aiToolHits
+      ? `${aiToolHits} restricted AI-assistance destination event${aiToolHits === 1 ? '' : 's'} recorded. Compare event timestamps with the transcript.`
+      : 'Behavioral monitoring events raised the review priority.';
+  } else if (scoreCount) {
+    scoreLabel.textContent = overall >= 70 ? 'Transcript review recommended' : overall >= 40 ? 'Watch transcript evidence' : 'No strong transcript signal';
+    scoreReasoning.textContent = 'Transcript risk is advisory and should be reviewed with session events.';
+  }
 }
 
 // ─── Idle: New Session ────────────────────────────────────────────────
