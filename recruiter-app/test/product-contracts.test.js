@@ -27,3 +27,12 @@ test('candidate-facing copy does not expose an AI score', () => {
   const html = fs.readFileSync('D:/Truveil-Client/src/renderer/index.html', 'utf8');
   assert.doesNotMatch(html, /AI-assistance risk|integrity percent|cheating score/i);
 });
+
+test('production hardening removes legacy anonymous session and audio access', () => {
+  const migration = read('supabase/final-access-hardening.sql');
+  assert.match(migration, /drop policy if exists "Truveil recent session-code access"/);
+  assert.match(migration, /revoke all on public\.sessions, public\.audio_chunks from anon/);
+  assert.match(migration, /private\.can_access_session\(s\.internal_id\)/);
+  assert.match(migration, /revoke all on function public\.cleanup_expired_session_audio\(interval\)/);
+  assert.doesNotMatch(migration, /to anon/);
+});
