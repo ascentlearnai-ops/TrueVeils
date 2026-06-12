@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('truveil', {
   updateSession: (data) => ipcRenderer.invoke('session:update', data),
   startSession: () => ipcRenderer.invoke('session:start'),
   endSession: () => ipcRenderer.invoke('session:end'),
+  addSessionNote: (data) => ipcRenderer.invoke('session:note', data),
 
   // Live analysis
   analyzeTranscript: (data) => ipcRenderer.invoke('analyze:transcript', data),
@@ -32,5 +33,7 @@ contextBridge.exposeInMainWorld('truveil', {
   // Misc
   copyLink: (text) => ipcRenderer.invoke('clipboard:write', text),
   openReportsFolder: () => ipcRenderer.invoke('report:openFolder'),
+  listReports: () => ipcRenderer.invoke('report:list'),
+  deleteReport: (id) => ipcRenderer.invoke('report:delete', id),
   getAudioSources: () => ipcRenderer.invoke('get-audio-sources'),
 });

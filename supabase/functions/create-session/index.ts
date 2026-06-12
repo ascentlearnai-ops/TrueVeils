@@ -79,6 +79,12 @@ Deno.serve(async (request) => {
       transcript: [],
       recruiter_id: authData.user.id,
       organization_id: member.organization_id,
+      candidate_name: String(body.candidateName || "").slice(0, 120),
+      role_title: String(body.role || "").slice(0, 160),
+      technical_vocabulary: Array.isArray(body.technicalVocabulary)
+        ? body.technicalVocabulary.map((item: unknown) => String(item).slice(0, 80)).slice(0, 40)
+        : [],
+      policy_preset: String(body.policyPreset || "standard_technical").slice(0, 40),
       allowed_apps: policy.allowed_apps || [],
       allowed_sites: policy.allowed_sites || [],
       blocked_sites: policy.blocked_sites || [],
@@ -88,6 +94,15 @@ Deno.serve(async (request) => {
         .toISOString(),
     }).select("*").single();
     if (error) throw error;
+    const { error: participantError } = await service.from(
+      "session_participants",
+    ).insert({
+      session_id: session.internal_id,
+      user_id: authData.user.id,
+      participant_role: "recruiter",
+      expires_at: session.expires_at,
+    });
+    if (participantError) throw participantError;
     return Response.json({ session }, {
       headers: { ...corsHeaders, "content-type": "application/json" },
     });

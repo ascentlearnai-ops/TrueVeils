@@ -25,6 +25,11 @@
       <span class="logo">Truveil</span>
       <span class="tb-divider"></span>
       <span class="tb-app">Command Center</span>
+      <nav class="workspace-nav" aria-label="Workspace">
+        <button class="workspace-nav-btn active" id="navNewSession">New session</button>
+        <button class="workspace-nav-btn" id="navLiveSession">Live session</button>
+        <button class="workspace-nav-btn" id="navReports">Reports</button>
+      </nav>
     </div>
     <div class="tb-right">
       <span class="auth-user" id="authUser" hidden></span>
@@ -119,6 +124,22 @@
       </div>
 
       <div class="form">
+        <div class="policy-toolbar">
+          <div class="field">
+            <label>Policy preset</label>
+            <select id="policyPresetSelect">
+              <option value="standard_technical">Standard technical</option>
+              <option value="open_book">Open-book</option>
+              <option value="strict">Strict</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Technical vocabulary</label>
+            <input type="text" id="technicalVocabularyInput" placeholder="e.g. Kubernetes, PostgreSQL, TypeScript">
+            <div class="field-hint">Improves live transcription for role-specific terms.</div>
+          </div>
+        </div>
         <div class="field">
           <label>Candidate name</label>
           <input type="text" id="candidateNameInput" placeholder="e.g. Alex Chen" autocomplete="off">
@@ -174,10 +195,15 @@ teams.microsoft.com</textarea>
       </div>
 
       <div class="setup-actions">
+        <div class="setup-status-strip" aria-live="polite">
+          <span><i></i> Session service connected</span>
+          <span id="candidateReadyState"><i></i> Candidate preflight pending</span>
+          <span><i></i> No raw audio retained</span>
+        </div>
         <button class="btn btn-ghost" id="cancelSetupBtn">Cancel</button>
         <button class="btn btn-primary" id="startMonitoringBtn">
           <span class="dots-pulse"><span></span><span></span><span></span></span>
-          Arm Live Session
+          Waiting for candidate preflight
         </button>
       </div>
     </div>
@@ -201,8 +227,8 @@ teams.microsoft.com</textarea>
 
       <div class="mock-metrics">
         <div class="mm">
-          <div class="mm-label">REVIEW PRIORITY</div>
-          <div class="mm-val risk-low" id="statsScore">0%</div>
+          <div class="mm-label">REVIEW BAND</div>
+          <div class="mm-val risk-low" id="statsScore">Clear</div>
         </div>
         <div class="mm">
           <div class="mm-label">FLAGS</div>
@@ -217,8 +243,8 @@ teams.microsoft.com</textarea>
           <div class="mm-val" id="statsAudio">0</div>
         </div>
         <div class="mm">
-          <div class="mm-label">LATEST</div>
-          <div class="mm-val mm-trend" id="scoreTrend">—</div>
+          <div class="mm-label">TELEMETRY</div>
+          <div class="mm-val mm-trend" id="scoreTrend">Waiting</div>
         </div>
       </div>
 
@@ -233,12 +259,12 @@ teams.microsoft.com</textarea>
                 <circle class="ring-fill" id="scoreRing" cx="32" cy="32" r="28"
                   stroke-dasharray="175.9" stroke-dashoffset="175.9" stroke="#22c55e"/>
               </svg>
-              <div class="score-value" id="scoreValue">—</div>
+              <div class="score-value" id="scoreValue">Clear</div>
             </div>
             <div class="score-info">
-              <div class="score-label-tag">INTERVIEW REVIEW PRIORITY</div>
-              <h3 id="scoreLabel">Listening</h3>
-              <p id="scoreReasoning">Waiting for first response…</p>
+              <div class="score-label-tag">EVIDENCE-FIRST REVIEW</div>
+              <h3 id="scoreLabel">Candidate preflight</h3>
+              <p id="scoreReasoning">Behavioral evidence determines the review band. Transcript patterns remain experimental and can only raise review attention after enough reliable context.</p>
             </div>
           </div>
 
@@ -294,6 +320,20 @@ teams.microsoft.com</textarea>
               <div class="empty-state">No active anomalies</div>
             </div>
           </div>
+          <div class="review-tools">
+            <div class="panel-label">INTERVIEWER NOTES</div>
+            <div class="note-composer">
+              <input id="noteInput" placeholder="Add a private review note">
+              <button class="btn sm" id="addNoteBtn">Add note</button>
+              <button class="btn sm" id="bookmarkBtn">Bookmark now</button>
+            </div>
+            <div class="suggested-followups">
+              <button data-followup="Can you explain that answer again using a concrete example from your own work?">Ask for a concrete example</button>
+              <button data-followup="What tradeoff did you consider, and what would make you choose differently?">Ask about tradeoffs</button>
+              <button data-followup="Please change one assumption and walk me through how your approach changes.">Change an assumption</button>
+            </div>
+            <div class="notes-list" id="notesList"></div>
+          </div>
         </div>
       </div>
 
@@ -314,6 +354,17 @@ teams.microsoft.com</textarea>
   </div>
 
   <!-- ─── Ended Screen ─── -->
+  <div class="screen" id="reports-screen">
+    <main class="reports-workspace">
+      <div>
+        <span class="eyebrow">Review history</span>
+        <h1>Reports</h1>
+        <p>Searchable 30-day interview evidence. Reports remain advisory and reviewer-owned.</p>
+      </div>
+      <div class="report-list" id="reportList"><div class="empty-state">Loading reports...</div></div>
+    </main>
+  </div>
+
   <div class="screen" id="ended-screen">
     <div class="idle-card glass-card">
       <div class="ended-icon">
@@ -344,7 +395,7 @@ teams.microsoft.com</textarea>
         <div class="field">
           <label>OpenRouter API key <span class="field-opt">optional</span></label>
           <input type="password" id="openrouterKeyInput" placeholder="sk-or-v1-…" autocomplete="off">
-          <div class="field-hint">Optional. The required path uses local audio transcription and local heuristic scoring. Add a key later only for extra cloud review.</div>
+          <div class="field-hint">Optional experimental transcript-pattern review. Required transcription provider credentials stay server-side.</div>
         </div>
         <div class="field">
           <label>Analysis model</label>
@@ -353,7 +404,7 @@ teams.microsoft.com</textarea>
             <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (balanced)</option>
             <option value="openai/gpt-4o-mini">GPT-4o mini</option>
           </select>
-          <div class="field-hint">Reserved for optional cloud review. Local risk scoring stays on even without a key.</div>
+          <div class="field-hint">Optional transcript-pattern context never overrides observed behavioral evidence.</div>
         </div>
         <div class="settings-status" id="settingsStatus"></div>
       </div>

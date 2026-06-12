@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Truveil gives interview teams live transcripts, monitored session events, and advisory AI-assistance risk evidence.">
+  <meta name="description" content="Truveil gives interview teams live transcripts, monitored session events, notes, bookmarks, and evidence-first review reports.">
   <title>Truveil - Interview verification for careful teams</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -24,7 +24,7 @@
       <div class="hero-copy reveal">
         <span class="eyebrow">Interview verification for careful teams</span>
         <h1>See the interview as it happens.</h1>
-        <p>Live transcript, session events, and explainable AI-assistance risk in one focused recruiter workspace.</p>
+        <p>Live transcript, exact session events, interviewer notes, and evidence-first review in one focused recruiter workspace.</p>
         <div class="hero-actions">
           <a class="primary-action" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download Command Center</a>
           <a class="text-action" href="#product">Explore the workflow <span aria-hidden="true">+</span></a>
@@ -58,15 +58,15 @@
               <p id="liveTypeText" aria-live="off"></p><b class="typing-caret" aria-hidden="true"></b>
             </article>
             <div class="risk-note">
-              <span>Advisory review</span>
-              <strong>Grounded example detected</strong>
-              <p>Specific details and self-correction provide a human counter-signal.</p>
+              <span>Interviewer workflow</span>
+              <strong>Follow-up question suggested</strong>
+              <p>Ask the candidate to explain the queue tradeoff using a different example.</p>
             </div>
           </div>
           <aside class="console-evidence">
             <div class="console-label"><span>Session evidence</span><em>Live</em></div>
             <div class="evidence-event safe"><i></i><div><strong>Candidate joined</strong><span>11:42:03</span></div></div>
-            <div class="evidence-event alert pulse-event"><i></i><div><strong>Restricted site detected</strong><span>chatgpt.com · Chrome</span></div></div>
+            <div class="evidence-event alert pulse-event"><i></i><div><strong>Restricted site closed</strong><span>chatgpt.com / Chrome</span></div></div>
             <div class="evidence-event"><i></i><div><strong>Returned to interview</strong><span>11:44:18</span></div></div>
             <div class="evidence-event"><i></i><div><strong>Transcript healthy</strong><span>Latency 1.4s</span></div></div>
           </aside>
@@ -82,6 +82,10 @@
         <h2>Signal arrives live. Context stays attached.</h2>
         <p>Transcript evidence and monitored behavior remain separate, so interviewers can understand what happened without treating a score as truth.</p>
       </div>
+      <figure class="real-app-shot reveal">
+        <img src="img/admin-app-real.png" alt="Real Truveil Command Center sign-in workspace">
+        <figcaption>Captured from the Windows Electron app</figcaption>
+      </figure>
       <div class="signal-showcase reveal">
         <div class="signal-column">
           <div class="showcase-label">Foreground monitoring</div>
@@ -95,8 +99,8 @@
           <blockquote>“I first rolled back the release, then realized the queue consumers were still holding the old schema. We drained those, replayed the failed jobs, and added a compatibility check afterward.”</blockquote>
           <div class="analysis-summary">
             <span>Latest response</span>
-            <strong>Needs human review</strong>
-            <p>Specific sequence and grounded remediation details are present. Advisory signals remain separate from monitored behavior.</p>
+            <strong>Transcript context available</strong>
+            <p>Specific sequence and grounded remediation details are preserved for interviewer review. Transcript patterns never override observed behavior.</p>
           </div>
           <div class="analysis-tags"><span>Specific example</span><span>Natural correction</span><span>Sequence detail</span></div>
         </div>
@@ -111,14 +115,14 @@
       <ol class="flow-list">
         <li class="reveal"><span>01</span><div><h3>Configure the session</h3><p>Select allowed meeting tools and restricted destinations before the candidate joins.</p></div></li>
         <li class="reveal"><span>02</span><div><h3>Candidate consents</h3><p>Truveil Secure explains the session check, requests microphone access, and joins with a short-lived code.</p></div></li>
-        <li class="reveal"><span>03</span><div><h3>Review live evidence</h3><p>See transcript health, monitored foreground changes, and advisory response-risk signals as they happen.</p></div></li>
+        <li class="reveal"><span>03</span><div><h3>Review live evidence</h3><p>See transcript health, exact foreground changes, and restricted-destination events as they happen.</p></div></li>
         <li class="reveal"><span>04</span><div><h3>Export a careful report</h3><p>The report preserves transcript and event evidence while making clear that the assessment is probabilistic.</p></div></li>
       </ol>
     </section>
 
     <section class="privacy-band" id="privacy">
       <div class="privacy-visual reveal">
-        <img src="img/candidate.png" alt="Truveil Secure candidate session view">
+        <img src="img/candidate-app-real.png" alt="Real Truveil Secure candidate check-in workspace">
       </div>
       <div class="privacy-copy reveal">
         <span class="eyebrow">Candidate-respectful by design</span>

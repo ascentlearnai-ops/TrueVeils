@@ -11,6 +11,11 @@ test('admin website uses a site-local installer and honest advisory language', (
   assert.match(html, /\/downloads\/TruveilRecruiter-Setup-1\.0\.0\.exe/);
   assert.doesNotMatch(html, /github\.com\/.*releases/i);
   assert.match(html, /Advisory evidence/i);
+  assert.doesNotMatch(html, /img\/candidate\.png/i);
+  assert.match(html, /img\/admin-app-real\.png/i);
+  assert.match(html, /img\/candidate-app-real\.png/i);
+  assert.equal(fs.existsSync(path.join(repo, 'landing/img/admin-app-real.png')), true);
+  assert.equal(fs.existsSync(path.join(repo, 'landing/img/candidate-app-real.png')), true);
 });
 
 test('packaged recruiter runtime config never contains provider secrets', () => {

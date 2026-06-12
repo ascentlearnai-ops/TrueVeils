@@ -1,6 +1,7 @@
 const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { evaluateReview } = require('../review/evidence');
 
 function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +16,13 @@ function durationStr(ms) {
   const s = Math.floor(ms / 1000);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+function evidenceDetail(event = {}) {
+  const target = event.detectedHost || event.detectedUrl || event.windowTitle || event.processName || '';
+  const source = event.detectionSource ? `Detected by ${event.detectionSource}` : '';
+  const rule = event.matchedRule ? `Matched ${event.matchedRule}` : '';
+  return [event.text, target, source, rule].filter(Boolean).join(' | ');
 }
 
 function scoreClass(n) {
@@ -145,7 +153,7 @@ function sessionRiskSummary({ scores = [], flags = [] }) {
 }
 
 async function generate(data) {
-  const { session, startedAt, endedAt, transcripts, flags, scores, audioChunks = [] } = data;
+  const { session, startedAt, endedAt, transcripts, flags, scores, audioChunks = [], notes = [] } = data;
   const dir = path.join(app.getPath('userData'), 'reports');
   fs.mkdirSync(dir, { recursive: true });
 
@@ -154,12 +162,18 @@ async function generate(data) {
   const duration = durationStr(endMs - startMs);
 
   const risk = sessionRiskSummary({ scores, flags });
+  const review = data.review || evaluateReview({
+    events: flags,
+    transcripts,
+    transcriptAnalyses: transcripts,
+    telemetry: data.telemetry || {}
+  });
   const avg = risk.avg;
   const max = risk.max;
   const highFlags = flags.filter(f => f.severity === 'high' || f.severity === 'critical').length;
 
   const html = buildHtml({
-    session, startMs, endMs, duration, avg, max, highFlags, risk,
+    session, startMs, endMs, duration, avg, max, highFlags, risk, review, notes,
     transcripts, flags, audioChunks, totalResponses: transcripts.length
   });
 
@@ -170,15 +184,15 @@ async function generate(data) {
 }
 
 function buildHtml(ctx) {
-  const { session, startMs, endMs, duration, avg, max, highFlags, risk, transcripts, flags, audioChunks, totalResponses } = ctx;
-  const riskCls = avg >= 70 ? 'high' : avg >= 40 ? 'med' : 'low';
+  const { session, startMs, endMs, duration, risk, review, notes = [], transcripts, flags, audioChunks, totalResponses } = ctx;
+  const riskCls = review.reviewBand === 'high_priority_review' ? 'high' : review.reviewBand === 'review' ? 'med' : 'low';
 
   const transcriptRows = transcripts.length
     ? transcripts.map(t => `
       <div class="entry">
         <div class="entry-head">
           <span class="time">${fmtTime(t.timestamp)}</span>
-          <span class="score ${scoreClass(t.aiScore)}">${t.aiScore != null ? t.aiScore + '%' : '—'}</span>
+          <span class="score ${t.scorable === false ? 'unk' : 'low'}">${t.scorable === false ? 'Pattern analysis abstained' : 'Pattern evidence recorded'}</span>
         </div>
         <div class="entry-text">${esc(t.text)}</div>
         ${t.reasoning ? `<div class="reasoning">${esc(t.reasoning)}</div>` : ''}
@@ -191,7 +205,7 @@ function buildHtml(ctx) {
       <tr>
         <td class="mono">${fmtTime(f.timestamp)}</td>
         <td><span class="sev ${esc(f.severity || 'medium')}">${esc((f.severity || 'medium').toUpperCase())}</span></td>
-        <td>${esc(f.text)}</td>
+        <td>${esc(evidenceDetail(f))}</td>
       </tr>`).join('')
     : '<tr><td colspan="3" class="empty">No anomalies recorded.</td></tr>';
 
@@ -205,6 +219,17 @@ function buildHtml(ctx) {
         <td>${chunk.transcript ? esc(chunk.transcript) : '<span style="color:rgba(255,255,255,.3)">No clear transcript</span>'}</td>
       </tr>`).join('')
     : '<tr><td colspan="5" class="empty">No audio chunks were captured.</td></tr>';
+  const noteRows = notes.length
+    ? notes.map(note => `<div class="entry"><div class="entry-head"><span class="time">${fmtTime(note.createdAt)}</span>${note.bookmarkedAt ? '<span class="score low">BOOKMARK</span>' : ''}</div><div class="entry-text">${esc(note.note)}</div></div>`).join('')
+    : '<div class="empty">No interviewer notes were added.</div>';
+  const correlationRows = review.correlations?.length
+    ? review.correlations.map(item => `
+      <div class="entry">
+        <div class="entry-head"><span class="time">${fmtTime(item.occurredAt)}</span><span class="score med">${esc(item.target)}</span></div>
+        <div class="entry-text">The next recorded response began ${esc(item.secondsUntilResponse)} seconds later.</div>
+        ${item.transcriptPreview ? `<div class="reasoning">${esc(item.transcriptPreview)}</div>` : ''}
+      </div>`).join('')
+    : '<div class="empty">No restricted-destination event could be correlated with a later response.</div>';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -289,23 +314,16 @@ function buildHtml(ctx) {
     <div class="sub-title">${esc(session.role)} · Session duration ${duration}</div>
 
     <div class="risk-banner ${riskCls}">
-      <div class="risk-dial">
-        <svg viewBox="0 0 64 64">
-          <circle class="bg" cx="32" cy="32" r="28"/>
-          <circle class="fill" cx="32" cy="32" r="28" stroke-dasharray="175.9" stroke-dashoffset="${175.9 - (avg / 100) * 175.9}"/>
-        </svg>
-        <div class="pct">${avg}%</div>
-      </div>
       <div class="risk-info">
-        <h2>${esc(risk.reviewLabel)}</h2>
-        <p>${esc(risk.reviewSummary)}</p>
-        <p>Transcript-only risk remains ${risk.transcriptAvg}%. Behavioral evidence raises review priority without being represented as a transcript probability.</p>
+        <h2>${esc(review.displayBand)}</h2>
+        <p>${esc(review.summary)}</p>
+        <p>${esc(review.evidence.join(' | ') || 'No meaningful behavioral evidence was recorded.')}</p>
       </div>
     </div>
 
     <div class="grid4">
-      <div class="stat"><div class="stat-label">Review Priority</div><div class="stat-val">${risk.reviewScore}%</div></div>
-      <div class="stat"><div class="stat-label">Transcript Risk</div><div class="stat-val">${risk.transcriptAvg}%</div></div>
+      <div class="stat"><div class="stat-label">Review Band</div><div class="stat-val">${esc(review.displayBand)}</div></div>
+      <div class="stat"><div class="stat-label">Transcript Context</div><div class="stat-val">${review.transcriptEligible ? 'Eligible' : 'Abstained'}</div></div>
       <div class="stat"><div class="stat-label">AI Tool Events</div><div class="stat-val">${risk.behavior.aiToolHits}</div></div>
       <div class="stat"><div class="stat-label">Responses</div><div class="stat-val">${totalResponses}</div></div>
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>
@@ -322,17 +340,23 @@ function buildHtml(ctx) {
       </table>
     </div>
 
-    <h3>Audio Timeline</h3>
+    <h3>Interviewer notes and bookmarks</h3>
+    <div class="panel">${noteRows}</div>
+
+    <h3>Evidence correlations</h3>
+    <div class="panel">${correlationRows}</div>
+
+    <h3>Transcription health timeline</h3>
     <div class="panel" style="padding:0">
       <table>
-        <thead><tr><th style="width:110px">TIME</th><th style="width:80px">CHUNK</th><th style="width:130px">STATUS</th><th style="width:90px">LENGTH</th><th>LOCAL TRANSCRIPT</th></tr></thead>
+        <thead><tr><th style="width:110px">TIME</th><th style="width:80px">SIGNAL</th><th style="width:130px">STATUS</th><th style="width:90px">LENGTH</th><th>TRANSCRIPT</th></tr></thead>
         <tbody>${audioRows}</tbody>
       </table>
     </div>
 
     <footer>
       Generated by Truveil Command Center · ${fmtDate(Date.now())}<br>
-      This report is advisory. Scores reflect probabilistic signal detection, not definitive determinations.
+      This report is advisory evidence for human review. It is not an automated hiring decision.
     </footer>
   </div>
 </body>

@@ -7,12 +7,17 @@ const screens = {
   idle: $('idle-screen'),
   setup: $('setup-screen'),
   dashboard: $('dashboard-screen'),
+  reports: $('reports-screen'),
   ended: $('ended-screen')
 };
 
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+  document.querySelectorAll('.workspace-nav-btn').forEach(button => button.classList.remove('active'));
+  if (name === 'dashboard') $('navLiveSession')?.classList.add('active');
+  else if (name === 'reports') $('navReports')?.classList.add('active');
+  else $('navNewSession')?.classList.add('active');
 }
 
 // ─── State ─────────────────────────────────────────────────────────────
@@ -28,6 +33,8 @@ let latestScore = null;
 let hasFirstTranscript = false;
 let currentSession = null;
 let flagEvidence = [];
+let candidateReady = false;
+let telemetryState = { connected: true, transcription: 'waiting', monitoring: 'waiting' };
 
 // ─── Elements ──────────────────────────────────────────────────────────
 const statusDot = $('statusDot');
@@ -66,6 +73,10 @@ const authEmailInput = $('authEmailInput');
 const authMessage = $('authMessage');
 const authUser = $('authUser');
 const signOutBtn = $('signOutBtn');
+const technicalVocabularyInput = $('technicalVocabularyInput');
+const policyPresetSelect = $('policyPresetSelect');
+const startMonitoringBtn = $('startMonitoringBtn');
+const notesList = $('notesList');
 
 // ─── Utility ───────────────────────────────────────────────────────────
 function toast(msg, variant = 'info') {
@@ -176,27 +187,29 @@ function currentOverallRisk() {
   return Math.max(currentTranscriptAverage(), behaviorBoostFromFlags(flagEvidence));
 }
 
-function refreshOverallRiskMetric() {
-  const overall = currentOverallRisk();
-  const behaviorScore = behaviorBoostFromFlags(flagEvidence);
-  statsScore.textContent = `${overall}%`;
-  statsScore.className = 'mm-val ' + (overall >= 70 ? 'risk-high' : overall >= 40 ? 'risk-med' : 'risk-low');
-  scoreRing.style.strokeDashoffset = 175.9 - (overall / 100) * 175.9;
-  scoreSection.classList.toggle('high-risk', overall >= 70);
-  scoreSection.classList.toggle('medium-risk', overall >= 40 && overall < 70);
-  scoreRing.setAttribute('stroke', overall >= 70 ? '#ef4444' : overall >= 40 ? '#f59e0b' : '#22c55e');
-  scoreValue.textContent = overall ? `${overall}%` : '—';
+function currentReviewBand() {
+  const exactAi = flagEvidence.some(flag => {
+    const text = flagEvidenceText(flag);
+    return /(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|interviewcoder|cluely|lockedin|finalround)/i.test(text)
+      && (flag.detectionSource === 'url' || flag.closedRestrictedTarget || flag.eventType === 'overlay_detected');
+  });
+  const possibleAi = flagEvidence.some(flag => /(chatgpt|claude|gemini|copilot|perplexity|interviewcoder|cluely)/i.test(flagEvidenceText(flag)));
+  const switches = flagEvidence.filter(flag => flag.eventType === 'focus_lost' || flag.eventType === 'foreground_changed').length;
+  if (exactAi) return { key: 'high_priority_review', label: 'High-priority review', reason: 'Exact restricted AI-tool or hidden-overlay evidence was recorded.' };
+  if (possibleAi || switches >= 4) return { key: 'review', label: 'Review', reason: 'One or more monitored events should be reviewed with interview context.' };
+  if (telemetryState.connected === false || telemetryState.transcription === 'unavailable') return { key: 'incomplete_evidence', label: 'Incomplete evidence', reason: 'Telemetry was incomplete during this session.' };
+  return { key: 'clear', label: 'Clear', reason: 'No meaningful integrity evidence has been recorded.' };
+}
 
-  if (behaviorScore >= currentTranscriptAverage() && behaviorScore > 0) {
-    const aiToolHits = flagEvidence.filter(flag => /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i.test(flagEvidenceText(flag))).length;
-    scoreLabel.textContent = aiToolHits > 1 ? 'Repeated AI-tool activity' : 'Behavior review recommended';
-    scoreReasoning.textContent = aiToolHits
-      ? `${aiToolHits} restricted AI-assistance destination event${aiToolHits === 1 ? '' : 's'} recorded. Compare event timestamps with the transcript.`
-      : 'Behavioral monitoring events raised the review priority.';
-  } else if (scoreCount) {
-    scoreLabel.textContent = overall >= 70 ? 'Transcript review recommended' : overall >= 40 ? 'Watch transcript evidence' : 'No strong transcript signal';
-    scoreReasoning.textContent = 'Transcript risk is advisory and should be reviewed with session events.';
-  }
+function refreshOverallRiskMetric() {
+  const band = currentReviewBand();
+  statsScore.textContent = band.label;
+  statsScore.className = 'mm-val ' + (band.key === 'high_priority_review' ? 'risk-high' : band.key === 'review' ? 'risk-med' : 'risk-low');
+  scoreSection.classList.toggle('high-risk', band.key === 'high_priority_review');
+  scoreSection.classList.toggle('medium-risk', band.key === 'review');
+  scoreValue.textContent = band.label;
+  scoreLabel.textContent = band.label;
+  scoreReasoning.textContent = band.reason;
 }
 
 // ─── Idle: New Session ────────────────────────────────────────────────
@@ -211,7 +224,9 @@ async function onNewSession() {
     // We create the session object now (generates TRV-XXXXXX), but don't start timer
     currentSession = await window.truveil.createSession({
       candidateName: '',
-      role: ''
+      role: '',
+      technicalVocabulary: [],
+      policyPreset: 'standard_technical'
     });
     sessionCodeEl.textContent = currentSession.sessionId;
     candidateNameInput.value = '';
@@ -219,6 +234,12 @@ async function onNewSession() {
     allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');
     allowedSitesInput.value = ['meet.google.com', 'zoom.us', 'teams.microsoft.com'].join('\n');
     customBlockedSitesInput.value = '';
+    technicalVocabularyInput.value = '';
+    policyPresetSelect.value = 'standard_technical';
+    candidateReady = false;
+    $('candidateReadyState').innerHTML = '<i></i> Candidate preflight pending';
+    startMonitoringBtn.disabled = true;
+    startMonitoringBtn.innerHTML = '<span class="dots-pulse"><span></span><span></span><span></span></span> Waiting for candidate preflight';
     document.querySelectorAll('[data-blocked-site]').forEach(input => {
       input.checked = [
         'chatgpt.com',
@@ -255,11 +276,21 @@ $('cancelSetupBtn').addEventListener('click', () => {
 $('startMonitoringBtn').addEventListener('click', startMonitoring);
 
 async function startMonitoring() {
+  if (!candidateReady) {
+    toast('Wait for the candidate to complete consent and microphone preflight.', 'error');
+    return;
+  }
   const name = candidateNameInput.value.trim() || 'Candidate';
   const role = roleInput.value.trim() || 'Interview';
 
   try {
-    currentSession = await window.truveil.updateSession({ candidateName: name, role, policy: getAllowedPolicy() });
+    currentSession = await window.truveil.updateSession({
+      candidateName: name,
+      role,
+      policy: getAllowedPolicy(),
+      technicalVocabulary: listFromTextarea(technicalVocabularyInput.value),
+      policyPreset: policyPresetSelect.value
+    });
   } catch (err) {
     toast('Failed to update session: ' + err.message, 'error');
     return;
@@ -271,12 +302,24 @@ async function startMonitoring() {
   startTimer();
 
   sessionIdEl.textContent = `SESSION: ${currentSession.sessionId}`;
-  glassTitleEl.textContent = `${name} · ${role}`;
+  glassTitleEl.textContent = `${name} / ${role}`;
 
   statusDot.className = 'status-dot active';
   statusText.textContent = 'Waiting for candidate';
   showScreen('dashboard');
 }
+
+policyPresetSelect?.addEventListener('change', () => {
+  const preset = policyPresetSelect.value;
+  const checks = Array.from(document.querySelectorAll('[data-blocked-site]'));
+  if (preset === 'open_book') {
+    checks.forEach(input => { input.checked = ['interviewcoder', 'cluely', 'finalround', 'lockedin'].includes(input.dataset.blockedSite); });
+  } else if (preset === 'strict') {
+    checks.forEach(input => { input.checked = true; });
+  } else if (preset === 'standard_technical') {
+    checks.forEach(input => { input.checked = !['poe.com', 'you.com', 'phind.com'].includes(input.dataset.blockedSite); });
+  }
+});
 
 // ─── Interim / final transcript ───────────────────────────────────────
 let interimBubble = null;
@@ -292,7 +335,7 @@ function updateInterim(text) {
     interimBubble.innerHTML = `
       <div class="entry-header">
         <span class="entry-time">${fmtTime(Date.now())}</span>
-        <span class="entry-score pending">Listening…</span>
+        <span class="entry-score pending">Live interim</span>
       </div>
       <div class="entry-text"></div>`;
     transcriptList.prepend(interimBubble);
@@ -318,7 +361,7 @@ async function commitFinalTranscript(text) {
   entryEl.innerHTML = `
     <div class="entry-header">
       <span class="entry-time">${fmtTime(timestamp)}</span>
-      <span class="entry-score pending">Analyzing…</span>
+      <span class="entry-score pending">Pattern review pending</span>
     </div>
     <div class="entry-text">${esc(text)}</div>
     <div class="entry-reasoning hidden"></div>`;
@@ -350,8 +393,8 @@ function renderAnalysis(entryEl, result) {
   }
 
   const cls = aiScore >= 70 ? 'high' : aiScore >= 40 ? 'medium' : 'low';
-  scoreEl.textContent = riskChipLabel(aiScore);
-  scoreEl.className = `entry-score ${cls}`;
+  scoreEl.textContent = scorable === false ? 'Pattern review abstained' : 'Experimental pattern note';
+  scoreEl.className = `entry-score ${scorable === false ? '' : cls}`;
 
   if (reasoning) {
     const evidence = aiSignals.length ? aiSignals.slice(0, 2).join(' + ') : 'No strong signal';
@@ -371,9 +414,8 @@ function renderAnalysis(entryEl, result) {
   const avg = currentOverallRisk();
   updateScoreRing(avg, canScore ? latestScore : null, reasoning, displayLabel);
 
-  if (flags && flags.length) {
-    flags.forEach(f => addFlag(f, result.timestamp, aiScore >= 70 ? 'high' : 'medium', false));
-  }
+  // Transcript-pattern analysis is advisory context only. It never creates a
+  // behavioral event or overrides observed app/site evidence.
 }
 
 function riskChipLabel(score) {
@@ -382,38 +424,9 @@ function riskChipLabel(score) {
   return 'Clear';
 }
 function updateScoreRing(avgScore, latest, reasoning, displayLabel) {
-  const circumference = 175.9;
-  const visibleScore = typeof latest === 'number' ? latest : avgScore;
-  const offset = circumference - (visibleScore / 100) * circumference;
-  scoreRing.style.strokeDashoffset = offset;
-
-  // Clear risk classes then reapply
-  scoreSection.classList.remove('high-risk', 'medium-risk');
-  let color, label;
-  if (typeof latest !== 'number') {
-    color = '#64748b';
-    label = displayLabel || 'Inconclusive';
-  } else if (latest >= 70) {
-    color = '#ef4444';
-    label = 'Review recommended';
-    scoreSection.classList.add('high-risk');
-  } else if (latest >= 40) {
-    color = '#f59e0b';
-    label = 'Watch closely';
-    scoreSection.classList.add('medium-risk');
-  } else {
-    color = '#22c55e';
-    label = 'No strong signal';
-  }
-  scoreRing.setAttribute('stroke', color);
-  scoreValue.textContent = typeof latest === 'number' ? `${latest}%` : '—';
-  scoreLabel.textContent = label;
-  if (reasoning) scoreReasoning.textContent = 'Use transcript and flags together. Scores are a triage signal, not a verdict.';
-
-  // Metrics
   refreshOverallRiskMetric();
-  scoreTrendEl.textContent = typeof latest === 'number' ? `${latest}%` : '—';
-  scoreTrendEl.className = 'mm-val mm-trend ' + (typeof latest === 'number' && latest >= 70 ? 'rising' : typeof latest === 'number' && latest < 40 ? 'falling' : '');
+  scoreTrendEl.textContent = telemetryState.transcription === 'healthy' ? 'Healthy' : 'Listening';
+  scoreTrendEl.className = 'mm-val mm-trend';
 }
 
 function audioStatusLabel(status) {
@@ -516,7 +529,7 @@ function addFlag(text, timestamp, severity = 'medium', persist = true, evidence 
 
   if (flagsList.querySelector('.empty-state')) flagsList.innerHTML = '';
 
-  const icons = { critical: '●', high: '●', medium: '●', low: '○' };
+  const icons = { critical: '!', high: '!', medium: '+', low: '-' };
   const target = {
     processName: evidence.processName || '',
     windowTitle: evidence.windowTitle || '',
@@ -535,7 +548,7 @@ function addFlag(text, timestamp, severity = 'medium', persist = true, evidence 
   el.dataset.target = JSON.stringify(target);
   el.className = `flag-item ${severity}`;
   el.innerHTML = `
-    <span class="flag-icon">${icons[severity] || '●'}</span>
+    <span class="flag-icon">${icons[severity] || '+'}</span>
     <div style="flex:1;min-width:0">
       <div class="flag-text">${esc(text)}</div>
       <div class="flag-time">${fmtTime(timestamp || Date.now())}</div>
@@ -606,6 +619,7 @@ function renderRealtimeTranscript(result) {
 window.truveil.onRealtimeTranscript((entry) => {
   statusDot.className = 'status-dot recording';
   statusText.textContent = 'Transcript live';
+  telemetryState.transcription = 'healthy';
   renderRealtimeTranscript(entry);
 });
 
@@ -623,6 +637,13 @@ window.truveil.onRealtimeFlag((flag) => {
 
 window.truveil.onRealtimeStatus((status) => {
   if (status?.text) statusText.textContent = status.text;
+  if (status?.candidateReady) {
+    candidateReady = true;
+    $('candidateReadyState').innerHTML = '<i></i> Candidate ready';
+    startMonitoringBtn.disabled = false;
+    startMonitoringBtn.textContent = 'Start interview';
+    toast('Candidate completed consent and microphone preflight.', 'success');
+  }
 });
 
 window.truveil.onRealtimeAudioChunk((chunk) => {
@@ -658,9 +679,9 @@ async function endSession() {
   statusDot.className = 'status-dot';
   statusText.textContent = 'Complete';
 
-  const avg = currentOverallRisk();
+  const band = currentReviewBand();
   $('endedStats').innerHTML = `
-    <div class="es-item"><span>${avg}%</span>Avg Risk</div>
+    <div class="es-item"><span>${band.label}</span>Review band</div>
     <div class="es-item"><span>${totalResponses}</span>Responses</div>
     <div class="es-item"><span>${totalTranscriptSignals}</span>Text Signals</div>
     <div class="es-item"><span>${totalFlags}</span>Flags</div>`;
@@ -683,6 +704,65 @@ $('openReportsFolderBtn').addEventListener('click', () => {
   window.truveil.openReportsFolder();
 });
 
+async function addNote(bookmark = false, overrideText = '') {
+  const input = $('noteInput');
+  const note = String(overrideText || input.value || '').trim();
+  if (!note) return;
+  try {
+    const entry = await window.truveil.addSessionNote({
+      note,
+      bookmarkedAt: bookmark ? Date.now() : null
+    });
+    const row = document.createElement('div');
+    row.className = 'note-item';
+    row.innerHTML = `${bookmark ? '<strong>Bookmark</strong> ' : ''}${esc(entry.note)}<span>${fmtTime(entry.createdAt)}</span>`;
+    notesList.prepend(row);
+    input.value = '';
+    toast(bookmark ? 'Moment bookmarked' : 'Note added', 'success');
+  } catch (error) {
+    toast(error.message || 'Could not add note', 'error');
+  }
+}
+
+$('addNoteBtn')?.addEventListener('click', () => addNote(false));
+$('bookmarkBtn')?.addEventListener('click', () => addNote(true, $('noteInput').value || 'Bookmarked interview moment'));
+document.querySelectorAll('[data-followup]').forEach(button => button.addEventListener('click', () => {
+  const question = button.dataset.followup;
+  window.truveil.copyLink(question);
+  addNote(false, `Suggested follow-up copied: ${question}`);
+}));
+
+async function loadReports() {
+  const list = $('reportList');
+  list.innerHTML = '<div class="empty-state">Loading reports...</div>';
+  const reports = await window.truveil.listReports();
+  if (!reports.length) {
+    list.innerHTML = '<div class="empty-state">No reports yet</div>';
+    return;
+  }
+  list.innerHTML = reports.map(report => `
+    <div class="report-row" data-report-id="${esc(report.id)}">
+      <div><strong>${esc(report.summary?.candidateName || 'Interview report')}</strong><span>${esc(report.summary?.role || '')} / ${new Date(report.created_at).toLocaleString()}</span></div>
+      <div class="review-band">${esc(String(report.review_band || 'incomplete_evidence').replaceAll('_', ' '))}</div>
+      <button class="btn sm" data-delete-report>Delete</button>
+    </div>`).join('');
+}
+
+$('reportList')?.addEventListener('click', async event => {
+  const button = event.target.closest('[data-delete-report]');
+  if (!button) return;
+  const row = button.closest('.report-row');
+  await window.truveil.deleteReport(row.dataset.reportId);
+  row.remove();
+});
+
+$('navNewSession')?.addEventListener('click', () => showScreen(currentSession ? 'setup' : 'idle'));
+$('navLiveSession')?.addEventListener('click', () => currentSession && showScreen('dashboard'));
+$('navReports')?.addEventListener('click', () => {
+  showScreen('reports');
+  loadReports().catch(error => toast(error.message, 'error'));
+});
+
 // ─── Reset ────────────────────────────────────────────────────────────
 function resetState() {
   totalFlags = 0;
@@ -693,13 +773,15 @@ function resetState() {
   scoreWeightSum = 0;
   latestScore = null;
   flagEvidence = [];
+  candidateReady = false;
+  telemetryState = { connected: true, transcription: 'waiting', monitoring: 'waiting' };
   hasFirstTranscript = false;
   interimBubble = null;
-  transcriptList.innerHTML = '<div class="empty-state"><span class="empty-cursor"></span>Listening for voice signature…</div>';
+  transcriptList.innerHTML = '<div class="empty-state"><span class="empty-cursor"></span>Waiting for the first reliable transcript segment</div>';
   flagsList.innerHTML = '<div class="empty-state">No active anomalies</div>';
   transcriptCount.textContent = '0';
   flagCount.textContent = '0';
-  statsScore.textContent = '0%';
+  statsScore.textContent = 'Clear';
   statsScore.className = 'mm-val risk-low';
   statsFlags.textContent = '0';
   statsResponses.textContent = '0';
@@ -713,11 +795,11 @@ function resetState() {
   if (audioHealth) audioHealth.textContent = 'No signal yet';
   if (audioLevelFill) audioLevelFill.style.width = '0%';
   if (audioLevelValue) audioLevelValue.textContent = '0%';
-  scoreTrendEl.textContent = '—';
+  scoreTrendEl.textContent = 'Waiting';
   scoreTrendEl.className = 'mm-val mm-trend';
-  scoreValue.textContent = '—';
-  scoreLabel.textContent = 'Listening';
-  scoreReasoning.textContent = 'Waiting for first response…';
+  scoreValue.textContent = 'Clear';
+  scoreLabel.textContent = 'Candidate preflight';
+  scoreReasoning.textContent = 'Behavioral evidence determines the review band. Transcript patterns remain experimental.';
   scoreRing.style.strokeDashoffset = '175.9';
   scoreRing.setAttribute('stroke', '#22c55e');
   scoreSection.classList.remove('high-risk', 'medium-risk');

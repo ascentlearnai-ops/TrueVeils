@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, dialog, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const WebSocket = require('ws');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -17,6 +18,7 @@ const SettingsStore = require('./src/settings/store');
 const { LocalTranscriber } = require('./src/audio/local-transcriber');
 const { DeepgramTranscriber } = require('./src/audio/deepgram-transcriber');
 const { GroqTranscriber } = require('./src/audio/groq-transcriber');
+const { evaluateReview } = require('./src/review/evidence');
 
 let mainWindow;
 let tray;
@@ -314,12 +316,18 @@ async function ensureRemoteSession(session) {
     const result = await client.functions.invoke('create-session', {
       body: {
         candidateAppUrl: candidateBaseUrl,
+        candidateName: session.candidateName,
+        role: session.role,
+        technicalVocabulary: session.technicalVocabulary || [],
+        policyPreset: session.policyPreset || 'standard_technical',
         policy: normalizePolicy(session.policy)
       }
     });
     if (!result.error && result.data?.session) {
       session.sessionId = result.data.session.join_code || result.data.session.id;
       session.internalId = result.data.session.internal_id;
+      session.organizationId = result.data.session.organization_id;
+      session.recruiterId = result.data.session.recruiter_id;
       return true;
     }
     if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
@@ -351,6 +359,22 @@ async function updateRemotePolicy(sessionId, policy) {
   console.warn('[Supabase] Policy columns missing; policy will be sent over realtime only.');
 }
 
+async function updateRemoteSessionDetails(session) {
+  const client = getSupabase();
+  if (!client || !session) return;
+  const patch = {
+    candidate_name: session.candidateName || null,
+    role_title: session.role || null,
+    technical_vocabulary: session.technicalVocabulary || [],
+    policy_preset: session.policyPreset || 'standard_technical'
+  };
+  const query = client.from('sessions').update(patch);
+  const { error } = session.internalId
+    ? await query.eq('internal_id', session.internalId)
+    : await query.eq('id', session.sessionId);
+  if (error) console.warn('[Supabase] session detail update failed:', error.message);
+}
+
 async function broadcastSessionPolicy() {
   if (!activeSession || !realtimeChannel) return;
   try {
@@ -380,21 +404,21 @@ async function sendCandidateAction(action, target = {}) {
   return payload;
 }
 
-async function joinRealtimeSession(sessionId) {
+async function joinRealtimeSession(sessionId, { privateChannel = false } = {}) {
   const client = getSupabase();
   if (!client) return false;
   if (realtimeChannel) await client.removeChannel(realtimeChannel);
 
   realtimeChannel = client
     .channel(sessionChannelName(sessionId), {
-      config: { broadcast: { self: false }, presence: { key: 'recruiter' } }
+      config: { private: privateChannel, broadcast: { self: false }, presence: { key: 'recruiter' } }
     })
     .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
       if (payload?.interim) {
         sendToRenderer('realtime:transcript-interim', {
           text: payload.text,
           timestamp: payload.timestamp || Date.now(),
-          source: payload.source || 'candidate-web-speech-interim'
+          source: payload.source || 'deepgram-live-interim'
         });
         return;
       }
@@ -471,15 +495,25 @@ async function analyzeCandidateTranscript(payload = {}) {
   if (typeof entry.aiScore === 'number' && entry.scorable) {
     sessionData.scores.push({ score: entry.aiScore, weight: entry.scoreWeight || 1 });
   }
-  (entry.flags || []).forEach(flagText => {
-    sessionData.flags.push({
-      text: flagText,
-      timestamp,
-      severity: entry.aiScore >= 70 ? 'high' : 'medium'
-    });
-  });
-
   sendToRenderer('realtime:transcript', entry);
+
+  const client = getSupabase();
+  if (client && activeSession?.internalId) {
+    client.from('transcript_segments').upsert({
+      session_id: activeSession.internalId,
+      segment_id: payload.segmentId || `${activeSession.sessionId}-${payload.sequence || sessionData.transcripts.length}`,
+      sequence: Number(payload.sequence) || 0,
+      revision: Number(payload.revision) || 0,
+      text,
+      confidence: Number.isFinite(transcriptConfidence) ? transcriptConfidence : null,
+      source: payload.source || 'candidate-transcript',
+      started_at: payload.startedAt ? new Date(payload.startedAt).toISOString() : null,
+      ended_at: payload.endedAt ? new Date(payload.endedAt).toISOString() : null,
+      emitted_at: new Date(timestamp).toISOString()
+    }, { onConflict: 'session_id,segment_id,revision' }).then(({ error }) => {
+      if (error) console.warn('[Supabase] transcript persistence failed:', error.message);
+    });
+  }
 }
 
 function safeFilePart(value) {
@@ -761,7 +795,7 @@ async function processAudioTranscription(entry) {
 function handleCandidateEvent(payload = {}) {
   if (!sessionData || !payload.type) return;
 
-  if (payload.type === 'candidate_connected') {
+  if (payload.type === 'candidate_connected' || payload.type === 'candidate_ready') {
     broadcastSessionPolicy();
   }
 
@@ -779,6 +813,7 @@ function handleCandidateEvent(payload = {}) {
   };
 
   const labels = {
+    candidate_ready: 'Candidate completed consent and microphone preflight',
     candidate_connected: 'Candidate connected to Truveil Secure',
     focus_lost: 'Candidate switched away from Truveil Secure',
     focus_gained: 'Candidate returned to Truveil Secure',
@@ -814,10 +849,34 @@ function handleCandidateEvent(payload = {}) {
   };
   sessionData.flags.push(flag);
 
+  const client = getSupabase();
+  if (client && activeSession?.internalId) {
+    client.from('session_events').insert({
+      session_id: activeSession.internalId,
+      event_type: flag.eventType,
+      severity: flag.severity,
+      occurred_at: new Date(flag.timestamp).toISOString(),
+      process_name: flag.processName || null,
+      window_title: flag.windowTitle || null,
+      detected_url: flag.detectedUrl || null,
+      detected_host: flag.detectedHost || null,
+      detection_source: flag.detectionSource || null,
+      matched_rule: flag.matchedRule || null,
+      metadata: {
+        policyDecision: flag.policyDecision,
+        closedRestrictedTarget: flag.closedRestrictedTarget
+      }
+    }).then(({ error }) => {
+      if (error) console.warn('[Supabase] event persistence failed:', error.message);
+    });
+  }
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('realtime:flag', flag);
-    if (payload.type === 'candidate_connected') {
-      mainWindow.webContents.send('realtime:status', { text: 'Candidate connected' });
+    if (payload.type === 'candidate_ready') {
+      mainWindow.webContents.send('realtime:status', { text: 'Candidate ready', candidateReady: true });
+    } else if (payload.type === 'candidate_connected') {
+      mainWindow.webContents.send('realtime:status', { text: 'Candidate connected', candidateConnected: true });
     }
   }
 }
@@ -984,13 +1043,15 @@ ipcMain.handle('auth:sign-out', async () => {
 });
 
 // Session lifecycle
-ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
+ipcMain.handle('session:create', async (_, { candidateName, role, policy, technicalVocabulary, policyPreset }) => {
   LocalRisk.resetHistory();
   const session = SessionManager.create({ candidateName, role });
   session.policy = normalizePolicy(policy);
+  session.technicalVocabulary = technicalVocabulary || [];
+  session.policyPreset = policyPreset || 'standard_technical';
   const remoteReady = await ensureRemoteSession(session);
   if (remoteReady) {
-    joinRealtimeSession(session.sessionId).catch((err) => {
+    joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: Boolean(session.internalId) }).catch((err) => {
       console.warn('[Realtime]', err.message);
     });
   }
@@ -1003,12 +1064,14 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy }) => {
     transcripts: [],
     flags: [],
     scores: [],
-    audioChunks: []
+    audioChunks: [],
+    notes: [],
+    telemetry: { connected: true, transcription: 'waiting', monitoring: 'waiting' }
   };
   return session;
 });
 
-ipcMain.handle('session:update', async (_, { candidateName, role, policy }) => {
+ipcMain.handle('session:update', async (_, { candidateName, role, policy, technicalVocabulary, policyPreset }) => {
   if (!activeSession || !sessionData) throw new Error('No active session');
   const normalizedPolicy = normalizePolicy(policy || activeSession.policy);
 
@@ -1016,11 +1079,14 @@ ipcMain.handle('session:update', async (_, { candidateName, role, policy }) => {
     ...activeSession,
     candidateName: candidateName || 'Candidate',
     role: role || 'Interview',
+    technicalVocabulary: technicalVocabulary || activeSession.technicalVocabulary || [],
+    policyPreset: policyPreset || activeSession.policyPreset || 'standard_technical',
     policy: normalizedPolicy
   };
   sessionData.session = activeSession;
 
   await updateRemotePolicy(activeSession.sessionId, normalizedPolicy);
+  await updateRemoteSessionDetails(activeSession);
   await broadcastSessionPolicy();
 
   return activeSession;
@@ -1029,7 +1095,56 @@ ipcMain.handle('session:update', async (_, { candidateName, role, policy }) => {
 ipcMain.handle('session:start', async () => {
   if (!sessionData) throw new Error('No active session');
   sessionData.startedAt = Date.now();
+  const client = getSupabase();
+  if (client) {
+    const query = client.from('sessions').update({
+      status: 'active',
+      started_at: new Date(sessionData.startedAt).toISOString()
+    });
+    const { error } = activeSession?.internalId
+      ? await query.eq('internal_id', activeSession.internalId)
+      : await query.eq('id', activeSession.sessionId);
+    if (error) throw new Error(error.message);
+  }
+  if (realtimeChannel) {
+    await realtimeChannel.send({
+      type: 'broadcast',
+      event: 'session_started',
+      payload: { sessionId: activeSession.sessionId, startedAt: sessionData.startedAt }
+    });
+  }
+  sessionData.telemetry.monitoring = 'healthy';
+  sessionData.telemetry.transcription = 'waiting';
   return { started: true, startedAt: sessionData.startedAt };
+});
+
+ipcMain.handle('session:note', async (_, note = {}) => {
+  if (!sessionData || !activeSession) throw new Error('No active session');
+  const entry = {
+    id: crypto.randomUUID(),
+    note: String(note.note || '').trim(),
+    bookmarkedAt: note.bookmarkedAt || null,
+    transcriptSegmentId: note.transcriptSegmentId || null,
+    eventId: note.eventId || null,
+    createdAt: Date.now()
+  };
+  if (!entry.note) throw new Error('Note cannot be empty.');
+  sessionData.notes.push(entry);
+
+  const client = getSupabase();
+  if (client && activeSession.internalId) {
+    const { data: authData } = await client.auth.getSession();
+    const { error } = await client.from('session_notes').insert({
+      id: entry.id,
+      session_id: activeSession.internalId,
+      author_id: authData.session?.user?.id || null,
+      note: entry.note,
+      bookmarked_at: entry.bookmarkedAt ? new Date(entry.bookmarkedAt).toISOString() : null,
+      transcript_segment_id: entry.transcriptSegmentId
+    });
+    if (error) throw new Error(error.message);
+  }
+  return entry;
 });
 
 // Analyze a final transcript chunk from the renderer (Web Speech result)
@@ -1055,9 +1170,6 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
   if (typeof analysis.score === 'number' && analysis.scorable !== false) {
     sessionData.scores.push({ score: analysis.score, weight: analysis.scoreWeight || 1 });
   }
-  (analysis.flags || []).forEach(f =>
-    sessionData.flags.push({ text: f, timestamp, severity: analysis.score >= 70 ? 'high' : 'medium' })
-  );
   return entry;
 });
 
@@ -1113,7 +1225,35 @@ ipcMain.handle('session:end', async () => {
     await closeRealtimeSession({ notifyCandidate: true });
     await persistCompletedSession();
     await cleanupRemoteAudioChunks();
+    const review = evaluateReview({
+      events: sessionData.flags,
+      transcripts: sessionData.transcripts,
+      transcriptAnalyses: sessionData.transcripts,
+      telemetry: sessionData.telemetry || {}
+    });
+    sessionData.review = review;
     const reportPath = await ReportGenerator.generate(sessionData);
+    const client = getSupabase();
+    if (client && sessionData.session.internalId) {
+      const { data: authData } = await client.auth.getSession();
+      const { error } = await client.from('reports').insert({
+        session_id: sessionData.session.internalId,
+        organization_id: sessionData.session.organizationId || null,
+        recruiter_id: authData.session?.user?.id || null,
+        review_band: review.reviewBand,
+        summary: {
+          candidateName: sessionData.session.candidateName,
+          role: sessionData.session.role,
+          review: review.summary,
+          startedAt: sessionData.startedAt,
+          endedAt: sessionData.endedAt
+        },
+        evidence: sessionData.flags,
+        notes: sessionData.notes || [],
+        telemetry_health: review.telemetryHealth
+      });
+      if (error) console.warn('[Supabase] report persistence failed:', error.message);
+    }
     shell.openPath(reportPath);
     const finalData = { ...sessionData, reportPath };
     activeSession = null;
@@ -1132,6 +1272,36 @@ ipcMain.handle('session:end', async () => {
 ipcMain.handle('report:openFolder', () => {
   const dir = path.join(app.getPath('userData'), 'reports');
   if (fs.existsSync(dir)) shell.openPath(dir);
+});
+
+ipcMain.handle('report:list', async () => {
+  const client = getSupabase();
+  if (client) {
+    const { data, error } = await client.from('reports')
+      .select('id,session_id,review_band,summary,created_at,retention_until')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (!error) return data || [];
+  }
+  const dir = path.join(app.getPath('userData'), 'reports');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter(name => name.endsWith('.html')).map(name => {
+    const stat = fs.statSync(path.join(dir, name));
+    return { id: name, review_band: 'incomplete_evidence', summary: { candidateName: name }, created_at: stat.mtime.toISOString() };
+  });
+});
+
+ipcMain.handle('report:delete', async (_, id) => {
+  const client = getSupabase();
+  if (client && /^[0-9a-f-]{36}$/i.test(String(id || ''))) {
+    const { error } = await client.from('reports').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  }
+  const candidate = path.resolve(app.getPath('userData'), 'reports', path.basename(String(id || '')));
+  const root = path.resolve(app.getPath('userData'), 'reports');
+  if (candidate.startsWith(root) && fs.existsSync(candidate)) fs.unlinkSync(candidate);
+  return { ok: true };
 });
 
 // Clipboard helper
