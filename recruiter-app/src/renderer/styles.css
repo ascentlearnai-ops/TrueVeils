@@ -47,3 +47,4 @@ button,input,textarea,select{font:inherit;color:inherit}.orb,.noise-overlay{disp
 .report-row span{margin-top:4px;color:var(--muted);font-size:10px}
 .review-band{padding:5px 8px;border:1px solid var(--line);border-radius:5px;color:#b9c7e3;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
 @media(max-width:1180px){.workspace-nav{display:none}.policy-toolbar{grid-template-columns:1fr}.note-composer{grid-template-columns:1fr 1fr}.note-composer input{grid-column:1/-1}}
+.app-brand{display:flex;align-items:center;gap:7px;height:28px;color:#f4f7ff;font-size:13px}.app-brand img{width:24px;height:24px;object-fit:cover;transform:scale(1.8);border-radius:6px}.app-brand strong{font-weight:680}.gb-brand-mark{display:block;width:24px;height:24px;border-radius:6px;overflow:hidden}.gb-brand-mark img{width:100%;height:100%;object-fit:cover;transform:scale(2)}

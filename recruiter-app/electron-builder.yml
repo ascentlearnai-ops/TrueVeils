@@ -6,6 +6,7 @@ protocols:
       - truveil-recruiter
 directories:
   output: dist
+compression: maximum
 files:
   - main.js
   - preload.js
@@ -13,6 +14,16 @@ files:
   - assets/**/*
   - src/config/runtime-config.json
   - src/**/*
+  - "!node_modules/**/*.map"
+  - "!node_modules/**/*.d.ts"
+  - "!node_modules/**/*.md"
+  - "!node_modules/**/LICENSE*"
+  - "!node_modules/**/CHANGELOG*"
+  - "!node_modules/**/docs/**/*"
+  - "!node_modules/**/example*"
+  - "!node_modules/**/examples/**/*"
+  - "!node_modules/**/test/**/*"
+  - "!node_modules/**/tests/**/*"
 asarUnpack:
   - node_modules/ffmpeg-static/ffmpeg.exe
 mac:

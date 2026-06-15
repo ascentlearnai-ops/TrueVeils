@@ -1,22 +1,7 @@
-const OpenAI = require('openai');
-
-let cachedClient = null;
-let cachedKey = null;
-
-function getClient(apiKey) {
+function requireKey(apiKey) {
   const key = apiKey || '';
   if (!key) throw new Error('OpenRouter key is not configured. Local risk scoring does not require one.');
-  if (cachedClient && cachedKey === key) return cachedClient;
-  cachedKey = key;
-  cachedClient = new OpenAI({
-    baseURL: 'https://openrouter.ai/api/v1',
-    apiKey: key,
-    defaultHeaders: {
-      'HTTP-Referer': 'https://truveil.com',
-      'X-Title': 'Truveil Command Center'
-    }
-  });
-  return cachedClient;
+  return key;
 }
 
 const SYSTEM_PROMPT = `You are a forensic linguist specialized in detecting AI-assisted speech during job interviews. A recruiter captured the candidate's spoken response via live transcription — analyze it and return ONLY a JSON object.
@@ -47,19 +32,30 @@ async function analyze(transcript, apiKey) {
   history.push(transcript);
   if (history.length > 8) history.shift();
 
-  const client = getClient(apiKey);
-  const response = await client.chat.completions.create({
-    model: 'google/gemini-2.0-flash-001',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `Response to analyze:\n"${transcript}"\n\nContext (recent responses this session): ${history.slice(0, -1).join(' | ') || 'none'}`
-      }
-    ]
+  const key = requireKey(apiKey);
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://truveil.com',
+      'X-Title': 'Truveil Command Center'
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.0-flash-001',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Response to analyze:\n"${transcript}"\n\nContext (recent responses this session): ${history.slice(0, -1).join(' | ') || 'none'}`
+        }
+      ]
+    })
   });
+  if (!response.ok) throw new Error(`OpenRouter analysis failed (${response.status}).`);
+  const result = await response.json();
 
-  const raw = response.choices[0].message.content
+  const raw = result.choices[0].message.content
     .trim()
     .replace(/^```json/i, '')
     .replace(/^```/, '')
