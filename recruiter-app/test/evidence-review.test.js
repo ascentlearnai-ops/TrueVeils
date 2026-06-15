@@ -21,6 +21,43 @@ test('transcript analysis abstains until enough reliable context exists', () => 
   assert.equal(result.transcriptEligible, false);
 });
 
+test('experimental transcript analysis never raises the formal review band', () => {
+  const longAnswer = Array.from({ length: 260 }, (_, index) => `word${index}`).join(' ');
+  const result = evaluateReview({
+    transcripts: [
+      { text: longAnswer, transcriptConfidence: 0.9 },
+      { text: longAnswer, transcriptConfidence: 0.9 },
+      { text: longAnswer, transcriptConfidence: 0.9 }
+    ],
+    transcriptAnalyses: [{ score: 99 }, { score: 98 }, { score: 97 }],
+    telemetry: { connected: true, transcription: 'healthy', monitoring: 'healthy' }
+  });
+  assert.equal(result.reviewBand, 'clear');
+});
+
+test('allowed AI destination does not raise review priority', () => {
+  const result = evaluateReview({
+    events: [{ detectedHost: 'chatgpt.com', detectionSource: 'url', policyDecision: 'allowed' }],
+    telemetry: { connected: true, transcription: 'healthy', monitoring: 'healthy' }
+  });
+  assert.equal(result.reviewBand, 'clear');
+});
+
+test('waiting telemetry is incomplete evidence', () => {
+  const result = evaluateReview({
+    telemetry: { connected: true, transcription: 'waiting', monitoring: 'waiting' }
+  });
+  assert.equal(result.reviewBand, 'incomplete_evidence');
+});
+
+test('does not correlate events with responses more than two minutes later', () => {
+  const result = correlateEvidence(
+    [{ detectedHost: 'chatgpt.com', occurredAt: 1000 }],
+    [{ text: 'Much later response', timestamp: 180000 }]
+  );
+  assert.equal(result.length, 0);
+});
+
 test('missing telemetry returns incomplete evidence', () => {
   const result = evaluateReview({ telemetry: { connected: false, transcription: 'unavailable' } });
   assert.equal(result.reviewBand, 'incomplete_evidence');

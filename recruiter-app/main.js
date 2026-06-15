@@ -789,6 +789,13 @@ async function processAudioTranscription(entry) {
       timestamp: Date.now()
     });
     await deleteRemoteAudioChunk(entry, 'failed_deleted');
+  } finally {
+    if (entry.localPath) {
+      try { fs.rmSync(entry.localPath, { force: true }); } catch (err) {
+        console.warn('[Audio cleanup] local fallback audio cleanup failed:', err.message);
+      }
+      entry.localPath = '';
+    }
   }
 }
 
@@ -990,12 +997,27 @@ function createTray() {
   tray.on('click', () => mainWindow.show());
 }
 
+function cleanupLocalFallbackAudio() {
+  const sessionsRoot = path.join(app.getPath('userData'), 'sessions');
+  if (!fs.existsSync(sessionsRoot)) return;
+  try {
+    for (const session of fs.readdirSync(sessionsRoot, { withFileTypes: true })) {
+      if (!session.isDirectory()) continue;
+      const audioDir = path.join(sessionsRoot, session.name, 'audio');
+      if (fs.existsSync(audioDir)) fs.rmSync(audioDir, { recursive: true, force: true });
+    }
+  } catch (err) {
+    console.warn('[Audio cleanup] startup cleanup failed:', err.message);
+  }
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
 
 app.whenReady().then(() => {
   app.setAsDefaultProtocolClient('truveil-recruiter');
+  cleanupLocalFallbackAudio();
   createWindow();
   createTray();
   if (pendingAuthUrl) handleAuthUrl(pendingAuthUrl);

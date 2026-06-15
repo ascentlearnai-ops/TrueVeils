@@ -1,5 +1,8 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { verifySessionToken } from "../_shared/session-token.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const MAX_AUDIO_BYTES = 2_500_000;
 
 const cleanTranscript = (value: unknown) =>
   String(value || "").replace(/\s+/g, " ").trim();
@@ -24,10 +27,36 @@ Deno.serve(async (request) => {
       headers: corsHeaders,
     });
   }
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > MAX_AUDIO_BYTES) {
+    return Response.json({ error: "Audio segment is too large." }, {
+      status: 413,
+      headers: corsHeaders,
+    });
+  }
+  const service = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  const { data: session } = await service.from("sessions").select("status")
+    .eq("internal_id", claims.sessionId).maybeSingle();
+  if (!session || session.status !== "active") {
+    return Response.json({ error: "Transcription is only available during an active session." }, {
+      status: 409,
+      headers: corsHeaders,
+    });
+  }
   const audio = await request.arrayBuffer();
   if (!audio.byteLength) {
     return Response.json({ error: "Audio was empty." }, {
       status: 400,
+      headers: corsHeaders,
+    });
+  }
+  if (audio.byteLength > MAX_AUDIO_BYTES) {
+    return Response.json({ error: "Audio segment is too large." }, {
+      status: 413,
       headers: corsHeaders,
     });
   }
@@ -81,7 +110,7 @@ Deno.serve(async (request) => {
   const text = cleanTranscript(body.text);
   return Response.json({
     text: knownHallucination(text) ? "" : text,
-    confidence: 0.72,
+    confidence: null,
     source: "groq-whisper-chunk",
   }, { headers: corsHeaders });
 });

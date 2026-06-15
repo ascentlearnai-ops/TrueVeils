@@ -1,5 +1,6 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { verifySessionToken } from "../_shared/session-token.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
@@ -14,6 +15,20 @@ Deno.serve(async (request) => {
   if (!claims) {
     return Response.json({ error: "Unauthorized" }, {
       status: 401,
+      headers: corsHeaders,
+    });
+  }
+
+  const service = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  const { data: session } = await service.from("sessions").select("status")
+    .eq("internal_id", claims.sessionId).maybeSingle();
+  if (!session || session.status !== "active") {
+    return Response.json({ error: "Transcription is only available during an active session." }, {
+      status: 409,
       headers: corsHeaders,
     });
   }
@@ -47,4 +62,3 @@ Deno.serve(async (request) => {
     },
   });
 });
-

@@ -4,8 +4,6 @@ import { verifySessionToken } from "../_shared/session-token.ts";
 
 const allowedStates = new Set([
   "candidate_ready",
-  "active",
-  "completed",
   "interrupted",
 ]);
 
@@ -41,8 +39,7 @@ Deno.serve(async (request) => {
     { auth: { persistSession: false } },
   );
   const patch: Record<string, unknown> = { status };
-  if (status === "active") patch.started_at = new Date().toISOString();
-  if (status === "completed" || status === "interrupted") {
+  if (status === "interrupted") {
     patch.ended_at = new Date().toISOString();
   }
   const { error } = await service.from("sessions").update(patch).eq(
@@ -57,4 +54,3 @@ Deno.serve(async (request) => {
   }
   return Response.json({ ok: true, status }, { headers: corsHeaders });
 });
-

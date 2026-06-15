@@ -53,12 +53,14 @@ function correlateEvidence(events = [], transcripts = []) {
       const occurredAt = timestampOf(event);
       const nextTranscript = orderedTranscripts.find(item => item._timestamp > occurredAt);
       if (!occurredAt || !nextTranscript) return null;
+      const secondsUntilResponse = Math.round((nextTranscript._timestamp - occurredAt) / 1000);
+      if (secondsUntilResponse > 120) return null;
       return {
         eventType: event.eventType || 'restricted_target',
         target: targetLabel(event),
         occurredAt,
         nextTranscriptAt: nextTranscript._timestamp,
-        secondsUntilResponse: Math.round((nextTranscript._timestamp - occurredAt) / 1000),
+        secondsUntilResponse,
         transcriptPreview: String(nextTranscript.text || '').slice(0, 180)
       };
     })
@@ -73,19 +75,24 @@ function evaluateReview({
 } = {}) {
   const exactAiEvents = events.filter(event => (
     AI_TARGET.test(eventText(event))
+    && event.policyDecision !== 'allowed'
+    && event.reviewStatus !== 'allowed'
     && (event.detectionSource === 'url' || event.closedRestrictedTarget || event.eventType === 'overlay_detected')
   ));
   const possibleAiEvents = events.filter(event => (
-    AI_TARGET.test(eventText(event)) && !exactAiEvents.includes(event)
+    AI_TARGET.test(eventText(event))
+    && event.policyDecision !== 'allowed'
+    && event.reviewStatus !== 'allowed'
+    && !exactAiEvents.includes(event)
   ));
   const overlayEvents = events.filter(event => OVERLAY_TARGET.test(eventText(event)));
   const unusualSwitches = events.filter(event => (
     event.eventType === 'focus_lost'
     || (event.eventType === 'foreground_changed' && event.policyDecision === 'unlisted')
   ));
-  const healthMissing = telemetry.connected === false
-    || telemetry.transcription === 'unavailable'
-    || telemetry.monitoring === 'unavailable';
+  const healthMissing = telemetry.connected !== true
+    || !['healthy', 'connected'].includes(telemetry.transcription)
+    || !['healthy', 'connected'].includes(telemetry.monitoring);
 
   let reviewBand = healthMissing ? 'incomplete_evidence' : 'clear';
   const evidence = [];
@@ -107,9 +114,8 @@ function evaluateReview({
   const strongTranscriptSignals = transcriptEligible
     ? transcriptAnalyses.filter(item => Number(item.aiScore ?? item.score) >= 70).length
     : 0;
-  if (strongTranscriptSignals >= 2 && rank[reviewBand] < rank.review) {
-    reviewBand = 'review';
-    evidence.push('Repeated experimental transcript-pattern signals');
+  if (strongTranscriptSignals >= 2) {
+    counterEvidence.push('Experimental transcript-pattern signals were recorded for research only and did not change the review band');
   }
   if (!transcriptEligible) {
     counterEvidence.push('Transcript-pattern analysis abstained until at least 250 reliable words across three responses');
@@ -119,7 +125,7 @@ function evaluateReview({
   }
 
   const summaries = {
-    clear: 'No meaningful integrity evidence was detected. Human review is still required.',
+    clear: 'No review signals were detected in the available evidence. Human review is still required.',
     review: 'One or more signals should be reviewed alongside the interview context.',
     high_priority_review: 'Strong behavioral evidence requires interviewer review before making a decision.',
     incomplete_evidence: 'Telemetry was incomplete, so this session cannot be confidently summarized.'

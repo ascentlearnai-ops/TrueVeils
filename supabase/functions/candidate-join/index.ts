@@ -49,7 +49,7 @@ Deno.serve(async (request) => {
         headers: corsHeaders,
       });
     }
-    if (!["waiting", "candidate_ready", "active"].includes(session.status)) {
+    if (!["waiting", "candidate_ready"].includes(session.status)) {
       return Response.json({ error: "This session has ended." }, {
         status: 409,
         headers: corsHeaders,
@@ -63,6 +63,18 @@ Deno.serve(async (request) => {
     }
 
     const exp = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
+    const { count: existingCandidates } = await client.from("session_participants")
+      .select("user_id", { count: "exact", head: true })
+      .eq("session_id", session.internal_id)
+      .eq("participant_role", "candidate")
+      .neq("user_id", authData.user.id);
+    if ((existingCandidates || 0) > 0) {
+      return Response.json({ error: "This session already has a candidate." }, {
+        status: 409,
+        headers: corsHeaders,
+      });
+    }
+
     const { error: participantError } = await client.from(
       "session_participants",
     ).upsert({
