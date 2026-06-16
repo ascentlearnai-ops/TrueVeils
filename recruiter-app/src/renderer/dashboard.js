@@ -268,6 +268,9 @@ async function onNewSession() {
       $('candidateReadyState').innerHTML = '<i></i> Manual code generated';
       sessionServiceNotice.hidden = false;
       sessionServiceNotice.textContent = `Manual code mode: ${currentSession.remoteError || 'Supabase session sync is unavailable.'}`;
+      candidateReady = true;
+      startMonitoringBtn.disabled = false;
+      startMonitoringBtn.textContent = 'Open local dashboard';
     } else {
       toast(`Candidate code created: ${currentSession.sessionId}`, 'success');
       $('candidateReadyState').innerHTML = '<i></i> Candidate preflight pending';
@@ -281,11 +284,11 @@ async function onNewSession() {
     customBlockedSitesInput.value = '';
     technicalVocabularyInput.value = '';
     policyPresetSelect.value = 'standard_technical';
-    candidateReady = false;
-    startMonitoringBtn.disabled = true;
-    startMonitoringBtn.innerHTML = currentSession.localOnly
-      ? 'Session service needs Supabase sync'
-      : '<span class="dots-pulse"><span></span><span></span><span></span></span> Waiting for candidate preflight';
+    if (!currentSession.localOnly) {
+      candidateReady = false;
+      startMonitoringBtn.disabled = true;
+      startMonitoringBtn.innerHTML = '<span class="dots-pulse"><span></span><span></span><span></span></span> Waiting for candidate preflight';
+    }
     document.querySelectorAll('[data-blocked-site]').forEach(input => {
       input.checked = [
         'chatgpt.com',
@@ -343,7 +346,7 @@ async function startMonitoring() {
   }
 
   // Kick off session timer. Candidate audio/transcript arrives over Supabase Realtime.
-  await window.truveil.startSession();
+  const started = await window.truveil.startSession();
   sessionStartTime = Date.now();
   startTimer();
 
@@ -351,7 +354,13 @@ async function startMonitoring() {
   glassTitleEl.textContent = `${name} / ${role}`;
 
   statusDot.className = 'status-dot active';
-  statusText.textContent = 'Waiting for candidate';
+  statusText.textContent = started?.localOnly ? 'Local dashboard' : 'Waiting for candidate';
+  if (started?.localOnly) {
+    addFlag('Manual code mode is active. Supabase session sync must be fixed before candidate telemetry can connect.', Date.now(), 'medium', false, {
+      eventType: 'manual_session_mode',
+      severity: 'medium'
+    });
+  }
   showScreen('dashboard');
 }
 

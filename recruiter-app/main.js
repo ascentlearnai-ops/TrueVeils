@@ -358,7 +358,7 @@ async function ensureRemoteSession(session) {
 
 async function updateRemotePolicy(sessionId, policy) {
   const client = getSupabase();
-  if (!client) return;
+  if (!client || activeSession?.localOnly) return;
 
   const { error } = await client.from('sessions').update({
     allowed_apps: policy.allowed_apps,
@@ -374,7 +374,7 @@ async function updateRemotePolicy(sessionId, policy) {
 
 async function updateRemoteSessionDetails(session) {
   const client = getSupabase();
-  if (!client || !session) return;
+  if (!client || !session || session.localOnly) return;
   const patch = {
     candidate_name: session.candidateName || null,
     role_title: session.role || null,
@@ -389,7 +389,7 @@ async function updateRemoteSessionDetails(session) {
 }
 
 async function broadcastSessionPolicy() {
-  if (!activeSession || !realtimeChannel) return;
+  if (!activeSession || activeSession.localOnly || !realtimeChannel) return;
   try {
     await realtimeChannel.send({
       type: 'broadcast',
@@ -1169,6 +1169,15 @@ ipcMain.handle('session:start', async () => {
       : await query.eq('id', activeSession.sessionId);
     if (error) throw new Error(error.message);
   }
+  if (activeSession?.localOnly) {
+    sendToRenderer('realtime:status', {
+      text: 'Local dashboard',
+      candidateReady: false,
+      manualMode: true
+    });
+    return { ok: true, localOnly: true };
+  }
+
   if (realtimeChannel) {
     await realtimeChannel.send({
       type: 'broadcast',

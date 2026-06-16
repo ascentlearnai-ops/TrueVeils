@@ -38,6 +38,8 @@ test('admin app separates email sign-in codes from candidate TRV codes', () => {
   assert.match(renderer, /manualSessionMode/);
   assert.match(renderer, /Candidate code created/);
   assert.match(renderer, /Manual code generated/);
+  assert.match(renderer, /Open local dashboard/);
+  assert.match(renderer, /Manual code mode is active/);
 });
 
 test('production hardening removes legacy anonymous session and audio access', () => {
