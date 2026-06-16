@@ -2,28 +2,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { issueSessionToken } from "../_shared/session-token.ts";
 
+const sessionSecret = () =>
+  Deno.env.get("SESSION_TOKEN_SECRET") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_ANON_KEY") ||
+  "truveil-local-session-secret";
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
   try {
-    const authorization = request.headers.get("authorization") || "";
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      {
-        global: { headers: { Authorization: authorization } },
-        auth: { persistSession: false },
-      },
-    );
-    const { data: authData, error: authError } = await userClient.auth.getUser();
-    if (authError || !authData.user) {
-      return Response.json({ error: "Anonymous candidate sign-in required." }, {
-        status: 401,
-        headers: corsHeaders,
-      });
-    }
-
     const { joinCode, candidateName } = await request.json();
     const code = String(joinCode || "").trim().toUpperCase();
     if (!/^TRV-[A-Z0-9]{6}$/.test(code)) {
@@ -63,28 +52,12 @@ Deno.serve(async (request) => {
     }
 
     const exp = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
-    const { count: existingCandidates } = await client.from("session_participants")
-      .select("user_id", { count: "exact", head: true })
-      .eq("session_id", session.internal_id)
-      .eq("participant_role", "candidate")
-      .neq("user_id", authData.user.id);
-    if ((existingCandidates || 0) > 0) {
-      return Response.json({ error: "This session already has a candidate." }, {
-        status: 409,
-        headers: corsHeaders,
-      });
-    }
-
-    const { error: participantError } = await client.from(
-      "session_participants",
-    ).upsert({
-      session_id: session.internal_id,
-      user_id: authData.user.id,
-      participant_role: "candidate",
-      candidate_name: String(candidateName || "").slice(0, 120),
-      expires_at: new Date(exp * 1000).toISOString(),
-    });
-    if (participantError) throw participantError;
+    const candidateId = crypto.randomUUID();
+    const { error: readyError } = await client.from("sessions").update({ status: "candidate_ready" }).eq(
+      "internal_id",
+      session.internal_id,
+    );
+    if (readyError) throw readyError;
 
     const { data: sessionDetails } = await client.from("sessions").select(
       "technical_vocabulary,candidate_name,role_title,policy_preset",
@@ -95,9 +68,9 @@ Deno.serve(async (request) => {
       channelId: session.id,
       joinCode: code,
       candidateName: String(candidateName || "").slice(0, 120),
-      userId: authData.user.id,
+      userId: candidateId,
       exp,
-    }, Deno.env.get("SESSION_TOKEN_SECRET")!);
+    }, sessionSecret());
 
     return Response.json({
       session: {

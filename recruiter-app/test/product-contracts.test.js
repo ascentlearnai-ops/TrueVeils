@@ -31,6 +31,7 @@ test('candidate-facing copy does not expose an AI score', () => {
 test('admin app separates email sign-in codes from candidate TRV codes', () => {
   const html = read('recruiter-app/src/renderer/index.html');
   const renderer = read('recruiter-app/src/renderer/dashboard.js');
+  const main = read('recruiter-app/main.js');
   assert.match(html, /Create interview code without email/);
   assert.match(html, /candidate receives the TRV session code/i);
   assert.match(html, /This is the candidate code/i);
@@ -40,6 +41,8 @@ test('admin app separates email sign-in codes from candidate TRV codes', () => {
   assert.match(renderer, /Manual code generated/);
   assert.match(renderer, /Open local dashboard/);
   assert.match(renderer, /Manual code mode is active/);
+  assert.match(main, /functions\.invoke\('create-session'/);
+  assert.doesNotMatch(main, /if \(authData\.session\?\.user\) \{\s*const result = await client\.functions\.invoke\('create-session'/);
 });
 
 test('production hardening removes legacy anonymous session and audio access', () => {

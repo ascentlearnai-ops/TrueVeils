@@ -14,6 +14,7 @@ Deno.serve(async (request) => {
     return new Response("ok", { headers: corsHeaders });
   }
   const authorization = request.headers.get("authorization") || "";
+  let authUser: { id: string; email?: string | null } | null = null;
   const userClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -22,12 +23,12 @@ Deno.serve(async (request) => {
       auth: { persistSession: false },
     },
   );
-  const { data: authData, error: authError } = await userClient.auth.getUser();
-  if (authError || !authData.user) {
-    return Response.json({ error: "Sign in required." }, {
-      status: 401,
-      headers: corsHeaders,
-    });
+  if (
+    authorization &&
+    !authorization.endsWith(Deno.env.get("SUPABASE_ANON_KEY") || "")
+  ) {
+    const { data: authData } = await userClient.auth.getUser();
+    authUser = authData.user || null;
   }
 
   try {
@@ -39,16 +40,21 @@ Deno.serve(async (request) => {
         auth: { persistSession: false },
       },
     );
-    let { data: member } = await service
-      .from("organization_members")
-      .select("organization_id")
-      .eq("user_id", authData.user.id)
-      .limit(1)
-      .maybeSingle();
+    let member: { organization_id: string } | null = null;
 
-    if (!member) {
+    if (authUser) {
+      const { data } = await service
+        .from("organization_members")
+        .select("organization_id")
+        .eq("user_id", authUser.id)
+        .limit(1)
+        .maybeSingle();
+      member = data;
+    }
+
+    if (authUser && !member) {
       const name = `${
-        authData.user.email?.split("@")[0] || "Truveil"
+        authUser.email?.split("@")[0] || "Truveil"
       } workspace`;
       const { data: organization, error: organizationError } = await service
         .from("organizations").insert({ name }).select("id").single();
@@ -56,7 +62,7 @@ Deno.serve(async (request) => {
       const { error: memberError } = await service.from("organization_members")
         .insert({
           organization_id: organization.id,
-          user_id: authData.user.id,
+          user_id: authUser.id,
           role: "owner",
         });
       if (memberError) throw memberError;
@@ -77,8 +83,8 @@ Deno.serve(async (request) => {
       status: "waiting",
       flags: [],
       transcript: [],
-      recruiter_id: authData.user.id,
-      organization_id: member.organization_id,
+      recruiter_id: authUser?.id || null,
+      organization_id: member?.organization_id || null,
       candidate_name: String(body.candidateName || "").slice(0, 120),
       role_title: String(body.role || "").slice(0, 160),
       technical_vocabulary: Array.isArray(body.technicalVocabulary)
@@ -94,15 +100,17 @@ Deno.serve(async (request) => {
         .toISOString(),
     }).select("*").single();
     if (error) throw error;
-    const { error: participantError } = await service.from(
-      "session_participants",
-    ).insert({
-      session_id: session.internal_id,
-      user_id: authData.user.id,
-      participant_role: "recruiter",
-      expires_at: session.expires_at,
-    });
-    if (participantError) throw participantError;
+    if (authUser) {
+      const { error: participantError } = await service.from(
+        "session_participants",
+      ).insert({
+        session_id: session.internal_id,
+        user_id: authUser.id,
+        participant_role: "recruiter",
+        expires_at: session.expires_at,
+      });
+      if (participantError) throw participantError;
+    }
     return Response.json({ session }, {
       headers: { ...corsHeaders, "content-type": "application/json" },
     });

@@ -4,6 +4,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const MAX_AUDIO_BYTES = 2_500_000;
 
+const sessionSecret = () =>
+  Deno.env.get("SESSION_TOKEN_SECRET") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_ANON_KEY") ||
+  "truveil-local-session-secret";
+
 const cleanTranscript = (value: unknown) =>
   String(value || "").replace(/\s+/g, " ").trim();
 const knownHallucination = (text: string) =>
@@ -19,7 +25,7 @@ Deno.serve(async (request) => {
   const token = request.headers.get("x-session-token") || "";
   const claims = await verifySessionToken(
     token,
-    Deno.env.get("SESSION_TOKEN_SECRET")!,
+    sessionSecret(),
   );
   if (!claims) {
     return Response.json({ error: "Unauthorized" }, {
@@ -41,8 +47,8 @@ Deno.serve(async (request) => {
   );
   const { data: session } = await service.from("sessions").select("status")
     .eq("internal_id", claims.sessionId).maybeSingle();
-  if (!session || session.status !== "active") {
-    return Response.json({ error: "Transcription is only available during an active session." }, {
+  if (!session || !["candidate_ready", "active"].includes(session.status)) {
+    return Response.json({ error: "Transcription is only available after candidate check-in." }, {
       status: 409,
       headers: corsHeaders,
     });
@@ -62,30 +68,41 @@ Deno.serve(async (request) => {
   }
 
   const contentType = request.headers.get("content-type") || "audio/webm";
+  const deepgramKey = Deno.env.get("DEEPGRAM_API_KEY");
   try {
-    const deepgram = await fetch(
-      "https://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&filler_words=true",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${Deno.env.get("DEEPGRAM_API_KEY")!}`,
-          "content-type": contentType,
+    if (deepgramKey) {
+      const deepgram = await fetch(
+        "https://api.deepgram.com/v1/listen?model=nova-3&language=en&smart_format=true&punctuate=true&filler_words=true",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${deepgramKey}`,
+            "content-type": contentType,
+          },
+          body: audio,
         },
-        body: audio,
-      },
-    );
-    if (deepgram.ok) {
-      const body = await deepgram.json();
-      const alternative = body.results?.channels?.[0]?.alternatives?.[0];
-      const text = cleanTranscript(alternative?.transcript);
-      const confidence = Number(alternative?.confidence || 0);
-      return Response.json({
-        text: confidence >= 0.52 && !knownHallucination(text) ? text : "",
-        confidence,
-        source: "deepgram-nova-3-chunk",
-      }, { headers: corsHeaders });
+      );
+      if (deepgram.ok) {
+        const body = await deepgram.json();
+        const alternative = body.results?.channels?.[0]?.alternatives?.[0];
+        const text = cleanTranscript(alternative?.transcript);
+        const confidence = Number(alternative?.confidence || 0);
+        return Response.json({
+          text: confidence >= 0.52 && !knownHallucination(text) ? text : "",
+          confidence,
+          source: "deepgram-nova-3-chunk",
+        }, { headers: corsHeaders });
+      }
     }
   } catch {}
+
+  const groqKey = Deno.env.get("GROQ_API_KEY");
+  if (!groqKey) {
+    return Response.json(
+      { error: "No transcription provider is configured in Supabase Edge Function secrets." },
+      { status: 502, headers: corsHeaders },
+    );
+  }
 
   const form = new FormData();
   form.append("model", "whisper-large-v3-turbo");
@@ -96,7 +113,7 @@ Deno.serve(async (request) => {
     "https://api.groq.com/openai/v1/audio/transcriptions",
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${Deno.env.get("GROQ_API_KEY")!}` },
+      headers: { Authorization: `Bearer ${groqKey}` },
       body: form,
     },
   );

@@ -321,28 +321,25 @@ async function ensureRemoteSession(session) {
     return false;
   }
 
-  const { data: authData } = await client.auth.getSession();
-  if (authData.session?.user) {
-    const result = await client.functions.invoke('create-session', {
-      body: {
-        candidateAppUrl: candidateBaseUrl,
-        candidateName: session.candidateName,
-        role: session.role,
-        technicalVocabulary: session.technicalVocabulary || [],
-        policyPreset: session.policyPreset || 'standard_technical',
-        policy: normalizePolicy(session.policy)
-      }
-    });
-    if (!result.error && result.data?.session) {
-      session.sessionId = result.data.session.join_code || result.data.session.id;
-      session.internalId = result.data.session.internal_id;
-      session.organizationId = result.data.session.organization_id;
-      session.recruiterId = result.data.session.recruiter_id;
-      session.candidateLink = result.data.session.candidate_link || `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
-      return true;
+  const result = await client.functions.invoke('create-session', {
+    body: {
+      candidateAppUrl: candidateBaseUrl,
+      candidateName: session.candidateName,
+      role: session.role,
+      technicalVocabulary: session.technicalVocabulary || [],
+      policyPreset: session.policyPreset || 'standard_technical',
+      policy: normalizePolicy(session.policy)
     }
-    if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
+  });
+  if (!result.error && result.data?.session) {
+    session.sessionId = result.data.session.join_code || result.data.session.id;
+    session.internalId = result.data.session.internal_id;
+    session.organizationId = result.data.session.organization_id;
+    session.recruiterId = result.data.session.recruiter_id;
+    session.candidateLink = result.data.session.candidate_link || `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
+    return true;
   }
+  if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
 
   const withPolicy = await client.from('sessions').upsert(buildSessionPayload(session));
   session.candidateLink = buildSessionPayload(session).candidate_link;
@@ -368,7 +365,10 @@ async function updateRemotePolicy(sessionId, policy) {
   }).eq('id', sessionId);
 
   if (!error) return;
-  if (!isPolicySchemaError(error)) throw new Error(error.message);
+  if (!isPolicySchemaError(error)) {
+    console.warn('[Supabase] policy update skipped:', error.message);
+    return;
+  }
   console.warn('[Supabase] Policy columns missing; policy will be sent over realtime only.');
 }
 
@@ -1111,7 +1111,7 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy, techni
     console.warn('[Supabase] created local code without remote session:', session.remoteError);
   }
   if (remoteReady) {
-    joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: Boolean(session.internalId) }).catch((err) => {
+    joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: false }).catch((err) => {
       console.warn('[Realtime]', err.message);
     });
   } else {
@@ -1158,6 +1158,15 @@ ipcMain.handle('session:update', async (_, { candidateName, role, policy, techni
 ipcMain.handle('session:start', async () => {
   if (!sessionData) throw new Error('No active session');
   sessionData.startedAt = Date.now();
+  if (activeSession?.localOnly) {
+    sendToRenderer('realtime:status', {
+      text: 'Local dashboard',
+      candidateReady: false,
+      manualMode: true
+    });
+    return { ok: true, localOnly: true };
+  }
+
   const client = getSupabase();
   if (client) {
     const query = client.from('sessions').update({
@@ -1167,15 +1176,7 @@ ipcMain.handle('session:start', async () => {
     const { error } = activeSession?.internalId
       ? await query.eq('internal_id', activeSession.internalId)
       : await query.eq('id', activeSession.sessionId);
-    if (error) throw new Error(error.message);
-  }
-  if (activeSession?.localOnly) {
-    sendToRenderer('realtime:status', {
-      text: 'Local dashboard',
-      candidateReady: false,
-      manualMode: true
-    });
-    return { ok: true, localOnly: true };
+    if (error) console.warn('[Supabase] active status update skipped:', error.message);
   }
 
   if (realtimeChannel) {
