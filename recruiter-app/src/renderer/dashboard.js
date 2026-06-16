@@ -35,6 +35,7 @@ let currentSession = null;
 let flagEvidence = [];
 let candidateReady = false;
 let telemetryState = { connected: true, transcription: 'waiting', monitoring: 'waiting' };
+let manualSessionMode = false;
 
 // ─── Elements ──────────────────────────────────────────────────────────
 const statusDot = $('statusDot');
@@ -118,7 +119,7 @@ async function renderAuthState(state = {}) {
   authUser.hidden = !signedIn;
   authUser.textContent = state.user?.email || '';
   signOutBtn.hidden = !signedIn;
-  showScreen(signedIn || state.configured === false ? 'idle' : 'auth');
+  showScreen(signedIn || manualSessionMode || state.configured === false ? 'idle' : 'auth');
 }
 
 $('sendSignInLinkBtn').addEventListener('click', async () => {
@@ -127,9 +128,12 @@ $('sendSignInLinkBtn').addEventListener('click', async () => {
   authMessage.textContent = 'Sending secure sign-in link...';
   try {
     await window.truveil.sendSignInLink(authEmailInput.value);
-    authMessage.textContent = 'Check your email and open the link on this computer.';
+    authMessage.textContent = 'Check your email. You can click the link or paste the 6 digit email code here. To create a candidate TRV code now, use the button below.';
   } catch (err) {
-    authMessage.textContent = err.message;
+    const message = String(err.message || '');
+    authMessage.textContent = message.includes('rate limit')
+      ? 'Email sign-in is rate-limited. Click "Create interview code without email" and share the TRV code from the next screen.'
+      : message;
   } finally {
     button.disabled = false;
   }
@@ -154,6 +158,13 @@ $('verifySignInCodeBtn')?.addEventListener('click', async () => {
   } finally {
     button.disabled = false;
   }
+});
+
+$('continueOfflineBtn')?.addEventListener('click', () => {
+  manualSessionMode = true;
+  authMessage.textContent = '';
+  showScreen('idle');
+  toast('Email skipped. Create a session and share the TRV code with the candidate.', 'success');
 });
 
 signOutBtn.addEventListener('click', async () => {
@@ -251,6 +262,7 @@ async function onNewSession() {
       policyPreset: 'standard_technical'
     });
     sessionCodeEl.textContent = currentSession.sessionId;
+    toast(`Candidate code created: ${currentSession.sessionId}`, 'success');
     candidateNameInput.value = '';
     roleInput.value = '';
     allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');

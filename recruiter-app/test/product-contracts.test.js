@@ -28,6 +28,16 @@ test('candidate-facing copy does not expose an AI score', () => {
   assert.doesNotMatch(html, /AI-assistance risk|integrity percent|cheating score/i);
 });
 
+test('admin app separates email sign-in codes from candidate TRV codes', () => {
+  const html = read('recruiter-app/src/renderer/index.html');
+  const renderer = read('recruiter-app/src/renderer/dashboard.js');
+  assert.match(html, /Create interview code without email/);
+  assert.match(html, /candidate receives the TRV session code/i);
+  assert.match(html, /This is the candidate code/i);
+  assert.match(renderer, /manualSessionMode/);
+  assert.match(renderer, /Candidate code created/);
+});
+
 test('production hardening removes legacy anonymous session and audio access', () => {
   const migration = read('supabase/final-access-hardening.sql');
   assert.match(migration, /drop policy if exists "Truveil recent session-code access"/);

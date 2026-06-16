@@ -72,6 +72,8 @@
           <input type="text" id="authCodeInput" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
         </label>
         <button class="btn btn-ghost lg" id="verifySignInCodeBtn">Verify code</button>
+        <button class="btn btn-ghost lg" id="continueOfflineBtn">Create interview code without email</button>
+        <p class="auth-help">The 6 digit code signs you into this admin app. The candidate receives the TRV session code after you create a session.</p>
         <div class="auth-message" id="authMessage" aria-live="polite"></div>
       </section>
     </main>
@@ -121,7 +123,7 @@
       <div class="session-code-card">
         <label>SESSION ID</label>
         <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
-        <p>Candidate enters this code in Truveil Secure. Transcript streaming starts only after their consent.</p>
+        <p>This is the candidate code. Tell them this TRV code, or copy the invite link below.</p>
         <div class="code-actions">
           <button class="btn sm" id="copySessionCodeBtn">Copy code</button>
           <button class="btn sm" id="copyCandidateLinkBtn">Copy invite link</button>
