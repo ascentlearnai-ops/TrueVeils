@@ -41,6 +41,7 @@ let manualSessionMode = false;
 const statusDot = $('statusDot');
 const statusText = $('statusText');
 const sessionCodeEl = $('sessionCode');
+const sessionServiceNotice = $('sessionServiceNotice');
 const sessionIdEl = $('sessionId');
 const sessionTimerEl = $('sessionTimer');
 const glassTitleEl = $('glassTitle');
@@ -262,7 +263,17 @@ async function onNewSession() {
       policyPreset: 'standard_technical'
     });
     sessionCodeEl.textContent = currentSession.sessionId;
-    toast(`Candidate code created: ${currentSession.sessionId}`, 'success');
+    if (currentSession.localOnly) {
+      toast(`Code generated: ${currentSession.sessionId}. Supabase rejected session sync, so use this as a manual code for now.`, 'warn');
+      $('candidateReadyState').innerHTML = '<i></i> Manual code generated';
+      sessionServiceNotice.hidden = false;
+      sessionServiceNotice.textContent = `Manual code mode: ${currentSession.remoteError || 'Supabase session sync is unavailable.'}`;
+    } else {
+      toast(`Candidate code created: ${currentSession.sessionId}`, 'success');
+      $('candidateReadyState').innerHTML = '<i></i> Candidate preflight pending';
+      sessionServiceNotice.hidden = true;
+      sessionServiceNotice.textContent = '';
+    }
     candidateNameInput.value = '';
     roleInput.value = '';
     allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');
@@ -271,9 +282,10 @@ async function onNewSession() {
     technicalVocabularyInput.value = '';
     policyPresetSelect.value = 'standard_technical';
     candidateReady = false;
-    $('candidateReadyState').innerHTML = '<i></i> Candidate preflight pending';
     startMonitoringBtn.disabled = true;
-    startMonitoringBtn.innerHTML = '<span class="dots-pulse"><span></span><span></span><span></span></span> Waiting for candidate preflight';
+    startMonitoringBtn.innerHTML = currentSession.localOnly
+      ? 'Session service needs Supabase sync'
+      : '<span class="dots-pulse"><span></span><span></span><span></span></span> Waiting for candidate preflight';
     document.querySelectorAll('[data-blocked-site]').forEach(input => {
       input.checked = [
         'chatgpt.com',
@@ -824,6 +836,10 @@ function resetState() {
   latestScore = null;
   flagEvidence = [];
   candidateReady = false;
+  if (sessionServiceNotice) {
+    sessionServiceNotice.hidden = true;
+    sessionServiceNotice.textContent = '';
+  }
   telemetryState = { connected: true, transcription: 'waiting', monitoring: 'waiting' };
   hasFirstTranscript = false;
   interimBubble = null;

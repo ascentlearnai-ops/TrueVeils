@@ -34,8 +34,10 @@ test('admin app separates email sign-in codes from candidate TRV codes', () => {
   assert.match(html, /Create interview code without email/);
   assert.match(html, /candidate receives the TRV session code/i);
   assert.match(html, /This is the candidate code/i);
+  assert.match(html, /sessionServiceNotice/);
   assert.match(renderer, /manualSessionMode/);
   assert.match(renderer, /Candidate code created/);
+  assert.match(renderer, /Manual code generated/);
 });
 
 test('production hardening removes legacy anonymous session and audio access', () => {

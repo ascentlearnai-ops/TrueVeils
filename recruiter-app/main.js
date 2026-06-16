@@ -313,6 +313,8 @@ function isPolicySchemaError(error) {
 }
 
 async function ensureRemoteSession(session) {
+  const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
+  session.candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
   const client = getSupabase();
   if (!client) {
     console.warn('[Supabase] Not configured; created a local-only session code.');
@@ -321,7 +323,6 @@ async function ensureRemoteSession(session) {
 
   const { data: authData } = await client.auth.getSession();
   if (authData.session?.user) {
-    const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
     const result = await client.functions.invoke('create-session', {
       body: {
         candidateAppUrl: candidateBaseUrl,
@@ -1101,11 +1102,21 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy, techni
   session.policy = normalizePolicy(policy);
   session.technicalVocabulary = technicalVocabulary || [];
   session.policyPreset = policyPreset || 'standard_technical';
-  const remoteReady = await ensureRemoteSession(session);
+  let remoteReady = false;
+  try {
+    remoteReady = await ensureRemoteSession(session);
+  } catch (err) {
+    session.localOnly = true;
+    session.remoteError = err.message || 'Session service unavailable.';
+    console.warn('[Supabase] created local code without remote session:', session.remoteError);
+  }
   if (remoteReady) {
     joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: Boolean(session.internalId) }).catch((err) => {
       console.warn('[Realtime]', err.message);
     });
+  } else {
+    session.localOnly = true;
+    session.remoteError = session.remoteError || 'Session service unavailable. The TRV code was still generated locally.';
   }
 
   activeSession = session;
