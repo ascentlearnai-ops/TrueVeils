@@ -165,8 +165,17 @@ async function handleAuthUrl(url) {
   try {
     const parsed = new URL(url);
     const code = parsed.searchParams.get('code');
-    if (!code) return;
-    const { error } = await client.auth.exchangeCodeForSession(code);
+    const hash = new URLSearchParams(String(parsed.hash || '').replace(/^#/, ''));
+    const accessToken = hash.get('access_token');
+    const refreshToken = hash.get('refresh_token');
+    let error = null;
+    if (code) {
+      ({ error } = await client.auth.exchangeCodeForSession(code));
+    } else if (accessToken && refreshToken) {
+      ({ error } = await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken }));
+    } else {
+      return;
+    }
     if (error) throw error;
     sendToRenderer('auth:changed', await authState());
   } catch (err) {
@@ -271,7 +280,7 @@ function sessionChannelName(sessionId) {
 }
 
 function buildSessionPayload(session, { includePolicy = true } = {}) {
-  const candidateBaseUrl = process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
+  const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
   const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
   const payload = {
     id: session.sessionId,
@@ -328,17 +337,20 @@ async function ensureRemoteSession(session) {
       session.internalId = result.data.session.internal_id;
       session.organizationId = result.data.session.organization_id;
       session.recruiterId = result.data.session.recruiter_id;
+      session.candidateLink = result.data.session.candidate_link || `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
       return true;
     }
     if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
   }
 
   const withPolicy = await client.from('sessions').upsert(buildSessionPayload(session));
+  session.candidateLink = buildSessionPayload(session).candidate_link;
   if (!withPolicy.error) return true;
   if (!isPolicySchemaError(withPolicy.error)) throw new Error(withPolicy.error.message);
 
   console.warn('[Supabase] Policy columns missing; creating session without persisted policy.');
   const baseOnly = await client.from('sessions').upsert(buildSessionPayload(session, { includePolicy: false }));
+  session.candidateLink = buildSessionPayload(session, { includePolicy: false }).candidate_link;
   if (baseOnly.error) throw new Error(baseOnly.error.message);
   return true;
 }
@@ -1053,10 +1065,28 @@ ipcMain.handle('auth:send-link', async (_, email) => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) throw new Error('Enter a valid work email.');
   const { error } = await client.auth.signInWithOtp({
     email: cleanEmail,
-    options: { emailRedirectTo: 'truveil-recruiter://auth/callback' }
+    options: {
+      emailRedirectTo: 'truveil-recruiter://auth/callback',
+      shouldCreateUser: true
+    }
   });
   if (error) throw error;
   return { ok: true };
+});
+ipcMain.handle('auth:verify-code', async (_, { email, token } = {}) => {
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase is not configured.');
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanToken = String(token || '').replace(/\D/g, '');
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) throw new Error('Enter the email you used for the sign-in code.');
+  if (!/^\d{6}$/.test(cleanToken)) throw new Error('Enter the 6 digit sign-in code from your email.');
+  const { error } = await client.auth.verifyOtp({
+    email: cleanEmail,
+    token: cleanToken,
+    type: 'email'
+  });
+  if (error) throw error;
+  return authState();
 });
 ipcMain.handle('auth:sign-out', async () => {
   const client = getSupabase();

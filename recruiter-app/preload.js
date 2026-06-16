@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('truveil', {
   saveSettings: (patch) => ipcRenderer.invoke('settings:save', patch),
   getAuth: () => ipcRenderer.invoke('auth:get'),
   sendSignInLink: (email) => ipcRenderer.invoke('auth:send-link', email),
+  verifySignInCode: (data) => ipcRenderer.invoke('auth:verify-code', data),
   signOut: () => ipcRenderer.invoke('auth:sign-out'),
   onAuthChanged: (cb) => ipcRenderer.on('auth:changed', (_, data) => cb(data)),
   onAuthError: (cb) => ipcRenderer.on('auth:error', (_, data) => cb(data)),

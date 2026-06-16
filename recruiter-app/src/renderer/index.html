@@ -66,6 +66,12 @@
           <input type="email" id="authEmailInput" placeholder="you@company.com" autocomplete="email">
         </label>
         <button class="btn btn-primary lg" id="sendSignInLinkBtn">Send secure sign-in link</button>
+        <div class="otp-divider"><span>or paste the email code</span></div>
+        <label class="field">
+          <span>6 digit code</span>
+          <input type="text" id="authCodeInput" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+        </label>
+        <button class="btn btn-ghost lg" id="verifySignInCodeBtn">Verify code</button>
         <div class="auth-message" id="authMessage" aria-live="polite"></div>
       </section>
     </main>
@@ -116,6 +122,10 @@
         <label>SESSION ID</label>
         <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
         <p>Candidate enters this code in Truveil Secure. Transcript streaming starts only after their consent.</p>
+        <div class="code-actions">
+          <button class="btn sm" id="copySessionCodeBtn">Copy code</button>
+          <button class="btn sm" id="copyCandidateLinkBtn">Copy invite link</button>
+        </div>
       </div>
 
       <div class="setup-flow">

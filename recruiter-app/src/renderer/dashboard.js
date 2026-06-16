@@ -70,6 +70,7 @@ const allowedSitesInput = $('allowedSitesInput');
 const customBlockedSitesInput = $('customBlockedSitesInput');
 const toastEl = $('toast');
 const authEmailInput = $('authEmailInput');
+const authCodeInput = $('authCodeInput');
 const authMessage = $('authMessage');
 const authUser = $('authUser');
 const signOutBtn = $('signOutBtn');
@@ -127,6 +128,27 @@ $('sendSignInLinkBtn').addEventListener('click', async () => {
   try {
     await window.truveil.sendSignInLink(authEmailInput.value);
     authMessage.textContent = 'Check your email and open the link on this computer.';
+  } catch (err) {
+    authMessage.textContent = err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+authCodeInput?.addEventListener('input', (event) => {
+  event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
+});
+
+$('verifySignInCodeBtn')?.addEventListener('click', async () => {
+  const button = $('verifySignInCodeBtn');
+  button.disabled = true;
+  authMessage.textContent = 'Verifying sign-in code...';
+  try {
+    await renderAuthState(await window.truveil.verifySignInCode({
+      email: authEmailInput.value,
+      token: authCodeInput.value
+    }));
+    authMessage.textContent = 'Signed in.';
   } catch (err) {
     authMessage.textContent = err.message;
   } finally {
@@ -308,6 +330,22 @@ async function startMonitoring() {
   statusText.textContent = 'Waiting for candidate';
   showScreen('dashboard');
 }
+
+function candidateInviteLink() {
+  const code = currentSession?.sessionId || sessionCodeEl.textContent;
+  return currentSession?.candidateLink || `https://truveil-client.vercel.app/?code=${encodeURIComponent(code)}#download`;
+}
+
+$('copySessionCodeBtn')?.addEventListener('click', async () => {
+  const code = currentSession?.sessionId || sessionCodeEl.textContent;
+  await window.truveil.copyLink(code);
+  toast(`Copied ${code}. Candidate can paste it in Truveil Secure.`, 'success');
+});
+
+$('copyCandidateLinkBtn')?.addEventListener('click', async () => {
+  await window.truveil.copyLink(candidateInviteLink());
+  toast('Copied candidate invite link.', 'success');
+});
 
 policyPresetSelect?.addEventListener('change', () => {
   const preset = policyPresetSelect.value;
