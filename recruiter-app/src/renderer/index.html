@@ -111,33 +111,35 @@
   <!-- ─── Setup Screen ─── -->
   <div class="screen" id="setup-screen">
     <div class="waiting-card glass-card">
-      <div class="waiting-pulse">
-        <span class="pulse-ring"></span>
-        <span class="pulse-ring d2"></span>
-        <span class="pulse-core"></span>
-      </div>
-      <div class="trust-badge"><span class="dot"></span>SESSION READY</div>
-      <h2>Configure this session</h2>
-      <p class="idle-sub">Share the code, choose restricted sites, then wait for the candidate to connect.</p>
-
-      <div class="session-code-card">
-        <label>SESSION ID</label>
-        <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
-        <p>This is the candidate code. Tell them this TRV code, or copy the invite link below.</p>
-        <div class="session-service-notice" id="sessionServiceNotice" hidden></div>
-        <div class="code-actions">
-          <button class="btn sm" id="copySessionCodeBtn">Copy code</button>
-          <button class="btn sm" id="copyCandidateLinkBtn">Copy invite link</button>
+      <aside class="setup-sidebar">
+        <div class="waiting-pulse">
+          <span class="pulse-ring"></span>
+          <span class="pulse-ring d2"></span>
+          <span class="pulse-core"></span>
         </div>
-      </div>
+        <div class="trust-badge"><span class="dot"></span>SESSION READY</div>
+        <h2>Configure this session</h2>
+        <p class="idle-sub">Share the code, choose restricted sites, then wait for the candidate to connect.</p>
 
-      <div class="setup-flow">
-        <div><span>01</span><strong>Share code</strong><small>Send the TRV code to the candidate.</small></div>
-        <div><span>02</span><strong>Set policy</strong><small>Check which AI sites should trigger warn + refocus.</small></div>
-        <div><span>03</span><strong>Arm session</strong><small>Wait here while transcript and risk signals arrive.</small></div>
-      </div>
+        <div class="session-code-card">
+          <label>SESSION ID</label>
+          <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
+          <p>This is the candidate code. Tell them this TRV code, or copy the invite link below.</p>
+          <div class="session-service-notice" id="sessionServiceNotice" hidden></div>
+          <div class="code-actions">
+            <button class="btn sm" id="copySessionCodeBtn">Copy code</button>
+            <button class="btn sm" id="copyCandidateLinkBtn">Copy invite link</button>
+          </div>
+        </div>
 
-      <div class="form">
+        <div class="setup-flow">
+          <div><span>01</span><strong>Share code</strong><small>Send the TRV code to the candidate.</small></div>
+          <div><span>02</span><strong>Set policy</strong><small>Check which AI sites should trigger warn + refocus.</small></div>
+          <div><span>03</span><strong>Arm session</strong><small>Wait here while transcript and risk signals arrive.</small></div>
+        </div>
+      </aside>
+
+      <section class="setup-main form">
         <div class="policy-toolbar">
           <div class="field">
             <label>Policy preset</label>
@@ -206,7 +208,7 @@ teams.microsoft.com</textarea>
           <textarea id="customBlockedSitesInput" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
           <div class="field-hint">Checked sites trigger warn + refocus on the candidate app and appear as flags in your dashboard.</div>
         </div>
-      </div>
+      </section>
 
       <div class="setup-actions">
         <div class="setup-status-strip" aria-live="polite">
