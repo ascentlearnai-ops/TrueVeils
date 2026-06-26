@@ -281,7 +281,7 @@ function sessionChannelName(sessionId) {
 
 function buildSessionPayload(session, { includePolicy = true } = {}) {
   const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
-  const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
+  const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
   const payload = {
     id: session.sessionId,
     candidate_link: candidateLink,
@@ -314,7 +314,7 @@ function isPolicySchemaError(error) {
 
 async function ensureRemoteSession(session) {
   const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
-  session.candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
+  session.candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
   const client = getSupabase();
   if (!client) {
     console.warn('[Supabase] Not configured; created a local-only session code.');
@@ -336,7 +336,7 @@ async function ensureRemoteSession(session) {
     session.internalId = result.data.session.internal_id;
     session.organizationId = result.data.session.organization_id;
     session.recruiterId = result.data.session.recruiter_id;
-    session.candidateLink = result.data.session.candidate_link || `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}#download`;
+    session.candidateLink = result.data.session.candidate_link || `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
     return true;
   }
   if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
@@ -344,12 +344,20 @@ async function ensureRemoteSession(session) {
   const withPolicy = await client.from('sessions').upsert(buildSessionPayload(session));
   session.candidateLink = buildSessionPayload(session).candidate_link;
   if (!withPolicy.error) return true;
-  if (!isPolicySchemaError(withPolicy.error)) throw new Error(withPolicy.error.message);
+  if (!isPolicySchemaError(withPolicy.error)) {
+    console.warn('[Supabase] session upsert unavailable:', withPolicy.error.message);
+    session.remoteError = withPolicy.error.message || 'Supabase session sync is unavailable.';
+    return false;
+  }
 
   console.warn('[Supabase] Policy columns missing; creating session without persisted policy.');
   const baseOnly = await client.from('sessions').upsert(buildSessionPayload(session, { includePolicy: false }));
   session.candidateLink = buildSessionPayload(session, { includePolicy: false }).candidate_link;
-  if (baseOnly.error) throw new Error(baseOnly.error.message);
+  if (baseOnly.error) {
+    console.warn('[Supabase] base session upsert unavailable:', baseOnly.error.message);
+    session.remoteError = baseOnly.error.message || 'Supabase session sync is unavailable.';
+    return false;
+  }
   return true;
 }
 
@@ -1093,6 +1101,15 @@ ipcMain.handle('auth:sign-out', async () => {
   const client = getSupabase();
   if (client) await client.auth.signOut();
   return authState();
+});
+
+ipcMain.handle('shell:open-external', async (_, url) => {
+  const cleanUrl = String(url || '').trim();
+  if (!/^mailto:/i.test(cleanUrl) && !/^https:\/\/truveil-client\.vercel\.app\//i.test(cleanUrl)) {
+    throw new Error('Unsupported external link.');
+  }
+  await shell.openExternal(cleanUrl);
+  return { ok: true };
 });
 
 // Session lifecycle

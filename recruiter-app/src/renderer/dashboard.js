@@ -67,9 +67,16 @@ const audioLevelFill = $('audioLevelFill');
 const audioLevelValue = $('audioLevelValue');
 const candidateNameInput = $('candidateNameInput');
 const roleInput = $('roleInput');
+const candidateEmailInput = $('candidateEmailInput');
 const allowedAppsInput = $('allowedAppsInput');
 const allowedSitesInput = $('allowedSitesInput');
 const customBlockedSitesInput = $('customBlockedSitesInput');
+const allowedAppsChips = $('allowedAppsChips');
+const allowedSitesChips = $('allowedSitesChips');
+const customBlockedSitesChips = $('customBlockedSitesChips');
+const allowedAppDraft = $('allowedAppDraft');
+const allowedSiteDraft = $('allowedSiteDraft');
+const customBlockedSiteDraft = $('customBlockedSiteDraft');
 const toastEl = $('toast');
 const authEmailInput = $('authEmailInput');
 const authCodeInput = $('authCodeInput');
@@ -99,6 +106,46 @@ function listFromTextarea(value) {
     .split(/\n|,/)
     .map(item => item.trim())
     .filter(Boolean);
+}
+function normalizePolicyInput(value, type = 'text') {
+  let clean = String(value || '').trim();
+  if (!clean) return '';
+  if (type === 'site') {
+    clean = clean.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].trim();
+  }
+  return clean;
+}
+function setTextareaList(textarea, items) {
+  textarea.value = Array.from(new Set(items.map(item => String(item).trim()).filter(Boolean))).join('\n');
+}
+function renderPolicyList(textarea, container, type = 'text') {
+  if (!textarea || !container) return;
+  const items = listFromTextarea(textarea.value).map(item => normalizePolicyInput(item, type)).filter(Boolean);
+  setTextareaList(textarea, items);
+  container.innerHTML = items.length
+    ? items.map((item) => `
+        <button class="policy-chip" type="button" data-policy-remove="${esc(item)}">
+          <span>${esc(item)}</span>
+          <strong aria-hidden="true">x</strong>
+        </button>`).join('')
+    : '<span class="policy-empty">None added</span>';
+}
+function renderPolicyControls() {
+  renderPolicyList(allowedAppsInput, allowedAppsChips, 'text');
+  renderPolicyList(allowedSitesInput, allowedSitesChips, 'site');
+  renderPolicyList(customBlockedSitesInput, customBlockedSitesChips, 'site');
+}
+function addPolicyItem(textarea, draft, container, type = 'text') {
+  const value = normalizePolicyInput(draft.value, type);
+  if (!value) return;
+  setTextareaList(textarea, [...listFromTextarea(textarea.value), value]);
+  draft.value = '';
+  renderPolicyList(textarea, container, type);
+}
+function removePolicyItem(textarea, value, container, type = 'text') {
+  const needle = normalizePolicyInput(value, type).toLowerCase();
+  setTextareaList(textarea, listFromTextarea(textarea.value).filter(item => normalizePolicyInput(item, type).toLowerCase() !== needle));
+  renderPolicyList(textarea, container, type);
 }
 function getBlockedSites() {
   const checked = Array.from(document.querySelectorAll('[data-blocked-site]:checked'))
@@ -222,14 +269,19 @@ function currentOverallRisk() {
 }
 
 function currentReviewBand() {
-  const exactAi = flagEvidence.some(flag => {
+  const restrictedAi = flagEvidence.filter(flag => {
     const text = flagEvidenceText(flag);
     return /(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|interviewcoder|cluely|lockedin|finalround)/i.test(text)
-      && (flag.detectionSource === 'url' || flag.closedRestrictedTarget || flag.eventType === 'overlay_detected');
+      && flag.reviewStatus !== 'allowed'
+      && flag.policyDecision !== 'allowed';
   });
-  const possibleAi = flagEvidence.some(flag => /(chatgpt|claude|gemini|copilot|perplexity|interviewcoder|cluely)/i.test(flagEvidenceText(flag)));
+  const exactAi = restrictedAi.some(flag => flag.detectionSource === 'url' || flag.closedRestrictedTarget || flag.eventType === 'overlay_detected');
+  const possibleAi = restrictedAi.length > 0;
   const switches = flagEvidence.filter(flag => flag.eventType === 'focus_lost' || flag.eventType === 'foreground_changed').length;
-  if (exactAi) return { key: 'high_priority_review', label: 'High-priority review', reason: 'Exact restricted AI-tool or hidden-overlay evidence was recorded.' };
+  if (exactAi || restrictedAi.length >= 1) {
+    const target = restrictedAi[0]?.detectedHost || restrictedAi[0]?.matchedRule || restrictedAi[0]?.windowTitle || 'a restricted AI destination';
+    return { key: 'high_priority_review', label: 'High-priority review', reason: `${target} was detected during the session. Behavioral evidence overrides transcript-only pattern notes.` };
+  }
   if (possibleAi || switches >= 4) return { key: 'review', label: 'Review', reason: 'One or more monitored events should be reviewed with interview context.' };
   if (telemetryState.connected === false || telemetryState.transcription === 'unavailable') return { key: 'incomplete_evidence', label: 'Incomplete evidence', reason: 'Telemetry was incomplete during this session.' };
   return { key: 'clear', label: 'Clear', reason: 'No meaningful integrity evidence has been recorded.' };
@@ -282,8 +334,10 @@ async function onNewSession() {
     allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');
     allowedSitesInput.value = ['meet.google.com', 'zoom.us', 'teams.microsoft.com'].join('\n');
     customBlockedSitesInput.value = '';
+    candidateEmailInput.value = '';
     technicalVocabularyInput.value = '';
     policyPresetSelect.value = 'standard_technical';
+    renderPolicyControls();
     if (!currentSession.localOnly) {
       candidateReady = false;
       startMonitoringBtn.disabled = true;
@@ -366,7 +420,7 @@ async function startMonitoring() {
 
 function candidateInviteLink() {
   const code = currentSession?.sessionId || sessionCodeEl.textContent;
-  return currentSession?.candidateLink || `https://truveil-client.vercel.app/?code=${encodeURIComponent(code)}#download`;
+  return currentSession?.candidateLink || `https://truveil-client.vercel.app/?code=${encodeURIComponent(code)}&open=1`;
 }
 
 $('copySessionCodeBtn')?.addEventListener('click', async () => {
@@ -380,6 +434,56 @@ $('copyCandidateLinkBtn')?.addEventListener('click', async () => {
   toast('Copied candidate invite link.', 'success');
 });
 
+$('emailCandidateLinkBtn')?.addEventListener('click', async () => {
+  const email = candidateEmailInput.value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    toast('Enter the candidate email first.', 'error');
+    candidateEmailInput.focus();
+    return;
+  }
+  const code = currentSession?.sessionId || sessionCodeEl.textContent;
+  const link = candidateInviteLink();
+  const subject = encodeURIComponent(`Your Truveil interview code: ${code}`);
+  const body = encodeURIComponent([
+    `Your interview code is ${code}.`,
+    '',
+    `Open this link to download/open Truveil Secure and prefill the code:`,
+    link,
+    '',
+    'If the desktop app is already installed, click "Open Truveil Secure" on the page.'
+  ].join('\n'));
+  await window.truveil.openExternal(`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`);
+  toast('Opened your email app with the candidate invite.', 'success');
+});
+
+$('addAllowedAppBtn')?.addEventListener('click', () => addPolicyItem(allowedAppsInput, allowedAppDraft, allowedAppsChips, 'text'));
+$('addAllowedSiteBtn')?.addEventListener('click', () => addPolicyItem(allowedSitesInput, allowedSiteDraft, allowedSitesChips, 'site'));
+$('addCustomBlockedSiteBtn')?.addEventListener('click', () => addPolicyItem(customBlockedSitesInput, customBlockedSiteDraft, customBlockedSitesChips, 'site'));
+
+[
+  [allowedAppDraft, allowedAppsInput, allowedAppsChips, 'text'],
+  [allowedSiteDraft, allowedSitesInput, allowedSitesChips, 'site'],
+  [customBlockedSiteDraft, customBlockedSitesInput, customBlockedSitesChips, 'site']
+].forEach(([draft, textarea, container, type]) => {
+  draft?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addPolicyItem(textarea, draft, container, type);
+  });
+});
+
+[
+  [allowedAppsChips, allowedAppsInput, 'text'],
+  [allowedSitesChips, allowedSitesInput, 'site'],
+  [customBlockedSitesChips, customBlockedSitesInput, 'site']
+].forEach(([container, textarea, type]) => {
+  container?.addEventListener('click', (event) => {
+    const chip = event.target.closest('[data-policy-remove]');
+    if (!chip) return;
+    removePolicyItem(textarea, chip.getAttribute('data-policy-remove'), container, type);
+  });
+});
+
 policyPresetSelect?.addEventListener('change', () => {
   const preset = policyPresetSelect.value;
   const checks = Array.from(document.querySelectorAll('[data-blocked-site]'));
@@ -390,6 +494,7 @@ policyPresetSelect?.addEventListener('change', () => {
   } else if (preset === 'standard_technical') {
     checks.forEach(input => { input.checked = !['poe.com', 'you.com', 'phind.com'].includes(input.dataset.blockedSite); });
   }
+  renderPolicyControls();
 });
 
 // ─── Interim / final transcript ───────────────────────────────────────
@@ -611,8 +716,8 @@ function addFlag(text, timestamp, severity = 'medium', persist = true, evidence 
   const hasTarget = Object.values(target).some(Boolean);
   const controls = hasTarget ? `
     <div class="flag-actions">
-      <button data-candidate-action="allow_target">Allow</button>
-      <button data-candidate-action="close_target">Close / refocus</button>
+      <button data-candidate-action="allow_target">Allow this site</button>
+      <button data-candidate-action="close_target">Close tab</button>
       ${(target.detectedUrl || target.detectedHost) ? '<button data-candidate-action="reopen_target">Reopen</button>' : ''}
     </div>` : '';
   const el = document.createElement('div');
@@ -645,7 +750,7 @@ flagsList.addEventListener('click', async (event) => {
     await window.truveil.sendCandidateAction({ action, target });
     const labels = {
       allow_target: 'Destination allowed for this session',
-      close_target: 'Close/refocus request sent',
+      close_target: 'Close-tab/refocus request sent',
       reopen_target: 'Reopen request sent'
     };
     toast(labels[action] || 'Action sent', 'success');

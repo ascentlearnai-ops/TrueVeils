@@ -102,7 +102,7 @@ function behavioralEvidence(flags = []) {
 
   const repeatedAiToolHits = Math.max(0, evidence.aiToolHits - destinations.size);
   const reviewScore = Math.min(100, Math.round(
-    (evidence.aiToolHits ? 48 + Math.min(34, (evidence.aiToolHits - 1) * 17) : 0)
+    (evidence.aiToolHits ? 78 + Math.min(18, (evidence.aiToolHits - 1) * 9) : 0)
       + Math.min(30, evidence.overlayHits * 24)
       + Math.min(12, evidence.criticalHits * 4)
       + Math.min(8, evidence.focusSwitches)
@@ -130,10 +130,9 @@ function sessionRiskSummary({ scores = [], flags = [] }) {
   const reviewScore = Math.max(transcriptAvg, behavior.reviewScore);
   const destinationText = behavior.destinations.length ? ` (${behavior.destinations.join(', ')})` : '';
   let reviewSummary = 'Insufficient transcript and behavioral evidence for a meaningful review priority.';
-  if (behavior.aiToolHits >= 2) {
-    reviewSummary = `High-priority review: ${behavior.aiToolHits} restricted AI-assistance destination events were recorded${destinationText}. Repeated AI-tool access is significant behavioral evidence even if transcript-only risk is low.`;
-  } else if (behavior.aiToolHits === 1) {
-    reviewSummary = `Review recommended: a restricted AI-assistance destination was recorded${destinationText}. Compare its timestamp with the surrounding transcript and interview context.`;
+  if (behavior.aiToolHits >= 1) {
+    const accessLabel = behavior.aiToolHits > 1 ? 'Repeated AI-tool access' : 'Known AI-tool access';
+    reviewSummary = `High-priority review: ${behavior.aiToolHits} restricted AI-assistance destination event${behavior.aiToolHits === 1 ? ' was' : 's were'} recorded${destinationText}. ${accessLabel} is significant behavioral evidence even if transcript-only pattern risk is low or unscorable.`;
   } else if (behavior.overlayHits) {
     reviewSummary = `High-priority review: ${behavior.overlayHits} possible hidden-assistant or overlay event${behavior.overlayHits === 1 ? '' : 's'} were recorded.`;
   } else if (valid.length) {

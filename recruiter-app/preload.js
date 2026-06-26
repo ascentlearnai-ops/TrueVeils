@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('truveil', {
 
   // Misc
   copyLink: (text) => ipcRenderer.invoke('clipboard:write', text),
+  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   openReportsFolder: () => ipcRenderer.invoke('report:openFolder'),
   listReports: () => ipcRenderer.invoke('report:list'),
   deleteReport: (id) => ipcRenderer.invoke('report:delete', id),

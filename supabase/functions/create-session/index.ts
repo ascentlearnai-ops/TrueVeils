@@ -79,7 +79,7 @@ Deno.serve(async (request) => {
       join_code: code,
       candidate_link: `${candidateBaseUrl}/?code=${
         encodeURIComponent(code)
-      }#download`,
+      }&open=1`,
       status: "waiting",
       flags: [],
       transcript: [],

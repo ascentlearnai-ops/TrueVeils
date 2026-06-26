@@ -73,18 +73,15 @@ function evaluateReview({
   telemetry = {},
   transcriptAnalyses = []
 } = {}) {
-  const exactAiEvents = events.filter(event => (
+  const restrictedAiEvents = events.filter(event => (
     AI_TARGET.test(eventText(event))
     && event.policyDecision !== 'allowed'
     && event.reviewStatus !== 'allowed'
-    && (event.detectionSource === 'url' || event.closedRestrictedTarget || event.eventType === 'overlay_detected')
   ));
-  const possibleAiEvents = events.filter(event => (
-    AI_TARGET.test(eventText(event))
-    && event.policyDecision !== 'allowed'
-    && event.reviewStatus !== 'allowed'
-    && !exactAiEvents.includes(event)
+  const exactAiEvents = restrictedAiEvents.filter(event => (
+    event.detectionSource === 'url' || event.closedRestrictedTarget || event.eventType === 'overlay_detected'
   ));
+  const possibleAiEvents = restrictedAiEvents.filter(event => !exactAiEvents.includes(event));
   const overlayEvents = events.filter(event => OVERLAY_TARGET.test(eventText(event)));
   const unusualSwitches = events.filter(event => (
     event.eventType === 'focus_lost'
@@ -98,9 +95,9 @@ function evaluateReview({
   const evidence = [];
   const counterEvidence = [];
 
-  if (exactAiEvents.length || overlayEvents.length) {
+  if (restrictedAiEvents.length || overlayEvents.length) {
     reviewBand = 'high_priority_review';
-    if (exactAiEvents.length) evidence.push(`${exactAiEvents.length} exact restricted AI-tool event${exactAiEvents.length === 1 ? '' : 's'}`);
+    if (restrictedAiEvents.length) evidence.push(`${restrictedAiEvents.length} restricted AI-tool event${restrictedAiEvents.length === 1 ? '' : 's'}`);
     if (overlayEvents.length) evidence.push(`${overlayEvents.length} hidden-overlay event${overlayEvents.length === 1 ? '' : 's'}`);
   } else if (possibleAiEvents.length || unusualSwitches.length >= 4) {
     reviewBand = 'review';

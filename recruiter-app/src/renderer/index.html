@@ -165,6 +165,14 @@
           <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
         </div>
         <div class="field">
+          <label>Candidate email <span class="field-opt">optional</span></label>
+          <div class="invite-row">
+            <input type="email" id="candidateEmailInput" placeholder="candidate@email.com" autocomplete="off">
+            <button class="btn" id="emailCandidateLinkBtn" type="button">Email invite</button>
+          </div>
+          <div class="field-hint">Uses your email app to send the TRV code and invite link. It does not send a Supabase sign-in email.</div>
+        </div>
+        <div class="field">
           <label>Transcript relay</label>
           <div class="relay-note">
             <span class="relay-dot"></span>
@@ -174,19 +182,33 @@
         <div class="policy-grid">
           <div class="field">
             <label>Allowed apps</label>
-            <textarea id="allowedAppsInput" rows="4" spellcheck="false">TruveilSecure
+            <div class="policy-list-builder">
+              <div class="policy-chip-list" id="allowedAppsChips"></div>
+              <div class="policy-add-row">
+                <input type="text" id="allowedAppDraft" placeholder="Add app name, e.g. Chrome">
+                <button class="btn sm" id="addAllowedAppBtn" type="button">Add</button>
+              </div>
+            </div>
+            <textarea id="allowedAppsInput" class="policy-source" rows="4" spellcheck="false">TruveilSecure
 Zoom
 Microsoft Teams
 Google Chrome
 Microsoft Edge</textarea>
-            <div class="field-hint">One app or process name per line. Everything else is warned and refocused.</div>
+            <div class="field-hint">Allowed apps can stay open. Known AI tools still close/refocus when detected.</div>
           </div>
           <div class="field">
             <label>Allowed sites</label>
-            <textarea id="allowedSitesInput" rows="4" spellcheck="false">meet.google.com
+            <div class="policy-list-builder">
+              <div class="policy-chip-list" id="allowedSitesChips"></div>
+              <div class="policy-add-row">
+                <input type="text" id="allowedSiteDraft" placeholder="Add domain, e.g. docs.google.com">
+                <button class="btn sm" id="addAllowedSiteBtn" type="button">Add</button>
+              </div>
+            </div>
+            <textarea id="allowedSitesInput" class="policy-source" rows="4" spellcheck="false">meet.google.com
 zoom.us
 teams.microsoft.com</textarea>
-            <div class="field-hint">One domain or title fragment per line for browser-based calls.</div>
+            <div class="field-hint">Allowed domains are observed but not closed as restricted destinations.</div>
           </div>
         </div>
         <div class="field">
@@ -205,8 +227,15 @@ teams.microsoft.com</textarea>
             <label class="check-tile"><input type="checkbox" data-blocked-site="finalround" checked><span>Final Round</span><small>app / title</small></label>
             <label class="check-tile"><input type="checkbox" data-blocked-site="lockedin" checked><span>LockedIn</span><small>app / title</small></label>
           </div>
-          <textarea id="customBlockedSitesInput" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
-          <div class="field-hint">Checked sites trigger warn + refocus on the candidate app and appear as flags in your dashboard.</div>
+          <div class="policy-list-builder compact">
+            <div class="policy-chip-list" id="customBlockedSitesChips"></div>
+            <div class="policy-add-row">
+              <input type="text" id="customBlockedSiteDraft" placeholder="Add extra AI domain or app title">
+              <button class="btn sm" id="addCustomBlockedSiteBtn" type="button">Add</button>
+            </div>
+          </div>
+          <textarea id="customBlockedSitesInput" class="policy-source" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
+          <div class="field-hint">Known restricted AI sites close the active browser tab when possible, then Truveil refocuses and logs evidence. Other app/site switches are observed.</div>
         </div>
       </section>
 
