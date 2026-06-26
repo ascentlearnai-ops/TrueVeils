@@ -19,3 +19,4 @@ build/
 *.idx
 !landing/downloads/
 !landing/downloads/TruveilRecruiter-Setup-1.0.0.exe
+supabase/.temp/
