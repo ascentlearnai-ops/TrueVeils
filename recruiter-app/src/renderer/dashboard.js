@@ -419,22 +419,36 @@ async function startMonitoring() {
 }
 
 function candidateInviteLink() {
+  if (!currentSession || !/^TRV-[A-Z0-9]{6}$/i.test(String(currentSession.sessionId || ''))) return '';
   const code = currentSession?.sessionId || sessionCodeEl.textContent;
   return currentSession?.candidateLink || `https://truveil-client.vercel.app/?code=${encodeURIComponent(code)}&open=1`;
 }
 
 $('copySessionCodeBtn')?.addEventListener('click', async () => {
+  if (!currentSession || !/^TRV-[A-Z0-9]{6}$/i.test(String(currentSession.sessionId || ''))) {
+    toast('Create a session first, then copy the candidate code.', 'error');
+    return;
+  }
   const code = currentSession?.sessionId || sessionCodeEl.textContent;
   await window.truveil.copyLink(code);
   toast(`Copied ${code}. Candidate can paste it in Truveil Secure.`, 'success');
 });
 
 $('copyCandidateLinkBtn')?.addEventListener('click', async () => {
-  await window.truveil.copyLink(candidateInviteLink());
+  const link = candidateInviteLink();
+  if (!link) {
+    toast('Create a session first, then copy the invite link.', 'error');
+    return;
+  }
+  await window.truveil.copyLink(link);
   toast('Copied candidate invite link.', 'success');
 });
 
 $('emailCandidateLinkBtn')?.addEventListener('click', async () => {
+  if (!currentSession || !/^TRV-[A-Z0-9]{6}$/i.test(String(currentSession.sessionId || ''))) {
+    toast('Create a session first, then email the invite.', 'error');
+    return;
+  }
   const email = candidateEmailInput.value.trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     toast('Enter the candidate email first.', 'error');
