@@ -3,9 +3,12 @@ const PATTERNS = {
   corrections: [/\bactually\b/g, /\blet me rephrase\b/g, /\bwhat i mean\b/g, /\bor rather\b/g, /\bi guess\b/g, /\bwait\b/g, /\bno,?\s+i\b/g],
   structured: [/\bfirst(?:ly)?\b/g, /\bsecond(?:ly)?\b/g, /\bthird(?:ly)?\b/g, /\bfinally\b/g, /\bin conclusion\b/g, /\bto summarize\b/g, /\bthere are (?:three|several|a few) (?:key|main|important)\b/g],
   generic: [/\bbest practices\b/g, /\bcross-functional\b/g, /\bstakeholders\b/g, /\bscalable\b/g, /\brobust\b/g, /\bseamless\b/g, /\bleverage\b/g, /\bdrive impact\b/g, /\bfrom a high level\b/g, /\bholistic\b/g, /\bstreamline\b/g, /\bensure that\b/g],
+  abstract: [/\balignment\b/g, /\bcollaboration\b/g, /\befficiency\b/g, /\bmaintainability\b/g, /\bimpact\b/g, /\bdelivery\b/g, /\bstrategy\b/g, /\bobjectives?\b/g, /\bconstraints?\b/g, /\brequirements?\b/g],
+  ownership: [/\bi (?:built|debugged|shipped|owned|wrote|fixed|tested|deployed|led|worked|designed|implemented)\b/g, /\bmy (?:team|project|manager|customer|class|role|previous job)\b/g, /\bwe (?:built|debugged|shipped|owned|wrote|fixed|tested|deployed|chose|moved)\b/g],
   specificity: [/\b\d+(?:\.\d+)?%?\b/g, /\bapi\b/g, /\bdatabase\b/g, /\bsql\b/g, /\bbug\b/g, /\bdebug(?:ged|ging)?\b/g, /\bshipped\b/g, /\bdeployed\b/g, /\bproduction\b/g, /\bincident\b/g, /\btest(?:ed|ing)?\b/g, /\bmy (?:team|project|manager|customer|class)\b/g],
   hypotheticals: [/\bi would\b/g, /\bi'd start\b/g, /\bi'd make sure\b/g, /\btypically\b/g, /\bgenerally\b/g, /\bone approach would be\b/g],
   assistantStyle: [/\bi can help\b/g, /\bi'?d be happy to\b/g, /\bhere(?:'s| is) how\b/g, /\blet'?s break (?:it|this) down\b/g, /\bdoes that make sense\b/g],
+  copiedArtifact: [/\bas an ai language model\b/g, /\bi (?:do not|don't) have personal experience\b/g, /\bi can't access (?:your|the) (?:resume|browser|files)\b/g, /\bregenerate response\b/g, /\buser:\s*/g, /\bassistant:\s*/g, /```/g, /\bhere(?:'s| is) a polished (?:answer|response)\b/g],
   directAi: [/\bchatgpt\b/g, /\bclaude\b/g, /\bgemini\b/g, /\bcopilot\b/g, /\bperplexity\b/g, /\bai tools?\b/g, /\bllm\b/g],
   directAiUse: [
     /\b(?:used|using|asked|prompted|copied|pasted|generated|opened|checked|looked up|got help from)\s+(?:chatgpt|claude|gemini|copilot|perplexity|an?\s+ai|an?\s+llm)\b/g,
@@ -70,6 +73,26 @@ function jaccard(left, right) {
   return overlap / Math.max(1, a.size + b.size - overlap);
 }
 
+function cosineDistance(left = [], right = []) {
+  const a = new Map();
+  const b = new Map();
+  left.forEach(token => a.set(token, (a.get(token) || 0) + 1));
+  right.forEach(token => b.set(token, (b.get(token) || 0) + 1));
+  const keys = new Set([...a.keys(), ...b.keys()]);
+  let dot = 0;
+  let leftMag = 0;
+  let rightMag = 0;
+  keys.forEach(key => {
+    const x = a.get(key) || 0;
+    const y = b.get(key) || 0;
+    dot += x * y;
+    leftMag += x * x;
+    rightMag += y * y;
+  });
+  if (!leftMag || !rightMag) return 0;
+  return clamp(1 - dot / (Math.sqrt(leftMag) * Math.sqrt(rightMag)));
+}
+
 function lexicalEntropy(tokens) {
   if (tokens.length < 2) return 0;
   const counts = new Map();
@@ -93,8 +116,17 @@ function extractFeatures(text, context = {}, history = []) {
   const alphaTokens = tokens.filter(token => /[a-z]/.test(token)).length;
   const quality = wordCount ? clamp((alphaTokens / wordCount) * transcriptConfidence) : 0;
   const density = key => countMatches(text, PATTERNS[key]) / Math.max(1, wordCount);
+  const vocabularyTerms = Array.isArray(context.technicalVocabulary)
+    ? context.technicalVocabulary
+    : String(context.technicalVocabulary || '').split(/[\n,]/);
+  const technicalVocabularyMatches = vocabularyTerms
+    .map(term => String(term || '').trim().toLowerCase())
+    .filter(term => term.length >= 2)
+    .reduce((count, term) => count + (String(text || '').toLowerCase().includes(term) ? 1 : 0), 0);
   const recent = history.slice(-6);
   const historySimilarity = recent.length ? Math.max(...recent.map(item => jaccard(tokens, item.tokens || []))) : 0;
+  const baselineTokens = recent.flatMap(item => item.tokens || []);
+  const styleDrift = recent.length >= 3 && baselineTokens.length >= 60 ? cosineDistance(tokens, baselineTokens) : 0;
   const historyLengths = recent.map(item => item.wordCount).filter(Boolean);
   const lengthAverage = mean(historyLengths);
   const lengthUniformity = historyLengths.length >= 3 && lengthAverage
@@ -111,9 +143,13 @@ function extractFeatures(text, context = {}, history = []) {
     correctionDensity: density('corrections'),
     structuredDensity: density('structured'),
     genericDensity: density('generic'),
+    abstractDensity: density('abstract'),
+    ownershipDensity: density('ownership'),
     specificityDensity: density('specificity'),
+    technicalVocabularyDensity: technicalVocabularyMatches / Math.max(1, wordCount),
     hypotheticalDensity: density('hypotheticals'),
     assistantStyleDensity: density('assistantStyle'),
+    copiedArtifactDensity: density('copiedArtifact'),
     directAiDensity: density('directAi'),
     directAiMentionDensity: density('directAi'),
     directAiUseDensity: density('directAiUse'),
@@ -124,6 +160,7 @@ function extractFeatures(text, context = {}, history = []) {
     phraseRepetition: Math.max(ngramRepetition(tokens, 2), ngramRepetition(tokens, 3)),
     sentenceCv,
     historySimilarity,
+    styleDrift,
     lengthUniformity,
     wordsPerMinute: context.durationMs
       ? wordCount / Math.max(Number(context.durationMs) / 60000, 0.1)

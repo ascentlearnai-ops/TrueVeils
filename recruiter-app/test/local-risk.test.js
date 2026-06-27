@@ -67,6 +67,43 @@ test('returns a high band for heavily assistant-style generic answers', () => {
   assert.ok(result.aiSignals.length > 0);
 });
 
+test('flags copied assistant artifacts as high precision evidence', () => {
+  const result = Risk.analyzeTranscript(
+    'As an AI language model, I do not have personal experience, but here is a polished answer you could use. First, I would align stakeholders around a robust scalable solution and then summarize the key tradeoffs clearly.'
+  );
+
+  assert.equal(result.scorable, true);
+  assert.equal(result.label, 'high_ai_assistance_risk');
+  assert.ok(result.aiSignals.includes('Copied assistant or prompt artifact'));
+});
+
+test('role vocabulary and ownership lower false positives for technical answers', () => {
+  const result = Risk.analyzeTranscript(
+    'In my last project I implemented a Kubernetes rollout for our Postgres migration. We tested the TypeScript worker, fixed two queue retries, and shipped the API change after a staged deploy.',
+    { technicalVocabulary: ['Kubernetes', 'Postgres', 'TypeScript', 'queue retries'] }
+  );
+
+  assert.equal(result.scorable, true);
+  assert.equal(result.label, 'low_ai_assistance_risk');
+  assert.ok(result.humanSignals.includes('Role-specific technical vocabulary'));
+  assert.ok(result.humanSignals.includes('First-person ownership of work'));
+});
+
+test('style drift from earlier answers adds review signal without overriding evidence rules', () => {
+  [
+    'Um, I usually start by checking the logs and then I test the API with my team after I find the failing request.',
+    'I mean, the tricky part was the migration because we had to roll back one database change and patch the worker.',
+    'Yeah, I fixed the checkout bug by adding a failing SQL test and then we shipped the rollback that afternoon.'
+  ].forEach(text => Risk.analyzeTranscript(text));
+
+  const result = Risk.analyzeTranscript(
+    'The optimal approach is to establish alignment, evaluate constraints, synthesize stakeholder requirements, and implement a robust scalable solution that maximizes long-term maintainability and business impact.'
+  );
+
+  assert.equal(result.scorable, true);
+  assert.ok(result.aiSignals.includes('Abrupt style shift from earlier answers'));
+});
+
 test('abstains on short single-sentence answers even when above the minimum word count', () => {
   const result = Risk.analyzeTranscript(
     'I debugged the payment API timeout with my team and shipped the tested database fix after the rollback review yesterday.'

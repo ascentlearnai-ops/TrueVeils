@@ -6,7 +6,9 @@ const MODEL_VERSION = model.version;
 
 const SIGNALS = {
   assistantStyleDensity: ['Assistant-style spoken framing', 'AI'],
+  copiedArtifactDensity: ['Copied assistant or prompt artifact', 'AI'],
   genericDensity: ['Generic polished interview phrasing', 'AI'],
+  abstractGenericity: ['Abstract claims without enough concrete grounding', 'AI'],
   structuredDensity: ['Highly packaged response structure', 'AI'],
   hypotheticalDensity: ['Hypothetical framing without lived detail', 'AI'],
   lowSpecificity: ['Limited concrete project detail', 'AI'],
@@ -15,12 +17,15 @@ const SIGNALS = {
   lexicalUniformity: ['Unusually uniform vocabulary pattern', 'AI'],
   phraseRepetition: ['Repeated phrase cadence', 'AI'],
   historySimilarity: ['Response closely resembles earlier phrasing', 'AI'],
+  styleDrift: ['Abrupt style shift from earlier answers', 'AI'],
   lengthUniformity: ['Response lengths are unusually uniform', 'AI'],
   directAiMention: ['AI tool mentioned in the response', 'AI'],
   directAiUse: ['Direct AI-tool use context', 'AI'],
   naturalDisfluency: ['Natural fillers and pauses', 'HUMAN'],
   selfCorrection: ['Self-corrections and rephrasing', 'HUMAN'],
   concreteDetail: ['Concrete project or first-person detail', 'HUMAN'],
+  firstPersonOwnership: ['First-person ownership of work', 'HUMAN'],
+  technicalVocabulary: ['Role-specific technical vocabulary', 'HUMAN'],
   spokenBurstiness: ['Varied spoken rhythm', 'HUMAN'],
   conversationalFlow: ['Conversational connective language', 'HUMAN'],
   negatedAiMention: ['AI-tool mention was rejected or negated', 'HUMAN']
@@ -34,9 +39,12 @@ function normalizedFeatures(features) {
   const enoughSpeechForDisfluency = features.wordCount >= 45 || features.sentenceCount >= 3;
   const lowLexicalDiversity = clamp((0.52 - features.uniqueRatio) / 0.24);
   const lowLexicalEntropy = clamp((0.76 - features.lexicalEntropy) / 0.28);
+  const groundedDetail = features.specificityDensity + features.ownershipDensity + features.technicalVocabularyDensity;
   return {
     assistantStyleDensity: clamp(features.assistantStyleDensity * 24),
+    copiedArtifactDensity: clamp(features.copiedArtifactDensity * 28),
     genericDensity: clamp(features.genericDensity * 18),
+    abstractGenericity: clamp((features.abstractDensity + features.genericDensity) * 12) * clamp((0.075 - groundedDetail) / 0.075),
     structuredDensity: clamp(features.structuredDensity * 18),
     hypotheticalDensity: clamp(features.hypotheticalDensity * 15),
     lowSpecificity: clamp((0.055 - features.specificityDensity) / 0.055),
@@ -47,12 +55,15 @@ function normalizedFeatures(features) {
     lexicalUniformity: lowLexicalDiversity * 0.65 + lowLexicalEntropy * 0.35,
     phraseRepetition: clamp(features.phraseRepetition / 0.13),
     historySimilarity: clamp((features.historySimilarity - 0.55) / 0.35),
+    styleDrift: features.wordCount >= 24 ? clamp((features.styleDrift - 0.46) / 0.28) : 0,
     lengthUniformity: clamp((features.lengthUniformity - 0.72) / 0.28),
     directAiMention: clamp((features.directAiMentionDensity ?? features.directAiDensity) * 5),
     directAiUse: clamp(features.directAiUseDensity * 18),
     naturalDisfluency: clamp((features.fillerDensity - 0.012) / 0.05),
     selfCorrection: clamp(features.correctionDensity / 0.045),
     concreteDetail: clamp(features.specificityDensity / 0.12),
+    firstPersonOwnership: clamp(features.ownershipDensity / 0.08),
+    technicalVocabulary: clamp(features.technicalVocabularyDensity / 0.06),
     spokenBurstiness: features.sentenceCount >= 3 ? clamp((features.sentenceCv - 0.32) / 0.7) : 0,
     conversationalFlow: clamp(features.discourseDensity / 0.16),
     negatedAiMention: clamp(features.negatedAiMentionDensity * 18)
@@ -96,12 +107,20 @@ function unscorable(reason, features) {
   };
 }
 
+function rememberTranscript(features, score = null) {
+  if (!features || features.wordCount < 8 || features.transcriptConfidence < model.minimums.transcriptConfidence || features.quality < model.minimums.quality) return;
+  transcriptHistory.push({ tokens: features.tokens, wordCount: features.wordCount, score, modelVersion: MODEL_VERSION });
+  if (transcriptHistory.length > 20) transcriptHistory.shift();
+}
+
 function analyzeTranscript(text, context = {}) {
   const features = extractFeatures(text, context, transcriptHistory);
   if (features.wordCount < model.minimums.words) {
+    rememberTranscript(features);
     return unscorable(`Needs at least ${model.minimums.words} words before estimating AI-assistance risk.`, features);
   }
   if (features.sentenceCount < 2 && features.wordCount < 24) {
+    rememberTranscript(features);
     return unscorable('Needs at least two sentences or 24 reliable words before estimating AI-assistance risk.', features);
   }
   if (features.transcriptConfidence < model.minimums.transcriptConfidence) {
@@ -141,8 +160,7 @@ function analyzeTranscript(text, context = {}) {
     ? `${displayLabel(label)}. Main signals: ${aiSignals.join('; ')}.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join('; ').toLowerCase()}.` : ''}`
     : `${displayLabel(label)}. No strong AI-style speech pattern was found.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join('; ').toLowerCase()}.` : ''}`;
 
-  transcriptHistory.push({ tokens: features.tokens, wordCount: features.wordCount, score, modelVersion: MODEL_VERSION });
-  if (transcriptHistory.length > 20) transcriptHistory.shift();
+  rememberTranscript(features, score);
 
   return {
     score,

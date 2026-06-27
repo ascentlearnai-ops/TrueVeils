@@ -1,6 +1,6 @@
 {
-  "version": "truveil-risk-v2.1.0",
-  "intercept": -1.45,
+  "version": "truveil-risk-v2.2.0",
+  "intercept": -1.5,
   "thresholds": {
     "elevated": 0.6,
     "high": 0.8
@@ -12,7 +12,9 @@
   },
   "weights": {
     "assistantStyleDensity": 2.35,
+    "copiedArtifactDensity": 2.8,
     "genericDensity": 1.28,
+    "abstractGenericity": 0.9,
     "structuredDensity": 1.0,
     "hypotheticalDensity": 0.65,
     "lowSpecificity": 1.3,
@@ -21,12 +23,15 @@
     "lexicalUniformity": 0.38,
     "phraseRepetition": 0.8,
     "historySimilarity": 0.75,
+    "styleDrift": 0.95,
     "lengthUniformity": 0.55,
     "directAiMention": 0.22,
     "directAiUse": 2.05,
     "naturalDisfluency": -1.15,
     "selfCorrection": -1.1,
     "concreteDetail": -1.4,
+    "firstPersonOwnership": -0.85,
+    "technicalVocabulary": -0.75,
     "spokenBurstiness": -0.75,
     "conversationalFlow": -0.45,
     "negatedAiMention": -1.05

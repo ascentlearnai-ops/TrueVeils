@@ -48,7 +48,7 @@ function correlateEvidence(events = [], transcripts = []) {
     .sort((a, b) => a._timestamp - b._timestamp);
 
   return events
-    .filter(event => AI_TARGET.test(eventText(event)))
+    .filter(event => AI_TARGET.test(eventText(event)) && event.policyDecision !== 'allowed' && event.reviewStatus !== 'allowed')
     .map(event => {
       const occurredAt = timestampOf(event);
       const nextTranscript = orderedTranscripts.find(item => item._timestamp > occurredAt);
@@ -91,7 +91,10 @@ function evaluateReview({
     || !['healthy', 'connected'].includes(telemetry.transcription)
     || !['healthy', 'connected'].includes(telemetry.monitoring);
 
-  let reviewBand = healthMissing ? 'incomplete_evidence' : 'clear';
+  const words = transcriptWordCount(transcripts);
+  const reliableResponses = transcripts.filter(item => Number(item.transcriptConfidence ?? item.confidence ?? 1) >= 0.58).length;
+  const hasReliableTranscript = words >= 18 && reliableResponses >= 1;
+  let reviewBand = healthMissing && !hasReliableTranscript ? 'incomplete_evidence' : 'clear';
   const evidence = [];
   const counterEvidence = [];
 
@@ -105,8 +108,6 @@ function evaluateReview({
     if (unusualSwitches.length >= 4) evidence.push(`${unusualSwitches.length} unusual foreground changes`);
   }
 
-  const words = transcriptWordCount(transcripts);
-  const reliableResponses = transcripts.filter(item => Number(item.transcriptConfidence ?? item.confidence ?? 1) >= 0.58).length;
   const transcriptEligible = words >= 250 && reliableResponses >= 3;
   const strongTranscriptSignals = transcriptEligible
     ? transcriptAnalyses.filter(item => Number(item.aiScore ?? item.score) >= 70).length
@@ -119,6 +120,9 @@ function evaluateReview({
   }
   if (!exactAiEvents.length && !possibleAiEvents.length && !overlayEvents.length) {
     counterEvidence.push('No restricted AI destination or hidden overlay was detected');
+  }
+  if (healthMissing && hasReliableTranscript) {
+    counterEvidence.push('Telemetry reported waiting or degraded state, but reliable transcript evidence was present');
   }
 
   const summaries = {
