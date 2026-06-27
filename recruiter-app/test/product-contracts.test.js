@@ -53,3 +53,14 @@ test('production hardening removes legacy anonymous session and audio access', (
   assert.match(migration, /revoke all on function public\.cleanup_expired_session_audio\(interval\)/);
   assert.doesNotMatch(migration, /to anon/);
 });
+
+test('admin transcript scoring uses response windows and session vocabulary', () => {
+  const main = read('recruiter-app/main.js');
+  assert.match(main, /ResponseWindowAnalyzer/);
+  assert.match(main, /analyzeResponseWindow/);
+  assert.match(main, /technicalVocabulary/);
+  assert.match(main, /streamEpoch/);
+  assert.match(main, /utteranceId/);
+  assert.match(main, /finalReason/);
+  assert.match(main, /responseWindowWordCount/);
+});

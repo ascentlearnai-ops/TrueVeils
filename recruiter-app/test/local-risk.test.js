@@ -57,13 +57,14 @@ test('returns evidence and a model version for a scorable answer', () => {
   assert.ok(result.evidence.length > 0);
 });
 
-test('returns a high band for heavily assistant-style generic answers', () => {
+test('caps heavily assistant-style generic answers at advisory review', () => {
   const result = Risk.analyzeTranscript(
     'I can help with that. First, there are several key best practices. Ultimately, I would leverage a robust and scalable approach to ensure that stakeholders align with business goals and that the process remains seamless.'
   );
 
   assert.equal(result.scorable, true);
-  assert.equal(result.label, 'high_ai_assistance_risk');
+  assert.equal(result.label, 'elevated_ai_assistance_risk');
+  assert.ok(result.score < 70);
   assert.ok(result.aiSignals.length > 0);
 });
 

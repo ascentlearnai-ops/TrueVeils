@@ -13,6 +13,7 @@ try {
 
 const SessionManager = require('./src/session/manager');
 const LocalRisk = require('./src/ai/local-risk');
+const { ResponseWindowAnalyzer } = require('./src/ai/response-window');
 const ReportGenerator = require('./src/report/generator');
 const SettingsStore = require('./src/settings/store');
 const { LocalTranscriber } = require('./src/audio/local-transcriber');
@@ -30,6 +31,32 @@ let localTranscriber = null;
 let deepgramTranscriber = null;
 let groqTranscriber = null;
 let pendingAuthUrl = null;
+
+function getTechnicalVocabulary() {
+  return activeSession?.technicalVocabulary || sessionData?.session?.technicalVocabulary || [];
+}
+
+function getResponseAnalyzer() {
+  if (!sessionData) return null;
+  if (!sessionData.responseAnalyzer) {
+    sessionData.responseAnalyzer = new ResponseWindowAnalyzer();
+  }
+  return sessionData.responseAnalyzer;
+}
+
+function analyzeResponseWindow(segment = {}) {
+  const analyzer = getResponseAnalyzer();
+  if (!analyzer) return null;
+  const technicalVocabulary = getTechnicalVocabulary();
+  return analyzer.addSegment(
+    segment,
+    (text, context) => LocalRisk.analyzeTranscript(text, {
+      ...context,
+      technicalVocabulary
+    }),
+    { technicalVocabulary }
+  );
+}
 
 function authStoragePath() {
   return path.join(app.getPath('userData'), 'auth-session.json');
@@ -487,11 +514,21 @@ async function analyzeCandidateTranscript(payload = {}) {
   while (sessionData.transcriptFingerprints.length > 40) sessionData.transcriptFingerprints.shift();
 
   const timestamp = payload.timestamp || Date.now();
-  const analysis = LocalRisk.analyzeTranscript(text, {
+  if (sessionData.telemetry) sessionData.telemetry.transcription = 'healthy';
+  const analysis = analyzeResponseWindow({
+    text,
+    timestamp,
     durationMs: payload.durationMs,
     sequence: payload.sequence,
-    transcriptConfidence
+    transcriptConfidence,
+    confidence: transcriptConfidence,
+    segmentId: payload.segmentId,
+    streamEpoch: payload.streamEpoch,
+    utteranceId: payload.utteranceId,
+    finalReason: payload.finalReason,
+    source: payload.source || 'candidate-transcript'
   });
+  if (!analysis) return;
   const entry = {
     text,
     timestamp,
@@ -509,7 +546,15 @@ async function analyzeCandidateTranscript(payload = {}) {
     counterSignal: analysis.counterSignal || null,
     modelVersion: analysis.modelVersion,
     unscorableReason: analysis.unscorableReason || null,
-    source: payload.source || 'candidate-transcript'
+    source: payload.source || 'candidate-transcript',
+    transcriptConfidence: Number.isFinite(transcriptConfidence) ? transcriptConfidence : null,
+    segmentId: payload.segmentId || `${activeSession?.sessionId || 'local'}-${payload.sequence || sessionData.transcripts.length + 1}`,
+    streamEpoch: Number.isFinite(Number(payload.streamEpoch)) ? Number(payload.streamEpoch) : null,
+    utteranceId: Number.isFinite(Number(payload.utteranceId)) ? Number(payload.utteranceId) : null,
+    finalReason: payload.finalReason || 'speech_final',
+    analysisWindowId: analysis.analysisWindowId || null,
+    responseWindowWordCount: analysis.responseWindowWordCount || 0,
+    responseWindowText: analysis.responseWindowText || ''
   };
 
   sessionData.transcripts.push(entry);
@@ -737,10 +782,20 @@ async function processAudioTranscription(entry) {
     entry.source = transcription.source;
 
     if (text) {
-      const analysis = LocalRisk.analyzeTranscript(text, {
+      if (sessionData?.telemetry) sessionData.telemetry.transcription = 'healthy';
+      const segmentId = `fallback-${Number(entry.sequence || 0)}-${entry.chunkId || entry.timestamp}`;
+      const analysis = analyzeResponseWindow({
+        text,
+        timestamp: entry.timestamp,
         durationMs: entry.durationMs,
-        sequence: entry.sequence
+        sequence: entry.sequence,
+        transcriptConfidence: transcription.confidence,
+        confidence: transcription.confidence,
+        segmentId,
+        finalReason: 'fallback_chunk',
+        source: transcription.source
       });
+      if (!analysis) return;
       entry.aiScore = analysis.score;
       entry.flags = analysis.flags || [];
       entry.reasoning = analysis.reasoning;
@@ -762,7 +817,12 @@ async function processAudioTranscription(entry) {
         modelVersion: analysis.modelVersion,
         unscorableReason: analysis.unscorableReason || null,
         source: transcription.source,
-        chunkId: entry.chunkId
+        chunkId: entry.chunkId,
+        segmentId,
+        finalReason: 'fallback_chunk',
+        analysisWindowId: analysis.analysisWindowId || null,
+        responseWindowWordCount: analysis.responseWindowWordCount || 0,
+        responseWindowText: analysis.responseWindowText || ''
       };
 
       sessionData.transcripts.push(transcriptEntry);
@@ -1146,6 +1206,7 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy, techni
     scores: [],
     audioChunks: [],
     notes: [],
+    responseAnalyzer: new ResponseWindowAnalyzer(),
     telemetry: { connected: true, transcription: 'waiting', monitoring: 'waiting' }
   };
   return session;
@@ -1242,7 +1303,15 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
   if (!sessionData) return null;
   if (!text || text.trim().length < 4) return null;
 
-  const analysis = LocalRisk.analyzeTranscript(text);
+  if (sessionData.telemetry) sessionData.telemetry.transcription = 'healthy';
+  const analysis = analyzeResponseWindow({
+    text,
+    timestamp,
+    source: 'local',
+    segmentId: `manual-${Date.now()}`,
+    finalReason: 'manual'
+  });
+  if (!analysis) return null;
 
   const entry = {
     text,
@@ -1254,7 +1323,11 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
     scoreWeight: analysis.scoreWeight || 0,
     flags: analysis.flags || [],
     reasoning: analysis.reasoning,
-    source: 'local'
+    source: 'local',
+    analysisWindowId: analysis.analysisWindowId || null,
+    responseWindowWordCount: analysis.responseWindowWordCount || 0,
+    responseWindowText: analysis.responseWindowText || '',
+    unscorableReason: analysis.unscorableReason || null
   };
   sessionData.transcripts.push(entry);
   if (typeof analysis.score === 'number' && analysis.scorable !== false) {

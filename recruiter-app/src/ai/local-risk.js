@@ -140,8 +140,18 @@ function analyzeTranscript(text, context = {}) {
   }));
   const logit = contributions.reduce((sum, item) => sum + item.contribution, model.intercept);
   const probability = clamp(sigmoid(logit));
-  const score = Math.round(probability * 100);
-  const label = labelFor(probability);
+  const rawScore = Math.round(probability * 100);
+  const hasHighPrecisionTranscriptEvidence = normalized.copiedArtifactDensity > 0.08 || normalized.directAiUse > 0.16;
+  const hasStrongGrounding = normalized.concreteDetail > 0.45 || normalized.firstPersonOwnership > 0.42 || normalized.technicalVocabulary > 0.35;
+  let score = rawScore;
+  if (!hasHighPrecisionTranscriptEvidence) {
+    score = Math.min(score, 68);
+  }
+  if (hasStrongGrounding && !hasHighPrecisionTranscriptEvidence) {
+    score = Math.min(score, 58);
+  }
+  const cappedProbability = score / 100;
+  const label = labelFor(cappedProbability);
   const evidence = contributions.filter(item => item.kind === 'AI' && item.contribution > 0.12)
     .sort((a, b) => b.contribution - a.contribution).slice(0, 3);
   const counters = contributions.filter(item => item.kind === 'HUMAN' && item.contribution < -0.12)
@@ -164,7 +174,9 @@ function analyzeTranscript(text, context = {}) {
 
   return {
     score,
-    probability,
+    probability: cappedProbability,
+    rawProbability: probability,
+    rawScore,
     label,
     displayLabel: displayLabel(label),
     confidence,

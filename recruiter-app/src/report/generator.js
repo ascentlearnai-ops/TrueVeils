@@ -185,6 +185,18 @@ async function generate(data) {
 function buildHtml(ctx) {
   const { session, startMs, endMs, duration, risk, review, notes = [], transcripts, flags, audioChunks, totalResponses } = ctx;
   const riskCls = review.reviewBand === 'high_priority_review' ? 'high' : review.reviewBand === 'review' ? 'med' : 'low';
+  const scorableTranscripts = transcripts.filter(item => item.scorable !== false);
+  const abstainedTranscripts = transcripts.length - scorableTranscripts.length;
+  const patternRows = `
+    <div class="entry">
+      <div class="entry-head"><span class="score ${review.transcriptEligible ? 'low' : 'unk'}">${review.transcriptEligible ? 'ELIGIBLE' : 'ABSTAINED'}</span></div>
+      <div class="entry-text">${esc(review.transcriptEligible ? 'Transcript-pattern analysis had enough context to contribute advisory evidence.' : 'Transcript-pattern analysis abstained until enough reliable words and responses are available.')}</div>
+      <div class="reasoning">Scorable windows: ${esc(scorableTranscripts.length)} | Short or low-confidence fragments: ${esc(abstainedTranscripts)} | Transcript-only score cannot override behavioral evidence.</div>
+    </div>
+    <div class="entry">
+      <div class="entry-head"><span class="score low">MODEL BOUNDARY</span></div>
+      <div class="entry-text">Transcript signals are advisory. Generic phrasing by itself does not create a high-priority review without direct AI artifacts or behavioral correlation.</div>
+    </div>`;
 
   const transcriptRows = transcripts.length
     ? transcripts.map(t => `
@@ -194,7 +206,7 @@ function buildHtml(ctx) {
           <span class="score ${t.scorable === false ? 'unk' : 'low'}">${t.scorable === false ? 'Pattern analysis abstained' : 'Pattern evidence recorded'}</span>
         </div>
         <div class="entry-text">${esc(t.text)}</div>
-        ${t.reasoning ? `<div class="reasoning">${esc(t.reasoning)}</div>` : ''}
+        ${t.reasoning ? `<div class="reasoning">${esc(t.reasoning)}${t.responseWindowWordCount ? ` | Window words: ${esc(t.responseWindowWordCount)}` : ''}</div>` : ''}
         ${t.flags && t.flags.length ? `<div class="sub-flags">${t.flags.map(f => `<span class="chip">${esc(f)}</span>`).join('')}</div>` : ''}
       </div>`).join('')
     : '<div class="empty">No transcripts were captured during this session.</div>';
@@ -229,6 +241,9 @@ function buildHtml(ctx) {
         ${item.transcriptPreview ? `<div class="reasoning">${esc(item.transcriptPreview)}</div>` : ''}
       </div>`).join('')
     : '<div class="empty">No restricted-destination event could be correlated with a later response.</div>';
+  const counterRows = review.counterEvidence?.length
+    ? review.counterEvidence.map(item => `<div class="entry"><div class="entry-text">${esc(item)}</div></div>`).join('')
+    : '<div class="empty">No counter-evidence was strong enough to add to the report.</div>';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -328,10 +343,13 @@ function buildHtml(ctx) {
       <div class="stat"><div class="stat-label">Flags</div><div class="stat-val">${flags.length}</div></div>
     </div>
 
+    <h3>Transcript Pattern Context</h3>
+    <div class="panel">${patternRows}</div>
+
     <h3>Response Analysis</h3>
     <div class="panel">${transcriptRows}</div>
 
-    <h3>Session activity and review events</h3>
+    <h3>Behavioral Evidence</h3>
     <div class="panel" style="padding:0">
       <table>
         <thead><tr><th style="width:110px">TIME</th><th style="width:110px">SEVERITY</th><th>DETAIL</th></tr></thead>
@@ -342,8 +360,11 @@ function buildHtml(ctx) {
     <h3>Interviewer notes and bookmarks</h3>
     <div class="panel">${noteRows}</div>
 
-    <h3>Evidence correlations</h3>
+    <h3>Correlated Moments</h3>
     <div class="panel">${correlationRows}</div>
+
+    <h3>Counter-Evidence</h3>
+    <div class="panel">${counterRows}</div>
 
     <h3>Transcription health timeline</h3>
     <div class="panel" style="padding:0">
@@ -362,4 +383,4 @@ function buildHtml(ctx) {
 </html>`;
 }
 
-module.exports = { generate, sessionRiskSummary, behavioralEvidence };
+module.exports = { generate, sessionRiskSummary, behavioralEvidence, buildHtml };
