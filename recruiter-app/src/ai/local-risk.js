@@ -17,11 +17,13 @@ const SIGNALS = {
   historySimilarity: ['Response closely resembles earlier phrasing', 'AI'],
   lengthUniformity: ['Response lengths are unusually uniform', 'AI'],
   directAiMention: ['AI tool mentioned in the response', 'AI'],
+  directAiUse: ['Direct AI-tool use context', 'AI'],
   naturalDisfluency: ['Natural fillers and pauses', 'HUMAN'],
   selfCorrection: ['Self-corrections and rephrasing', 'HUMAN'],
   concreteDetail: ['Concrete project or first-person detail', 'HUMAN'],
   spokenBurstiness: ['Varied spoken rhythm', 'HUMAN'],
-  conversationalFlow: ['Conversational connective language', 'HUMAN']
+  conversationalFlow: ['Conversational connective language', 'HUMAN'],
+  negatedAiMention: ['AI-tool mention was rejected or negated', 'HUMAN']
 };
 
 function sigmoid(value) {
@@ -29,24 +31,31 @@ function sigmoid(value) {
 }
 
 function normalizedFeatures(features) {
+  const enoughSpeechForDisfluency = features.wordCount >= 45 || features.sentenceCount >= 3;
+  const lowLexicalDiversity = clamp((0.52 - features.uniqueRatio) / 0.24);
+  const lowLexicalEntropy = clamp((0.76 - features.lexicalEntropy) / 0.28);
   return {
     assistantStyleDensity: clamp(features.assistantStyleDensity * 24),
     genericDensity: clamp(features.genericDensity * 18),
     structuredDensity: clamp(features.structuredDensity * 18),
     hypotheticalDensity: clamp(features.hypotheticalDensity * 15),
     lowSpecificity: clamp((0.055 - features.specificityDensity) / 0.055),
-    lowDisfluency: clamp((0.018 - features.fillerDensity - features.correctionDensity) / 0.018),
+    lowDisfluency: enoughSpeechForDisfluency
+      ? clamp((0.016 - features.fillerDensity - features.correctionDensity) / 0.016)
+      : 0,
     lowBurstiness: features.sentenceCount >= 3 ? clamp((0.3 - features.sentenceCv) / 0.3) : 0,
-    lexicalUniformity: clamp((features.uniqueRatio - 0.68) / 0.22) * clamp((features.lexicalEntropy - 0.82) / 0.18),
+    lexicalUniformity: lowLexicalDiversity * 0.65 + lowLexicalEntropy * 0.35,
     phraseRepetition: clamp(features.phraseRepetition / 0.13),
     historySimilarity: clamp((features.historySimilarity - 0.55) / 0.35),
     lengthUniformity: clamp((features.lengthUniformity - 0.72) / 0.28),
-    directAiMention: clamp(features.directAiDensity * 10),
+    directAiMention: clamp((features.directAiMentionDensity ?? features.directAiDensity) * 5),
+    directAiUse: clamp(features.directAiUseDensity * 18),
     naturalDisfluency: clamp((features.fillerDensity - 0.012) / 0.05),
     selfCorrection: clamp(features.correctionDensity / 0.045),
     concreteDetail: clamp(features.specificityDensity / 0.12),
     spokenBurstiness: features.sentenceCount >= 3 ? clamp((features.sentenceCv - 0.32) / 0.7) : 0,
-    conversationalFlow: clamp(features.discourseDensity / 0.16)
+    conversationalFlow: clamp(features.discourseDensity / 0.16),
+    negatedAiMention: clamp(features.negatedAiMentionDensity * 18)
   };
 }
 
@@ -92,6 +101,9 @@ function analyzeTranscript(text, context = {}) {
   if (features.wordCount < model.minimums.words) {
     return unscorable(`Needs at least ${model.minimums.words} words before estimating AI-assistance risk.`, features);
   }
+  if (features.sentenceCount < 2 && features.wordCount < 24) {
+    return unscorable('Needs at least two sentences or 24 reliable words before estimating AI-assistance risk.', features);
+  }
   if (features.transcriptConfidence < model.minimums.transcriptConfidence) {
     return unscorable('Transcript confidence is too low for a reliable estimate.', features);
   }
@@ -126,8 +138,8 @@ function analyzeTranscript(text, context = {}) {
   const aiSignals = evidence.map(item => item.message);
   const humanSignals = counters.slice(0, 3).map(item => item.message);
   const reasoning = evidence.length
-    ? `${displayLabel(label)}. Strongest evidence: ${aiSignals.join('; ')}.${counterSignal ? ` Counter-signal: ${counterSignal.toLowerCase()}.` : ''}`
-    : `${displayLabel(label)}. No strong AI-style speech pattern was found.${counterSignal ? ` Strongest counter-signal: ${counterSignal.toLowerCase()}.` : ''}`;
+    ? `${displayLabel(label)}. Main signals: ${aiSignals.join('; ')}.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join('; ').toLowerCase()}.` : ''}`
+    : `${displayLabel(label)}. No strong AI-style speech pattern was found.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join('; ').toLowerCase()}.` : ''}`;
 
   transcriptHistory.push({ tokens: features.tokens, wordCount: features.wordCount, score, modelVersion: MODEL_VERSION });
   if (transcriptHistory.length > 20) transcriptHistory.shift();

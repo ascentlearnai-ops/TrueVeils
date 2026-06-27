@@ -7,6 +7,16 @@ const PATTERNS = {
   hypotheticals: [/\bi would\b/g, /\bi'd start\b/g, /\bi'd make sure\b/g, /\btypically\b/g, /\bgenerally\b/g, /\bone approach would be\b/g],
   assistantStyle: [/\bi can help\b/g, /\bi'?d be happy to\b/g, /\bhere(?:'s| is) how\b/g, /\blet'?s break (?:it|this) down\b/g, /\bdoes that make sense\b/g],
   directAi: [/\bchatgpt\b/g, /\bclaude\b/g, /\bgemini\b/g, /\bcopilot\b/g, /\bperplexity\b/g, /\bai tools?\b/g, /\bllm\b/g],
+  directAiUse: [
+    /\b(?:used|using|asked|prompted|copied|pasted|generated|opened|checked|looked up|got help from)\s+(?:chatgpt|claude|gemini|copilot|perplexity|an?\s+ai|an?\s+llm)\b/g,
+    /\b(?:chatgpt|claude|gemini|copilot|perplexity)\s+(?:said|suggested|gave|generated|wrote|answered)\b/g,
+    /\b(?:i|we)\s+(?:put|fed|typed)\s+(?:it|the question|the prompt|my answer)\s+(?:into|in)\s+(?:chatgpt|claude|gemini|copilot|perplexity)\b/g
+  ],
+  negatedAi: [
+    /\b(?:did not|didn't|never|without|avoided|rejected|blocked|disabled|closed)\s+(?:using\s+)?(?:chatgpt|claude|gemini|copilot|perplexity|an?\s+ai|an?\s+llm)\b/g,
+    /\b(?:chatgpt|claude|gemini|copilot|perplexity)\s+(?:was|is)\s+(?:blocked|disabled|closed|not allowed|rejected)\b/g,
+    /\b(?:chatgpt|claude|gemini|copilot|perplexity)\b.{0,90}\b(?:rejected|blocked|disabled|closed|not allowed)\s+(?:it|that|the tool)?\b/g
+  ],
   discourse: [/\bso\b/g, /\band\b/g, /\bbut\b/g, /\bbecause\b/g, /\bthen\b/g]
 };
 
@@ -105,6 +115,9 @@ function extractFeatures(text, context = {}, history = []) {
     hypotheticalDensity: density('hypotheticals'),
     assistantStyleDensity: density('assistantStyle'),
     directAiDensity: density('directAi'),
+    directAiMentionDensity: density('directAi'),
+    directAiUseDensity: density('directAiUse'),
+    negatedAiMentionDensity: density('negatedAi'),
     discourseDensity: density('discourse'),
     uniqueRatio,
     lexicalEntropy: lexicalEntropy(tokens),
