@@ -68,6 +68,9 @@ const audioLevelValue = $('audioLevelValue');
 const candidateNameInput = $('candidateNameInput');
 const roleInput = $('roleInput');
 const candidateEmailInput = $('candidateEmailInput');
+const candidateInviteMessage = $('candidateInviteMessage');
+const inviteLinkPreview = $('inviteLinkPreview');
+const inviteLinkState = $('inviteLinkState');
 const allowedAppsInput = $('allowedAppsInput');
 const allowedSitesInput = $('allowedSitesInput');
 const customBlockedSitesInput = $('customBlockedSitesInput');
@@ -106,6 +109,45 @@ function listFromTextarea(value) {
     .split(/\n|,/)
     .map(item => item.trim())
     .filter(Boolean);
+}
+function buildCandidateInviteMessage() {
+  const code = currentSession?.sessionId || sessionCodeEl.textContent || '';
+  const link = candidateInviteLink();
+  const candidateName = candidateNameInput.value.trim();
+  const role = roleInput.value.trim();
+  const greeting = candidateName ? `Hi ${candidateName},` : 'Hi,';
+  const roleLine = role ? `This is for your ${role} interview.` : 'This is for your upcoming interview.';
+  if (!/^TRV-[A-Z0-9]{6}$/i.test(String(code)) || !link) {
+    return {
+      code: '',
+      link: '',
+      subject: 'Your Truveil interview code',
+      body: 'Create a session to generate the candidate invite message.'
+    };
+  }
+  return {
+    code,
+    link,
+    subject: `Your Truveil interview code: ${code}`,
+    body: [
+      greeting,
+      '',
+      `${roleLine} Please install/open Truveil Secure and join with this code: ${code}`,
+      '',
+      `Open Truveil Secure here: ${link}`,
+      '',
+      'Before the call, enter the code, confirm the session notice, allow microphone access, and keep Truveil Secure open while the interview runs.',
+      '',
+      'Thanks.'
+    ].join('\n')
+  };
+}
+function refreshCandidateInvite() {
+  if (!candidateInviteMessage || !inviteLinkPreview || !inviteLinkState) return;
+  const invite = buildCandidateInviteMessage();
+  candidateInviteMessage.value = invite.body;
+  inviteLinkPreview.textContent = invite.link || 'Your candidate invite link will appear here.';
+  inviteLinkState.textContent = invite.link ? `Ready: ${invite.code}` : 'Create a session first';
 }
 function normalizePolicyInput(value, type = 'text') {
   let clean = String(value || '').trim();
@@ -338,6 +380,7 @@ async function onNewSession() {
     technicalVocabularyInput.value = '';
     policyPresetSelect.value = 'standard_technical';
     renderPolicyControls();
+    refreshCandidateInvite();
     if (!currentSession.localOnly) {
       candidateReady = false;
       startMonitoringBtn.disabled = true;
@@ -444,30 +487,52 @@ $('copyCandidateLinkBtn')?.addEventListener('click', async () => {
   toast('Copied candidate invite link.', 'success');
 });
 
-$('emailCandidateLinkBtn')?.addEventListener('click', async () => {
-  if (!currentSession || !/^TRV-[A-Z0-9]{6}$/i.test(String(currentSession.sessionId || ''))) {
-    toast('Create a session first, then email the invite.', 'error');
-    return;
+function ensureInviteReady(actionLabel = 'use the invite') {
+  const invite = buildCandidateInviteMessage();
+  if (!invite.link) {
+    toast(`Create a session first, then ${actionLabel}.`, 'error');
+    return null;
   }
+  refreshCandidateInvite();
+  return invite;
+}
+
+$('copyInviteMessageBtn')?.addEventListener('click', async () => {
+  const invite = ensureInviteReady('copy the invite message');
+  if (!invite) return;
+  await window.truveil.copyLink(invite.body);
+  toast('Copied full candidate invite message.', 'success');
+});
+
+$('openCandidateLinkBtn')?.addEventListener('click', async () => {
+  const invite = ensureInviteReady('open the invite link');
+  if (!invite) return;
+  await window.truveil.openExternal(invite.link);
+  toast('Opened candidate invite link.', 'success');
+});
+
+$('refreshInviteMessageBtn')?.addEventListener('click', () => {
+  refreshCandidateInvite();
+  toast('Invite message refreshed.', 'success');
+});
+
+$('emailCandidateLinkBtn')?.addEventListener('click', async () => {
+  const invite = ensureInviteReady('email the invite');
+  if (!invite) return;
   const email = candidateEmailInput.value.trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     toast('Enter the candidate email first.', 'error');
     candidateEmailInput.focus();
     return;
   }
-  const code = currentSession?.sessionId || sessionCodeEl.textContent;
-  const link = candidateInviteLink();
-  const subject = encodeURIComponent(`Your Truveil interview code: ${code}`);
-  const body = encodeURIComponent([
-    `Your interview code is ${code}.`,
-    '',
-    `Open this link to download/open Truveil Secure and prefill the code:`,
-    link,
-    '',
-    'If the desktop app is already installed, click "Open Truveil Secure" on the page.'
-  ].join('\n'));
+  const subject = encodeURIComponent(invite.subject);
+  const body = encodeURIComponent(invite.body);
   await window.truveil.openExternal(`mailto:${encodeURIComponent(email)}?subject=${subject}&body=${body}`);
   toast('Opened your email app with the candidate invite.', 'success');
+});
+
+[candidateNameInput, roleInput].forEach(input => {
+  input?.addEventListener('input', refreshCandidateInvite);
 });
 
 $('addAllowedAppBtn')?.addEventListener('click', () => addPolicyItem(allowedAppsInput, allowedAppDraft, allowedAppsChips, 'text'));

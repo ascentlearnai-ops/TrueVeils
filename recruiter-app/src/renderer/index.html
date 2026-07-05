@@ -172,6 +172,20 @@
           </div>
           <div class="field-hint">Uses your email app to send the TRV code and invite link. It does not send a Supabase sign-in email.</div>
         </div>
+        <div class="field invite-panel">
+          <div class="invite-panel-head">
+            <label>Share interview invite</label>
+            <span id="inviteLinkState">Create a session first</span>
+          </div>
+          <div class="invite-link-box" id="inviteLinkPreview">Your candidate invite link will appear here.</div>
+          <textarea id="candidateInviteMessage" rows="5" readonly spellcheck="false">Create a session to generate the candidate invite message.</textarea>
+          <div class="invite-action-grid">
+            <button class="btn sm" id="copyInviteMessageBtn" type="button">Copy message</button>
+            <button class="btn sm" id="openCandidateLinkBtn" type="button">Open link</button>
+            <button class="btn sm" id="refreshInviteMessageBtn" type="button">Refresh</button>
+          </div>
+          <div class="field-hint">Send this message through Gmail, Outlook, SMS, Slack, or your calendar invite. The link opens the client site with the TRV code prefilled.</div>
+        </div>
         <div class="field">
           <label>Transcript relay</label>
           <div class="relay-note">

@@ -45,6 +45,19 @@ test('admin app separates email sign-in codes from candidate TRV codes', () => {
   assert.doesNotMatch(main, /if \(authData\.session\?\.user\) \{\s*const result = await client\.functions\.invoke\('create-session'/);
 });
 
+test('admin app creates a shareable candidate invite link and message', () => {
+  const html = read('recruiter-app/src/renderer/index.html');
+  const renderer = read('recruiter-app/src/renderer/dashboard.js');
+  assert.match(html, /Share interview invite/);
+  assert.match(html, /candidateInviteMessage/);
+  assert.match(html, /copyInviteMessageBtn/);
+  assert.match(html, /openCandidateLinkBtn/);
+  assert.match(renderer, /buildCandidateInviteMessage/);
+  assert.match(renderer, /\?code=\$\{encodeURIComponent\(code\)\}&open=1/);
+  assert.match(renderer, /Open Truveil Secure here/);
+  assert.match(renderer, /mailto:/);
+});
+
 test('production hardening removes legacy anonymous session and audio access', () => {
   const migration = read('supabase/final-access-hardening.sql');
   assert.match(migration, /drop policy if exists "Truveil recent session-code access"/);
