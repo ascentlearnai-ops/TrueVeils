@@ -21,7 +21,7 @@ test('transcript analysis abstains until enough reliable context exists', () => 
   assert.equal(result.transcriptEligible, false);
 });
 
-test('experimental transcript analysis never raises the formal review band', () => {
+test('style-only transcript analysis never raises the formal review band', () => {
   const longAnswer = Array.from({ length: 260 }, (_, index) => `word${index}`).join(' ');
   const result = evaluateReview({
     transcripts: [
@@ -29,10 +29,48 @@ test('experimental transcript analysis never raises the formal review band', () 
       { text: longAnswer, transcriptConfidence: 0.9 },
       { text: longAnswer, transcriptConfidence: 0.9 }
     ],
-    transcriptAnalyses: [{ score: 99 }, { score: 98 }, { score: 97 }],
+    transcriptAnalyses: [
+      { score: 99, scorable: true, aiSignals: ['Generic polished interview phrasing'] },
+      { score: 98, scorable: true, aiSignals: ['Low natural disfluency'] },
+      { score: 97, scorable: true, aiSignals: ['Unusually uniform spoken rhythm'] }
+    ],
     telemetry: { connected: true, transcription: 'healthy', monitoring: 'healthy' }
   });
   assert.equal(result.reviewBand, 'clear');
+  assert.ok(result.counterEvidence.some(item => /style-only transcript patterns did not change/i.test(item)));
+});
+
+test('direct transcript artifacts raise review priority', () => {
+  const result = evaluateReview({
+    transcripts: [{
+      text: 'Suggested answer: The candidate should say they would use a robust scalable architecture.',
+      transcriptConfidence: 0.92
+    }],
+    transcriptAnalyses: [{
+      score: 84,
+      confidence: 0.74,
+      scorable: true,
+      aiSignals: ['Prompt or answer-label residue', 'Generic polished interview phrasing']
+    }],
+    telemetry: { connected: true, transcription: 'healthy', monitoring: 'healthy' }
+  });
+  assert.equal(result.reviewBand, 'high_priority_review');
+  assert.ok(result.evidence.some(item => /direct transcript AI-artifact signal/i.test(item)));
+});
+
+test('possible AI title or process match is review, not automatic high priority', () => {
+  const result = evaluateReview({
+    events: [{
+      eventType: 'foreground_changed',
+      processName: 'chrome.exe',
+      windowTitle: 'ChatGPT - Google Chrome',
+      detectionSource: 'title'
+    }],
+    transcripts: [{ text: 'I would check the logs and explain the database rollback.', transcriptConfidence: 0.9 }],
+    telemetry: { connected: true, transcription: 'healthy', monitoring: 'healthy' }
+  });
+  assert.equal(result.reviewBand, 'review');
+  assert.ok(result.evidence.some(item => /possible AI-tool title or process match/i.test(item)));
 });
 
 test('allowed AI destination does not raise review priority', () => {

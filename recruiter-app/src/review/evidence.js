@@ -1,5 +1,7 @@
-const AI_TARGET = /\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i;
+const AI_TARGET = /\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i;
 const OVERLAY_TARGET = /\b(hidden overlay|overlay detected|exclude.?from.?capture|interviewcoder|interview coder|cluely|lockedin|finalround|parakeet)\b/i;
+const DIRECT_TRANSCRIPT_SIGNAL = /\b(copied assistant or prompt artifact|markdown or code-block artifact|prompt or answer-label residue|direct ai-tool use context)\b/i;
+const CORRELATED_TRANSCRIPT_SIGNAL = /\bresponse followed a restricted ai-tool event\b/i;
 
 const rank = {
   clear: 0,
@@ -39,6 +41,37 @@ function targetLabel(event = {}) {
     || event.processName
     || event.matchedRule
     || 'restricted destination';
+}
+
+function analysisScore(item = {}) {
+  const value = item.aiScore ?? item.score;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function analysisSignals(item = {}) {
+  return [
+    ...(Array.isArray(item.aiSignals) ? item.aiSignals : []),
+    ...(Array.isArray(item.flags) ? item.flags : []),
+    ...(Array.isArray(item.evidence) ? item.evidence.map(entry => entry?.label || entry?.signal) : [])
+  ].filter(Boolean).join(' | ');
+}
+
+function isScorableAnalysis(item = {}) {
+  return item.scorable !== false && analysisScore(item) != null;
+}
+
+function isDirectTranscriptArtifact(item = {}) {
+  const score = analysisScore(item);
+  if (score == null || score < 78 || item.scorable === false) return false;
+  const confidence = Number(item.confidence ?? item.scoreWeight ?? 1);
+  if (Number.isFinite(confidence) && confidence < 0.45) return false;
+  return DIRECT_TRANSCRIPT_SIGNAL.test(analysisSignals(item));
+}
+
+function isCorrelatedTranscriptSignal(item = {}) {
+  const score = analysisScore(item);
+  if (score == null || score < 72 || item.scorable === false) return false;
+  return CORRELATED_TRANSCRIPT_SIGNAL.test(analysisSignals(item));
 }
 
 function correlateEvidence(events = [], transcripts = []) {
@@ -98,9 +131,9 @@ function evaluateReview({
   const evidence = [];
   const counterEvidence = [];
 
-  if (restrictedAiEvents.length || overlayEvents.length) {
+  if (exactAiEvents.length || overlayEvents.length) {
     reviewBand = 'high_priority_review';
-    if (restrictedAiEvents.length) evidence.push(`${restrictedAiEvents.length} restricted AI-tool event${restrictedAiEvents.length === 1 ? '' : 's'}`);
+    if (exactAiEvents.length) evidence.push(`${exactAiEvents.length} restricted AI-tool event${exactAiEvents.length === 1 ? '' : 's'}`);
     if (overlayEvents.length) evidence.push(`${overlayEvents.length} hidden-overlay event${overlayEvents.length === 1 ? '' : 's'}`);
   } else if (possibleAiEvents.length || unusualSwitches.length >= 4) {
     reviewBand = 'review';
@@ -108,14 +141,31 @@ function evaluateReview({
     if (unusualSwitches.length >= 4) evidence.push(`${unusualSwitches.length} unusual foreground changes`);
   }
 
-  const transcriptEligible = words >= 250 && reliableResponses >= 3;
-  const strongTranscriptSignals = transcriptEligible
-    ? transcriptAnalyses.filter(item => Number(item.aiScore ?? item.score) >= 70).length
+  const directTranscriptFindings = transcriptAnalyses.filter(isDirectTranscriptArtifact);
+  const correlatedTranscriptFindings = transcriptAnalyses.filter(isCorrelatedTranscriptSignal);
+  const transcriptEligible = directTranscriptFindings.length > 0 || (words >= 250 && reliableResponses >= 3);
+  const advisoryTranscriptSignals = transcriptEligible
+    ? transcriptAnalyses.filter(item => {
+      const score = analysisScore(item);
+      return isScorableAnalysis(item)
+        && score >= 70
+        && !isDirectTranscriptArtifact(item)
+        && !isCorrelatedTranscriptSignal(item);
+    }).length
     : 0;
-  if (strongTranscriptSignals >= 2) {
-    counterEvidence.push('Experimental transcript-pattern signals were recorded for research only and did not change the review band');
+
+  if (!exactAiEvents.length && !overlayEvents.length && directTranscriptFindings.length) {
+    reviewBand = 'high_priority_review';
+    evidence.push(`${directTranscriptFindings.length} direct transcript AI-artifact signal${directTranscriptFindings.length === 1 ? '' : 's'}`);
+  } else if (reviewBand === 'clear' && correlatedTranscriptFindings.length) {
+    reviewBand = 'review';
+    evidence.push(`${correlatedTranscriptFindings.length} transcript response${correlatedTranscriptFindings.length === 1 ? '' : 's'} followed restricted AI-tool activity`);
   }
-  if (!transcriptEligible) {
+
+  if (advisoryTranscriptSignals >= 2) {
+    counterEvidence.push('Advisory transcript-pattern signals were recorded, but style-only transcript patterns did not change the review band');
+  }
+  if (!transcriptEligible && transcriptAnalyses.length) {
     counterEvidence.push('Transcript-pattern analysis abstained until at least 250 reliable words across three responses');
   }
   if (!exactAiEvents.length && !possibleAiEvents.length && !overlayEvents.length) {

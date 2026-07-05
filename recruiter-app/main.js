@@ -44,17 +44,48 @@ function getResponseAnalyzer() {
   return sessionData.responseAnalyzer;
 }
 
+function recentAiEventContext(timestamp = Date.now()) {
+  const pattern = /\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i;
+  const occurredAt = Number(timestamp) || Date.now();
+  const events = (sessionData?.flags || [])
+    .map(flag => ({
+      ...flag,
+      timestamp: Number(flag.timestamp || flag.occurredAt || flag.createdAt || 0)
+    }))
+    .filter(flag => {
+      if (!flag.timestamp || flag.timestamp > occurredAt) return false;
+      if (occurredAt - flag.timestamp > 120000) return false;
+      if (flag.policyDecision === 'allowed' || flag.reviewStatus === 'allowed') return false;
+      return pattern.test([
+        flag.text,
+        flag.detectedHost,
+        flag.detectedUrl,
+        flag.matchedRule,
+        flag.processName,
+        flag.windowTitle
+      ].filter(Boolean).join(' '));
+    })
+    .sort((a, b) => b.timestamp - a.timestamp);
+  const latest = events[0];
+  return {
+    secondsSinceAiEvent: latest ? Math.max(0, (occurredAt - latest.timestamp) / 1000) : Infinity,
+    behavioralAiEventCount: events.length
+  };
+}
+
 function analyzeResponseWindow(segment = {}) {
   const analyzer = getResponseAnalyzer();
   if (!analyzer) return null;
   const technicalVocabulary = getTechnicalVocabulary();
+  const behavioralContext = recentAiEventContext(segment.timestamp);
   return analyzer.addSegment(
     segment,
     (text, context) => LocalRisk.analyzeTranscript(text, {
       ...context,
-      technicalVocabulary
+      technicalVocabulary,
+      ...behavioralContext
     }),
-    { technicalVocabulary }
+    { technicalVocabulary, ...behavioralContext }
   );
 }
 

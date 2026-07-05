@@ -7,9 +7,12 @@ const MODEL_VERSION = model.version;
 const SIGNALS = {
   assistantStyleDensity: ['Assistant-style spoken framing', 'AI'],
   copiedArtifactDensity: ['Copied assistant or prompt artifact', 'AI'],
+  markdownArtifactDensity: ['Markdown or code-block artifact', 'AI'],
+  promptResidueDensity: ['Prompt or answer-label residue', 'AI'],
   genericDensity: ['Generic polished interview phrasing', 'AI'],
   abstractGenericity: ['Abstract claims without enough concrete grounding', 'AI'],
   structuredDensity: ['Highly packaged response structure', 'AI'],
+  templateClosureDensity: ['Template-like interview conclusion', 'AI'],
   hypotheticalDensity: ['Hypothetical framing without lived detail', 'AI'],
   lowSpecificity: ['Limited concrete project detail', 'AI'],
   lowDisfluency: ['Long response with little natural disfluency', 'AI'],
@@ -21,11 +24,16 @@ const SIGNALS = {
   lengthUniformity: ['Response lengths are unusually uniform', 'AI'],
   directAiMention: ['AI tool mentioned in the response', 'AI'],
   directAiUse: ['Direct AI-tool use context', 'AI'],
+  pasteLikeTempo: ['Unusually fast long-form response cadence', 'AI'],
+  nearZeroLatency: ['Very short delay before complex answer', 'AI'],
+  postAiEventProximity: ['Response followed a restricted AI-tool event', 'AI'],
   naturalDisfluency: ['Natural fillers and pauses', 'HUMAN'],
   selfCorrection: ['Self-corrections and rephrasing', 'HUMAN'],
   concreteDetail: ['Concrete project or first-person detail', 'HUMAN'],
   firstPersonOwnership: ['First-person ownership of work', 'HUMAN'],
   technicalVocabulary: ['Role-specific technical vocabulary', 'HUMAN'],
+  namedTechnology: ['Specific tools or technologies named', 'HUMAN'],
+  timelineDetail: ['Concrete timeline or incident context', 'HUMAN'],
   spokenBurstiness: ['Varied spoken rhythm', 'HUMAN'],
   conversationalFlow: ['Conversational connective language', 'HUMAN'],
   negatedAiMention: ['AI-tool mention was rejected or negated', 'HUMAN']
@@ -39,13 +47,21 @@ function normalizedFeatures(features) {
   const enoughSpeechForDisfluency = features.wordCount >= 45 || features.sentenceCount >= 3;
   const lowLexicalDiversity = clamp((0.52 - features.uniqueRatio) / 0.24);
   const lowLexicalEntropy = clamp((0.76 - features.lexicalEntropy) / 0.28);
-  const groundedDetail = features.specificityDensity + features.ownershipDensity + features.technicalVocabularyDensity;
+  const groundedDetail = features.specificityDensity
+    + features.ownershipDensity
+    + features.technicalVocabularyDensity
+    + features.namedTechnologyDensity
+    + features.timelineDensity;
+  const longEnoughForTempo = features.wordCount >= 35;
   return {
     assistantStyleDensity: clamp(features.assistantStyleDensity * 24),
     copiedArtifactDensity: clamp(features.copiedArtifactDensity * 28),
+    markdownArtifactDensity: clamp(features.markdownArtifactDensity * 24),
+    promptResidueDensity: clamp(features.promptResidueDensity * 20),
     genericDensity: clamp(features.genericDensity * 18),
     abstractGenericity: clamp((features.abstractDensity + features.genericDensity) * 12) * clamp((0.075 - groundedDetail) / 0.075),
     structuredDensity: clamp(features.structuredDensity * 18),
+    templateClosureDensity: clamp(features.templateClosureDensity * 16),
     hypotheticalDensity: clamp(features.hypotheticalDensity * 15),
     lowSpecificity: clamp((0.055 - features.specificityDensity) / 0.055),
     lowDisfluency: enoughSpeechForDisfluency
@@ -59,11 +75,16 @@ function normalizedFeatures(features) {
     lengthUniformity: clamp((features.lengthUniformity - 0.72) / 0.28),
     directAiMention: clamp((features.directAiMentionDensity ?? features.directAiDensity) * 5),
     directAiUse: clamp(features.directAiUseDensity * 18),
+    pasteLikeTempo: longEnoughForTempo && features.wordsPerMinute ? clamp((features.wordsPerMinute - 210) / 170) : 0,
+    nearZeroLatency: longEnoughForTempo && features.responseLatencyMs > 0 ? clamp((18000 - features.responseLatencyMs) / 18000) : 0,
+    postAiEventProximity: clamp(features.postAiEventProximity) * clamp(features.behavioralAiEventCount),
     naturalDisfluency: clamp((features.fillerDensity - 0.012) / 0.05),
     selfCorrection: clamp(features.correctionDensity / 0.045),
     concreteDetail: clamp(features.specificityDensity / 0.12),
     firstPersonOwnership: clamp(features.ownershipDensity / 0.08),
     technicalVocabulary: clamp(features.technicalVocabularyDensity / 0.06),
+    namedTechnology: clamp(features.namedTechnologyDensity / 0.055),
+    timelineDetail: clamp(features.timelineDensity / 0.04),
     spokenBurstiness: features.sentenceCount >= 3 ? clamp((features.sentenceCv - 0.32) / 0.7) : 0,
     conversationalFlow: clamp(features.discourseDensity / 0.16),
     negatedAiMention: clamp(features.negatedAiMentionDensity * 18)
@@ -141,13 +162,26 @@ function analyzeTranscript(text, context = {}) {
   const logit = contributions.reduce((sum, item) => sum + item.contribution, model.intercept);
   const probability = clamp(sigmoid(logit));
   const rawScore = Math.round(probability * 100);
-  const hasHighPrecisionTranscriptEvidence = normalized.copiedArtifactDensity > 0.08 || normalized.directAiUse > 0.16;
-  const hasStrongGrounding = normalized.concreteDetail > 0.45 || normalized.firstPersonOwnership > 0.42 || normalized.technicalVocabulary > 0.35;
+  const directArtifactStrength = Math.max(
+    normalized.copiedArtifactDensity,
+    normalized.markdownArtifactDensity,
+    normalized.promptResidueDensity,
+    normalized.directAiUse
+  );
+  const hasHighPrecisionTranscriptEvidence = directArtifactStrength > 0.12;
+  const hasBehavioralCorrelation = normalized.postAiEventProximity > 0.3;
+  const hasStrongGrounding = normalized.concreteDetail > 0.45
+    || normalized.firstPersonOwnership > 0.42
+    || normalized.technicalVocabulary > 0.35
+    || (normalized.namedTechnology > 0.35 && normalized.timelineDetail > 0.2);
   let score = rawScore;
-  if (!hasHighPrecisionTranscriptEvidence) {
+  if (!hasHighPrecisionTranscriptEvidence && !hasBehavioralCorrelation) {
     score = Math.min(score, 68);
   }
-  if (hasStrongGrounding && !hasHighPrecisionTranscriptEvidence) {
+  if (hasBehavioralCorrelation && rawScore >= 72 && !hasHighPrecisionTranscriptEvidence) {
+    score = Math.min(Math.max(score, 72), 84);
+  }
+  if (hasStrongGrounding && !hasHighPrecisionTranscriptEvidence && !hasBehavioralCorrelation) {
     score = Math.min(score, 58);
   }
   const cappedProbability = score / 100;

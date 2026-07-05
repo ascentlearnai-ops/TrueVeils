@@ -235,7 +235,7 @@ function behaviorBoostFromFlags(flags = []) {
     const text = flagEvidenceText(flag);
     const severity = String(flag.severity || '').toLowerCase();
     if (severity === 'critical') criticalHits++;
-    if (/\b(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|poe\.com|you\.com|phind\.com|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) aiToolHits++;
+    if (/\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) aiToolHits++;
     if (/\b(hidden overlay|overlay detected|exclude.?from.?capture|interview coder|interviewcoder|cluely|lockedin|finalround|parakeet)\b/.test(text)) overlayHits++;
     if (/\bswitched away\b/.test(text)) focusSwitches++;
     if (/\bunlisted app\/site\b/.test(text)) unlistedAppHits++;
@@ -271,7 +271,7 @@ function currentOverallRisk() {
 function currentReviewBand() {
   const restrictedAi = flagEvidence.filter(flag => {
     const text = flagEvidenceText(flag);
-    return /(chatgpt\.com|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com|perplexity\.ai|interviewcoder|cluely|lockedin|finalround)/i.test(text)
+    return /(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|interviewcoder|cluely|lockedin|finalround)/i.test(text)
       && flag.reviewStatus !== 'allowed'
       && flag.policyDecision !== 'allowed';
   });
