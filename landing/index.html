@@ -22,6 +22,7 @@
   <main>
     <section class="hero" id="top">
       <div class="hero-glow"></div>
+      <div class="hero-beam" aria-hidden="true"><span></span><span></span></div>
       <div class="hero-copy reveal">
         <span class="eyebrow">Interview verification for careful teams</span>
         <h1>See the interview as it happens.</h1>
@@ -87,6 +88,27 @@
         <img src="img/admin-app-real.png" alt="Real Truveil Command Center sign-in workspace">
         <figcaption>Captured from the Windows Electron app</figcaption>
       </figure>
+      <div class="motion-wall reveal" aria-label="Animated Truveil product workflow preview">
+        <div class="motion-track">
+          <figure class="motion-frame frame-wide">
+            <img src="img/admin-app-real.png" alt="Truveil Command Center session setup screen">
+            <figcaption>Session setup</figcaption>
+          </figure>
+          <figure class="motion-frame">
+            <img src="img/candidate-app-real.png" alt="Truveil Secure candidate check-in screen">
+            <figcaption>Candidate check-in</figcaption>
+          </figure>
+          <div class="motion-frame signal-frame" aria-hidden="true">
+            <div class="signal-header"><span></span>Live evidence</div>
+            <div class="signal-bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="signal-timeline">
+              <span>11:42 Candidate joined</span>
+              <span>11:43 Transcript final</span>
+              <span>11:44 Restricted target closed</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="signal-showcase reveal">
         <div class="signal-column">
           <div class="showcase-label">Foreground monitoring</div>
@@ -97,7 +119,7 @@
         </div>
         <div class="analysis-column">
           <div class="showcase-label">Reviewable transcript evidence</div>
-          <blockquote>“I first rolled back the release, then realized the queue consumers were still holding the old schema. We drained those, replayed the failed jobs, and added a compatibility check afterward.”</blockquote>
+          <blockquote>"I first rolled back the release, then realized the queue consumers were still holding the old schema. We drained those, replayed the failed jobs, and added a compatibility check afterward."</blockquote>
           <div class="analysis-summary">
             <span>Latest response</span>
             <strong>Transcript context available</strong>
