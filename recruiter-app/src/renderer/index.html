@@ -118,13 +118,13 @@
           <span class="pulse-core"></span>
         </div>
         <div class="trust-badge"><span class="dot"></span>SESSION READY</div>
-        <h2>Configure this session</h2>
-        <p class="idle-sub">Share the code, choose restricted sites, then wait for the candidate to connect.</p>
+        <h2>Create interview</h2>
+        <p class="idle-sub">Set the candidate, share the TRV code, then start only after preflight is complete.</p>
 
         <div class="session-code-card">
-          <label>SESSION ID</label>
+          <label>Candidate code</label>
           <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
-          <p>This is the candidate code. Tell them this TRV code, or copy the invite link below.</p>
+          <p>This is the candidate code. The candidate enters it in Truveil Secure; the invite link pre-fills it.</p>
           <div class="session-service-notice" id="sessionServiceNotice" hidden></div>
           <div class="code-actions">
             <button class="btn sm" id="copySessionCodeBtn">Copy code</button>
@@ -133,14 +133,67 @@
         </div>
 
         <div class="setup-flow">
-          <div><span>01</span><strong>Share code</strong><small>Send the TRV code to the candidate.</small></div>
-          <div><span>02</span><strong>Set policy</strong><small>Choose restricted AI tools and allowed meeting destinations.</small></div>
-          <div><span>03</span><strong>Confirm notice</strong><small>Start only after candidate consent and recruiter review.</small></div>
+          <div><span>01</span><strong>Add details</strong><small>Name, role, and role vocabulary.</small></div>
+          <div><span>02</span><strong>Share invite</strong><small>Copy code, link, or email draft.</small></div>
+          <div><span>03</span><strong>Review policy</strong><small>Allowed meeting sites and restricted AI tools.</small></div>
         </div>
       </aside>
 
       <section class="setup-main form">
-        <div class="policy-toolbar">
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <span>01</span>
+            <div>
+              <h3>Candidate invite</h3>
+              <p>Send one clear code/link before the call. The candidate must complete consent and microphone preflight before you can start.</p>
+            </div>
+          </div>
+          <div class="field two-up">
+            <div>
+              <label>Candidate name</label>
+              <input type="text" id="candidateNameInput" placeholder="e.g. Alex Chen" autocomplete="off">
+            </div>
+            <div>
+              <label>Role / Position</label>
+              <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label>Candidate email <span class="field-opt">optional</span></label>
+            <div class="invite-row">
+              <input type="email" id="candidateEmailInput" placeholder="candidate@email.com" autocomplete="off">
+              <button class="btn" id="emailCandidateLinkBtn" type="button">Email invite</button>
+            </div>
+            <div class="field-hint">Uses your email app to send the TRV code and invite link. It does not send a Supabase sign-in email.</div>
+          </div>
+          <div class="field invite-panel">
+            <div class="invite-panel-head">
+              <label>Share interview invite</label>
+              <span id="inviteLinkState">Create a session first</span>
+            </div>
+            <div class="invite-link-box" id="inviteLinkPreview">Your candidate invite link will appear here.</div>
+            <div class="invite-action-grid">
+              <button class="btn sm" id="copyInviteMessageBtn" type="button">Copy message</button>
+              <button class="btn sm" id="openCandidateLinkBtn" type="button">Open link</button>
+              <button class="btn sm" id="refreshInviteMessageBtn" type="button">Refresh</button>
+            </div>
+            <details class="message-preview">
+              <summary>Preview full candidate message</summary>
+              <textarea id="candidateInviteMessage" rows="4" readonly spellcheck="false">Create a session to generate the candidate invite message.</textarea>
+            </details>
+            <div class="field-hint">Send this through Gmail, Outlook, SMS, Slack, or your calendar invite.</div>
+          </div>
+        </div>
+
+        <div class="setup-section">
+          <div class="setup-section-head">
+            <span>02</span>
+            <div>
+              <h3>Interview policy</h3>
+              <p>Choose what is allowed during the call. Known AI tools are closed/refocused when detected; normal switches are logged for review.</p>
+            </div>
+          </div>
+          <div class="policy-toolbar">
           <div class="field">
             <label>Policy preset</label>
             <select id="policyPresetSelect">
@@ -155,120 +208,97 @@
             <input type="text" id="technicalVocabularyInput" placeholder="e.g. Kubernetes, PostgreSQL, TypeScript">
             <div class="field-hint">Improves live transcription for role-specific terms.</div>
           </div>
-        </div>
-        <div class="field">
-          <label>Candidate name</label>
-          <input type="text" id="candidateNameInput" placeholder="e.g. Alex Chen" autocomplete="off">
-        </div>
-        <div class="field">
-          <label>Role / Position</label>
-          <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
-        </div>
-        <div class="field">
-          <label>Candidate email <span class="field-opt">optional</span></label>
-          <div class="invite-row">
-            <input type="email" id="candidateEmailInput" placeholder="candidate@email.com" autocomplete="off">
-            <button class="btn" id="emailCandidateLinkBtn" type="button">Email invite</button>
           </div>
-          <div class="field-hint">Uses your email app to send the TRV code and invite link. It does not send a Supabase sign-in email.</div>
-        </div>
-        <div class="field invite-panel">
-          <div class="invite-panel-head">
-            <label>Share interview invite</label>
-            <span id="inviteLinkState">Create a session first</span>
-          </div>
-          <div class="invite-link-box" id="inviteLinkPreview">Your candidate invite link will appear here.</div>
-          <textarea id="candidateInviteMessage" rows="5" readonly spellcheck="false">Create a session to generate the candidate invite message.</textarea>
-          <div class="invite-action-grid">
-            <button class="btn sm" id="copyInviteMessageBtn" type="button">Copy message</button>
-            <button class="btn sm" id="openCandidateLinkBtn" type="button">Open link</button>
-            <button class="btn sm" id="refreshInviteMessageBtn" type="button">Refresh</button>
-          </div>
-          <div class="field-hint">Send this message through Gmail, Outlook, SMS, Slack, or your calendar invite. The link opens the client site with the TRV code prefilled.</div>
-        </div>
-        <div class="field">
-          <label>Transcript relay</label>
-          <div class="relay-note">
-            <span class="relay-dot"></span>
-            Candidate speech appears here as live transcript text. Fallback audio is temporary and deleted after transcription.
-          </div>
-        </div>
-        <div class="policy-grid">
           <div class="field">
-            <label>Allowed apps</label>
-            <div class="policy-list-builder">
-              <div class="policy-chip-list" id="allowedAppsChips"></div>
-              <div class="policy-add-row">
-                <input type="text" id="allowedAppDraft" placeholder="Add app name, e.g. Chrome">
-                <button class="btn sm" id="addAllowedAppBtn" type="button">Add</button>
-              </div>
+            <label>Transcript relay</label>
+            <div class="relay-note">
+              <span class="relay-dot"></span>
+              Candidate speech appears in the live dashboard. Fallback audio is temporary and deleted after transcription.
             </div>
-            <textarea id="allowedAppsInput" class="policy-source" rows="4" spellcheck="false">TruveilSecure
+          </div>
+          <div class="policy-grid">
+            <div class="field">
+              <label>Allowed apps</label>
+              <div class="policy-list-builder">
+                <div class="policy-chip-list" id="allowedAppsChips"></div>
+                <div class="policy-add-row">
+                  <input type="text" id="allowedAppDraft" placeholder="Add app name, e.g. Chrome">
+                  <button class="btn sm" id="addAllowedAppBtn" type="button">Add</button>
+                </div>
+              </div>
+              <textarea id="allowedAppsInput" class="policy-source" rows="4" spellcheck="false">TruveilSecure
 Zoom
 Microsoft Teams
 Google Chrome
 Microsoft Edge</textarea>
-            <div class="field-hint">Allowed apps can stay open. Known AI tools still close/refocus when detected.</div>
-          </div>
-          <div class="field">
-            <label>Allowed sites</label>
-            <div class="policy-list-builder">
-              <div class="policy-chip-list" id="allowedSitesChips"></div>
-              <div class="policy-add-row">
-                <input type="text" id="allowedSiteDraft" placeholder="Add domain, e.g. docs.google.com">
-                <button class="btn sm" id="addAllowedSiteBtn" type="button">Add</button>
-              </div>
+              <div class="field-hint">Allowed apps can stay open. Known AI tools still close/refocus when detected.</div>
             </div>
-            <textarea id="allowedSitesInput" class="policy-source" rows="4" spellcheck="false">meet.google.com
+            <div class="field">
+              <label>Allowed sites</label>
+              <div class="policy-list-builder">
+                <div class="policy-chip-list" id="allowedSitesChips"></div>
+                <div class="policy-add-row">
+                  <input type="text" id="allowedSiteDraft" placeholder="Add domain, e.g. docs.google.com">
+                  <button class="btn sm" id="addAllowedSiteBtn" type="button">Add</button>
+                </div>
+              </div>
+              <textarea id="allowedSitesInput" class="policy-source" rows="4" spellcheck="false">meet.google.com
 zoom.us
 teams.microsoft.com</textarea>
-            <div class="field-hint">Allowed domains are observed but not closed as restricted destinations.</div>
-          </div>
-        </div>
-        <div class="field">
-          <label>Blocked websites</label>
-          <div class="blocked-site-grid" id="blockedSiteGrid">
-            <label class="check-tile"><input type="checkbox" data-blocked-site="chatgpt.com" checked><span>ChatGPT</span><small>chatgpt.com</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="claude.ai" checked><span>Claude</span><small>claude.ai</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="gemini.google.com" checked><span>Gemini</span><small>gemini.google.com</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="copilot.microsoft.com" checked><span>Copilot</span><small>copilot.microsoft.com</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="perplexity.ai" checked><span>Perplexity</span><small>perplexity.ai</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="poe.com"><span>Poe</span><small>poe.com</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="you.com"><span>You.com</span><small>you.com</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="phind.com"><span>Phind</span><small>phind.com</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="interviewcoder" checked><span>Interview Coder</span><small>app / title</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="cluely" checked><span>Cluely</span><small>app / title</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="finalround" checked><span>Final Round</span><small>app / title</small></label>
-            <label class="check-tile"><input type="checkbox" data-blocked-site="lockedin" checked><span>LockedIn</span><small>app / title</small></label>
-          </div>
-          <div class="policy-list-builder compact">
-            <div class="policy-chip-list" id="customBlockedSitesChips"></div>
-            <div class="policy-add-row">
-              <input type="text" id="customBlockedSiteDraft" placeholder="Add extra AI domain or app title">
-              <button class="btn sm" id="addCustomBlockedSiteBtn" type="button">Add</button>
+              <div class="field-hint">Allowed domains are observed but not closed as restricted destinations.</div>
             </div>
           </div>
-          <textarea id="customBlockedSitesInput" class="policy-source" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
-          <div class="field-hint">Known restricted AI sites close the active browser tab when possible, then Truveil refocuses and logs evidence. Other app/site switches are observed.</div>
-        </div>
-        <div class="field compliance-panel">
-          <label>Recruiter confirmation</label>
-          <div class="compliance-copy">
-            Confirm these before starting. Truveil reports are advisory evidence for human review and should not be used as the sole hiring decision.
+          <div class="field">
+            <label>Restricted AI tools</label>
+            <div class="blocked-site-grid" id="blockedSiteGrid">
+              <label class="check-tile"><input type="checkbox" data-blocked-site="chatgpt.com" checked><span>ChatGPT</span><small>chatgpt.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="claude.ai" checked><span>Claude</span><small>claude.ai</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="gemini.google.com" checked><span>Gemini</span><small>gemini.google.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="copilot.microsoft.com" checked><span>Copilot</span><small>copilot.microsoft.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="perplexity.ai" checked><span>Perplexity</span><small>perplexity.ai</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="poe.com"><span>Poe</span><small>poe.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="you.com"><span>You.com</span><small>you.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="phind.com"><span>Phind</span><small>phind.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="interviewcoder" checked><span>Interview Coder</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="cluely" checked><span>Cluely</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="finalround" checked><span>Final Round</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="lockedin" checked><span>LockedIn</span><small>app / title</small></label>
+            </div>
+            <div class="policy-list-builder compact">
+              <div class="policy-chip-list" id="customBlockedSitesChips"></div>
+              <div class="policy-add-row">
+                <input type="text" id="customBlockedSiteDraft" placeholder="Add extra AI domain or app title">
+                <button class="btn sm" id="addCustomBlockedSiteBtn" type="button">Add</button>
+              </div>
+            </div>
+            <textarea id="customBlockedSitesInput" class="policy-source" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
+            <div class="field-hint">Known restricted AI sites close the active browser tab when possible, then Truveil refocuses and logs evidence.</div>
           </div>
-          <label class="compliance-check">
-            <input type="checkbox" id="noticeConfirmedInput">
-            <span>The candidate received notice of microphone transcription, foreground app/window monitoring, restricted-target controls, and 30-day report retention.</span>
-          </label>
-          <label class="compliance-check">
-            <input type="checkbox" id="policyConfirmedInput">
-            <span>The allowed and restricted destinations above match this interview policy.</span>
-          </label>
-          <label class="compliance-check">
-            <input type="checkbox" id="humanReviewConfirmedInput">
-            <span>I will treat Clear, Review, High-priority review, and Incomplete evidence as reviewer-owned signals, not automated employment decisions.</span>
-          </label>
-          <div class="field-hint">Review <a href="https://trueveil.vercel.app/privacy.html" target="_blank" rel="noreferrer">Privacy</a>, <a href="https://trueveil.vercel.app/terms.html" target="_blank" rel="noreferrer">Terms</a>, and <a href="https://trueveil.vercel.app/legal.html" target="_blank" rel="noreferrer">Trust & Legal</a> before live customer use.</div>
+        </div>
+
+        <div class="setup-section setup-section-review">
+          <div class="setup-section-head">
+            <span>03</span>
+            <div>
+              <h3>Recruiter confirmation</h3>
+              <p>Confirm notice and policy before starting. Truveil reports are reviewer-owned evidence and must not be used as the sole hiring decision.</p>
+            </div>
+          </div>
+          <div class="field compliance-panel">
+            <label class="compliance-check">
+              <input type="checkbox" id="noticeConfirmedInput">
+              <span>Candidate notice covers microphone transcription, foreground app/window monitoring, restricted-target controls, and 30-day report retention.</span>
+            </label>
+            <label class="compliance-check">
+              <input type="checkbox" id="policyConfirmedInput">
+              <span>The allowed and restricted destinations match this interview policy.</span>
+            </label>
+            <label class="compliance-check">
+              <input type="checkbox" id="humanReviewConfirmedInput">
+              <span>I will treat Clear, Review, High-priority review, and Incomplete evidence as review signals, not automatic decisions.</span>
+            </label>
+            <div class="field-hint">Review <a href="https://trueveil.vercel.app/privacy.html" target="_blank" rel="noreferrer">Privacy</a>, <a href="https://trueveil.vercel.app/terms.html" target="_blank" rel="noreferrer">Terms</a>, and <a href="https://trueveil.vercel.app/legal.html" target="_blank" rel="noreferrer">Trust & Legal</a> before live customer use.</div>
+          </div>
         </div>
       </section>
 
