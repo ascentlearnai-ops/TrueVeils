@@ -12,10 +12,10 @@ test('admin website uses a site-local installer and honest advisory language', (
   assert.doesNotMatch(html, /github\.com\/.*releases/i);
   assert.match(html, /Advisory evidence/i);
   assert.doesNotMatch(html, /img\/candidate\.png/i);
-  assert.match(html, /img\/admin-app-real\.png/i);
-  assert.match(html, /img\/candidate-app-real\.png/i);
-  assert.equal(fs.existsSync(path.join(repo, 'landing/img/admin-app-real.png')), true);
-  assert.equal(fs.existsSync(path.join(repo, 'landing/img/candidate-app-real.png')), true);
+  assert.match(html, /workflow-cinema/i);
+  assert.match(html, /cinema-panel/i);
+  assert.doesNotMatch(html, /admin-app-real\.png|candidate-app-real\.png/i);
+  assert.doesNotMatch(html, /truveil-horizontal-transparent\.png/i);
 });
 
 test('packaged recruiter runtime config never contains provider secrets', () => {

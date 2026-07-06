@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="site-nav">
-    <a class="brand" href="#top" aria-label="Truveil home"><img src="img/brand/truveil-horizontal-transparent.png" alt="Truveil"></a>
+    <a class="brand" href="#top" aria-label="Truveil home"><span class="brand-glyph">T</span><span>Truveil</span></a>
     <nav aria-label="Primary navigation">
       <a href="#product">Product</a>
       <a href="#how">How it works</a>
@@ -39,7 +39,7 @@
       </div>
       <div class="hero-console reveal" data-parallax="0.04" aria-label="Live Truveil Command Center preview">
         <div class="console-bar">
-          <div class="console-brand"><img src="img/brand/truveil-horizontal-transparent.png" alt=""><strong>Command Center</strong></div>
+          <div class="console-brand"><span class="brand-glyph mini">T</span><strong>Command Center</strong></div>
           <span class="console-session">TRV-482910</span>
           <span class="console-live"><i></i>Live</span>
         </div>
@@ -84,30 +84,30 @@
         <h2>Signal arrives live. Context stays attached.</h2>
         <p>Transcript evidence and monitored behavior remain separate, so interviewers can understand what happened without treating a score as truth.</p>
       </div>
-      <figure class="real-app-shot reveal">
-        <img src="img/admin-app-real.png" alt="Real Truveil Command Center sign-in workspace">
-        <figcaption>Captured from the Windows Electron app</figcaption>
-      </figure>
-      <div class="motion-wall reveal" aria-label="Animated Truveil product workflow preview">
-        <div class="motion-track">
-          <figure class="motion-frame frame-wide">
-            <img src="img/admin-app-real.png" alt="Truveil Command Center session setup screen">
-            <figcaption>Session setup</figcaption>
-          </figure>
-          <figure class="motion-frame">
-            <img src="img/candidate-app-real.png" alt="Truveil Secure candidate check-in screen">
-            <figcaption>Candidate check-in</figcaption>
-          </figure>
-          <div class="motion-frame signal-frame" aria-hidden="true">
-            <div class="signal-header"><span></span>Live evidence</div>
-            <div class="signal-bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            <div class="signal-timeline">
-              <span>11:42 Candidate joined</span>
-              <span>11:43 Transcript final</span>
-              <span>11:44 Restricted target closed</span>
-            </div>
+      <div class="workflow-cinema reveal" aria-label="Designed Truveil product workflow preview">
+        <section class="cinema-panel invite-demo">
+          <div class="cinema-label">Create session</div>
+          <div class="code-slab"><span>Candidate code</span><strong>TRV-482910</strong></div>
+          <div class="invite-demo-grid">
+            <span>Policy preset</span><strong>Standard technical</strong>
+            <span>Candidate status</span><strong class="ready-text">Preflight ready</strong>
+            <span>Transcription</span><strong>Deepgram live</strong>
           </div>
-        </div>
+          <button type="button">Copy invite message</button>
+        </section>
+        <section class="cinema-panel transcript-demo">
+          <div class="cinema-label">Live transcript</div>
+          <div class="speaker-line interviewer"><span>Interviewer</span><p>Walk me through a production incident you owned.</p></div>
+          <div class="speaker-line candidate"><span>Candidate</span><p>I rolled back the deploy first, then checked the queue consumers because the schema mismatch was still replaying failed jobs.</p></div>
+          <div class="wave-strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </section>
+        <section class="cinema-panel evidence-demo">
+          <div class="cinema-label">Evidence timeline</div>
+          <div class="evidence-line ok"><span>11:42</span><strong>Candidate joined</strong></div>
+          <div class="evidence-line high"><span>11:44</span><strong>chatgpt.com closed</strong></div>
+          <div class="evidence-line"><span>11:45</span><strong>Returned to interview</strong></div>
+          <div class="report-chip">Report band: Review</div>
+        </section>
       </div>
       <div class="signal-showcase reveal">
         <div class="signal-column">
@@ -144,8 +144,11 @@
     </section>
 
     <section class="privacy-band" id="privacy">
-      <div class="privacy-visual reveal">
-        <img src="img/candidate-app-real.png" alt="Real Truveil Secure candidate check-in workspace">
+      <div class="privacy-visual privacy-stack reveal">
+        <div class="privacy-row"><span>No camera</span><strong>Off by design</strong></div>
+        <div class="privacy-row"><span>No screen recording</span><strong>Events only</strong></div>
+        <div class="privacy-row"><span>No raw audio report</span><strong>Transcript retained</strong></div>
+        <div class="privacy-row"><span>Candidate consent</span><strong>Required first</strong></div>
       </div>
       <div class="privacy-copy reveal">
         <span class="eyebrow">Candidate-respectful by design</span>
@@ -168,7 +171,7 @@
   </main>
 
   <footer>
-    <a class="brand" href="#top"><img src="img/brand/truveil-horizontal-transparent.png" alt="Truveil"></a>
+    <a class="brand" href="#top"><span class="brand-glyph">T</span><span>Truveil</span></a>
     <p>Advisory interview verification. Human review required.</p>
     <a href="/downloads/TruveilRecruiter-Setup-1.0.0.exe.sha256" download>SHA-256 checksum</a>
     <a href="/privacy.html">Privacy</a>
