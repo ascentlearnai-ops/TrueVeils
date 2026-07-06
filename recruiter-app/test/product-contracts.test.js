@@ -58,6 +58,32 @@ test('admin app creates a shareable candidate invite link and message', () => {
   assert.match(renderer, /mailto:/);
 });
 
+test('admin app requires recruiter notice and human-review confirmation', () => {
+  const html = read('recruiter-app/src/renderer/index.html');
+  const renderer = read('recruiter-app/src/renderer/dashboard.js');
+  assert.match(html, /Recruiter confirmation/);
+  assert.match(html, /noticeConfirmedInput/);
+  assert.match(html, /policyConfirmedInput/);
+  assert.match(html, /humanReviewConfirmedInput/);
+  assert.match(html, /not be used as the sole hiring decision/i);
+  assert.match(renderer, /recruiterConfirmationReady/);
+  assert.match(renderer, /Confirm candidate notice, session policy, and human-review use/);
+});
+
+test('admin legal pages disclose advisory use and collection boundaries', () => {
+  const privacy = read('landing/privacy.html');
+  const terms = read('landing/terms.html');
+  const legal = read('landing/legal.html');
+  assert.match(privacy, /No camera video/i);
+  assert.match(privacy, /No screen recording/i);
+  assert.match(privacy, /No clipboard collection/i);
+  assert.match(terms, /sole basis for an employment decision/i);
+  assert.match(terms, /best-effort Windows desktop controls/i);
+  assert.match(legal, /Clear/);
+  assert.match(legal, /High-priority review/);
+  assert.match(legal, /not legal advice/i);
+});
+
 test('production hardening removes legacy anonymous session and audio access', () => {
   const migration = read('supabase/final-access-hardening.sql');
   assert.match(migration, /drop policy if exists "Truveil recent session-code access"/);

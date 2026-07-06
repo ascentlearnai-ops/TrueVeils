@@ -227,7 +227,8 @@ footer { min-height:90px; display:flex; align-items:center; justify-content:spac
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }.reveal { opacity:1; transform:none; transition:none; }.typing-caret,.console-live i,.console-footer i { animation:none; }
 }
-.legal-page{width:min(760px,calc(100% - 40px));margin:0 auto;padding:96px 0}.legal-page h1{font-size:clamp(42px,7vw,72px);margin-bottom:28px}.legal-page h2{margin-top:36px;margin-bottom:12px}.legal-page p{color:var(--muted);line-height:1.75;margin-bottom:18px}.legal-page a{color:var(--ink)}
+.legal-page{width:min(860px,calc(100% - 40px));margin:0 auto;padding:96px 0}.legal-page h1{font-size:clamp(42px,7vw,72px);margin-bottom:28px}.legal-page h2{margin-top:36px;margin-bottom:12px}.legal-page p{color:var(--muted);line-height:1.75;margin-bottom:18px}.legal-page a{color:var(--ink)}
+.legal-page ul{display:grid;gap:10px;margin:0 0 24px;padding:0;list-style:none}.legal-page li{padding:13px 14px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.025);color:var(--muted);line-height:1.55}.legal-page li strong{color:var(--ink)}.legal-kicker{margin:0 0 12px!important;color:#d0d6e0!important;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px!important;letter-spacing:.16em;text-transform:uppercase}.legal-back{display:inline-flex;margin-bottom:34px;color:#8a8f98!important;text-decoration:none}.legal-back:hover{color:var(--ink)!important}.legal-note{padding:14px 16px;border:1px solid rgba(255,255,255,.13);border-radius:8px;background:rgba(255,255,255,.03);color:#d0d6e0!important}
 
 /* Premium monochrome pass: Linear/xAI-inspired command deck */
 :root {

@@ -50,7 +50,7 @@
       <section class="auth-copy">
         <span class="eyebrow">Recruiter workspace</span>
         <h1>Evidence you can review. Decisions you still own.</h1>
-        <p>Run consent-based interview verification with live transcripts, monitored session events, and advisory risk evidence.</p>
+        <p>Run consent-based interview verification with live transcripts, monitored session events, and advisory review evidence.</p>
         <div class="auth-proof">
           <span>Windows paid beta</span>
           <span>30-day report retention</span>
@@ -89,7 +89,7 @@
       </div>
       <div class="trust-badge"><span class="dot"></span>READY</div>
       <h1>Run verified interviews<br><span class="gradient-text">in real time.</span></h1>
-      <p class="idle-sub">Create a session code, watch live transcript text, and review concise flags when restricted tools or unusual answer patterns appear.</p>
+      <p class="idle-sub">Create a session code, watch live transcript text, and review concise events when restricted tools or unusual answer patterns appear.</p>
       <button class="btn btn-primary lg" id="newSessionBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
         New Interview Session
@@ -97,7 +97,7 @@
       <div class="idle-features">
         <div class="if"><span class="if-dot"></span> Live Transcription</div>
         <div class="if"><span class="if-dot"></span> Response Review</div>
-        <div class="if"><span class="if-dot"></span> Forensic Flag Feed</div>
+        <div class="if"><span class="if-dot"></span> Session Event Feed</div>
         <div class="if"><span class="if-dot"></span> Instant HTML Report</div>
       </div>
       <div class="ops-strip">
@@ -134,8 +134,8 @@
 
         <div class="setup-flow">
           <div><span>01</span><strong>Share code</strong><small>Send the TRV code to the candidate.</small></div>
-          <div><span>02</span><strong>Set policy</strong><small>Check which AI sites should trigger warn + refocus.</small></div>
-          <div><span>03</span><strong>Arm session</strong><small>Wait here while transcript and risk signals arrive.</small></div>
+          <div><span>02</span><strong>Set policy</strong><small>Choose restricted AI tools and allowed meeting destinations.</small></div>
+          <div><span>03</span><strong>Confirm notice</strong><small>Start only after candidate consent and recruiter review.</small></div>
         </div>
       </aside>
 
@@ -251,13 +251,32 @@ teams.microsoft.com</textarea>
           <textarea id="customBlockedSitesInput" class="policy-source" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
           <div class="field-hint">Known restricted AI sites close the active browser tab when possible, then Truveil refocuses and logs evidence. Other app/site switches are observed.</div>
         </div>
+        <div class="field compliance-panel">
+          <label>Recruiter confirmation</label>
+          <div class="compliance-copy">
+            Confirm these before starting. Truveil reports are advisory evidence for human review and should not be used as the sole hiring decision.
+          </div>
+          <label class="compliance-check">
+            <input type="checkbox" id="noticeConfirmedInput">
+            <span>The candidate received notice of microphone transcription, foreground app/window monitoring, restricted-target controls, and 30-day report retention.</span>
+          </label>
+          <label class="compliance-check">
+            <input type="checkbox" id="policyConfirmedInput">
+            <span>The allowed and restricted destinations above match this interview policy.</span>
+          </label>
+          <label class="compliance-check">
+            <input type="checkbox" id="humanReviewConfirmedInput">
+            <span>I will treat Clear, Review, High-priority review, and Incomplete evidence as reviewer-owned signals, not automated employment decisions.</span>
+          </label>
+          <div class="field-hint">Review <a href="https://trueveil.vercel.app/privacy.html" target="_blank" rel="noreferrer">Privacy</a>, <a href="https://trueveil.vercel.app/terms.html" target="_blank" rel="noreferrer">Terms</a>, and <a href="https://trueveil.vercel.app/legal.html" target="_blank" rel="noreferrer">Trust & Legal</a> before live customer use.</div>
+        </div>
       </section>
 
       <div class="setup-actions">
         <div class="setup-status-strip" aria-live="polite">
           <span><i></i> Session service connected</span>
           <span id="candidateReadyState"><i></i> Candidate preflight pending</span>
-          <span><i></i> No raw audio retained</span>
+          <span><i></i> Human-review report</span>
         </div>
         <button class="btn btn-ghost" id="cancelSetupBtn">Cancel</button>
         <button class="btn btn-primary" id="startMonitoringBtn">
@@ -338,7 +357,7 @@ teams.microsoft.com</textarea>
             <div class="transcript-list" id="transcriptList">
               <div class="empty-state">
                 <span class="empty-cursor"></span>
-                Listening for voice signature…
+                Waiting for the first reliable transcript segment
               </div>
             </div>
           </div>
@@ -371,12 +390,12 @@ teams.microsoft.com</textarea>
             <div class="panel-header">
               <div class="panel-label">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
-                ANOMALIES
+                SESSION EVENTS
               </div>
               <span class="panel-count danger" id="flagCount">0</span>
             </div>
             <div class="flags-list" id="flagsList">
-              <div class="empty-state">No active anomalies</div>
+              <div class="empty-state">No session events yet</div>
             </div>
           </div>
           <div class="review-tools">

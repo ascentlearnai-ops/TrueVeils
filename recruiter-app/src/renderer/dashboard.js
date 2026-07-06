@@ -90,6 +90,11 @@ const technicalVocabularyInput = $('technicalVocabularyInput');
 const policyPresetSelect = $('policyPresetSelect');
 const startMonitoringBtn = $('startMonitoringBtn');
 const notesList = $('notesList');
+const recruiterConfirmationInputs = [
+  $('noticeConfirmedInput'),
+  $('policyConfirmedInput'),
+  $('humanReviewConfirmedInput')
+].filter(Boolean);
 
 // ─── Utility ───────────────────────────────────────────────────────────
 function toast(msg, variant = 'info') {
@@ -136,11 +141,21 @@ function buildCandidateInviteMessage() {
       '',
       `Open Truveil Secure here: ${link}`,
       '',
-      'Before the call, enter the code, confirm the session notice, allow microphone access, and keep Truveil Secure open while the interview runs.',
+      'Before the call, enter the code, review the session notice, allow microphone access, and keep Truveil Secure open while the interview runs.',
+      '',
+      'Truveil Secure may share live transcript text, foreground app/window details, browser host/URL when Windows exposes it, and restricted-target events with the interviewer. It does not use camera, screen recording, file access, clipboard access, or stored raw audio.',
       '',
       'Thanks.'
     ].join('\n')
   };
+}
+
+function recruiterConfirmationReady() {
+  return recruiterConfirmationInputs.length === 0 || recruiterConfirmationInputs.every(input => input.checked);
+}
+
+function resetRecruiterConfirmations() {
+  recruiterConfirmationInputs.forEach(input => { input.checked = false; });
 }
 function refreshCandidateInvite() {
   if (!candidateInviteMessage || !inviteLinkPreview || !inviteLinkState) return;
@@ -379,6 +394,7 @@ async function onNewSession() {
     candidateEmailInput.value = '';
     technicalVocabularyInput.value = '';
     policyPresetSelect.value = 'standard_technical';
+    resetRecruiterConfirmations();
     renderPolicyControls();
     refreshCandidateInvite();
     if (!currentSession.localOnly) {
@@ -424,6 +440,11 @@ $('startMonitoringBtn').addEventListener('click', startMonitoring);
 async function startMonitoring() {
   if (!candidateReady) {
     toast('Wait for the candidate to complete consent and microphone preflight.', 'error');
+    return;
+  }
+  if (!recruiterConfirmationReady()) {
+    toast('Confirm candidate notice, session policy, and human-review use before starting.', 'error');
+    recruiterConfirmationInputs.find(input => !input.checked)?.focus();
     return;
   }
   const name = candidateNameInput.value.trim() || 'Candidate';
@@ -1037,7 +1058,7 @@ function resetState() {
   hasFirstTranscript = false;
   interimBubble = null;
   transcriptList.innerHTML = '<div class="empty-state"><span class="empty-cursor"></span>Waiting for the first reliable transcript segment</div>';
-  flagsList.innerHTML = '<div class="empty-state">No active anomalies</div>';
+  flagsList.innerHTML = '<div class="empty-state">No session events yet</div>';
   transcriptCount.textContent = '0';
   flagCount.textContent = '0';
   statsScore.textContent = 'Clear';

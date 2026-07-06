@@ -930,6 +930,45 @@ body {
   min-height: 92px;
 }
 
+#setup-screen .compliance-panel {
+  padding: 16px;
+  border: 1px solid #23252a;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)),
+    rgba(15,16,17,.78);
+}
+
+.compliance-copy {
+  margin: -2px 0 12px;
+  color: #a2a9b5;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.compliance-check {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 11px 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+  color: #d4d8df;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compliance-check input {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: #f7f8f8;
+}
+
+.compliance-panel a {
+  color: #f7f8f8;
+}
+
 #setup-screen .blocked-site-grid {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 8px;
