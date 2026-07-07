@@ -13,6 +13,10 @@ const PATTERNS = {
   markdownArtifact: [/```/g, /^#{1,6}\s+/gm, /^\s*[-*]\s+\w+/gm, /^\s*\d+\.\s+\w+/gm, /\*\*[^*]+\*\*/g, /\bmarkdown\b/g],
   promptResidue: [/\b(?:question|answer|response):\s+/g, /\binterviewer(?: asks| asked| question)\b/g, /\bthe candidate should\b/g, /\buse this answer\b/g, /\bcopy this response\b/g, /\bfinal answer\b/g],
   templateClosure: [/\bin summary\b/g, /\boverall\b/g, /\bultimately\b/g, /\bthis demonstrates\b/g, /\bthat would be my approach\b/g, /\bthis enables\b/g, /\blong-term (?:success|maintainability|impact)\b/g],
+  polishedConnectors: [/\badditionally\b/g, /\bfurthermore\b/g, /\bmoreover\b/g, /\bin addition\b/g, /\bas a result\b/g, /\btherefore\b/g, /\bconsequently\b/g, /\bthat being said\b/g, /\bwith that in mind\b/g, /\bit'?s important to\b/g, /\ba key consideration\b/g, /\bkey considerations\b/g, /\bthe core principle\b/g, /\bthe optimal approach\b/g],
+  certainty: [/\balways\b/g, /\bnever\b/g, /\bclearly\b/g, /\bobviously\b/g, /\bundoubtedly\b/g, /\bguarantee\b/g, /\bensure\b/g, /\bbest way\b/g, /\boptimal\b/g, /\bwithout question\b/g],
+  uncertainty: [/\bmaybe\b/g, /\bprobably\b/g, /\bit depends\b/g, /\bi think\b/g, /\bi'?m not sure\b/g, /\broughly\b/g, /\baround\b/g, /\babout\b/g, /\btrade-?off\b/g, /\bdepends on\b/g],
+  mechanics: [/\breproduc(?:e|ed|ing)\b/g, /\btraced?\b/g, /\binspected\b/g, /\blog(?:ged|s|ging)?\b/g, /\bprofiled\b/g, /\bbenchmarked\b/g, /\bcanary\b/g, /\bstaging\b/g, /\brollout\b/g, /\bfeature flag\b/g, /\bpostmortem\b/g, /\bpager\b/g, /\bstack trace\b/g, /\broot cause\b/g, /\bfailed test\b/g, /\brollback plan\b/g],
   directAi: [/\bchatgpt\b/g, /\bclaude\b/g, /\bgemini\b/g, /\bcopilot\b/g, /\bperplexity\b/g, /\bai tools?\b/g, /\bllm\b/g],
   directAiUse: [
     /\b(?:used|using|asked|prompted|copied|pasted|generated|opened|checked|looked up|got help from)\s+(?:chatgpt|claude|gemini|copilot|perplexity|an?\s+ai|an?\s+llm)\b/g,
@@ -133,12 +137,17 @@ function extractFeatures(text, context = {}, history = []) {
     .filter(term => term.length >= 2)
     .reduce((count, term) => count + (String(text || '').toLowerCase().includes(term) ? 1 : 0), 0);
   const responseLatencyMs = Number(context.responseLatencyMs ?? context.latencyMs ?? 0);
+  const priorSilenceGapMs = Number(context.priorSilenceGapMs ?? NaN);
   const secondsSinceAiEvent = Number(context.secondsSinceAiEvent ?? context.secondsSinceRestrictedAiEvent ?? Infinity);
   const behavioralAiEventCount = Number(context.behavioralAiEventCount ?? 0);
   const recent = history.slice(-6);
   const historySimilarity = recent.length ? Math.max(...recent.map(item => jaccard(tokens, item.tokens || []))) : 0;
   const baselineTokens = recent.flatMap(item => item.tokens || []);
   const styleDrift = recent.length >= 3 && baselineTokens.length >= 60 ? cosineDistance(tokens, baselineTokens) : 0;
+  const disfluencyHistory = recent
+    .map(item => Number(item.fillerDensity) + Number(item.correctionDensity))
+    .filter(Number.isFinite);
+  const baselineDisfluency = disfluencyHistory.length >= 3 ? mean(disfluencyHistory) : 0;
   const historyLengths = recent.map(item => item.wordCount).filter(Boolean);
   const lengthAverage = mean(historyLengths);
   const lengthUniformity = historyLengths.length >= 3 && lengthAverage
@@ -167,6 +176,10 @@ function extractFeatures(text, context = {}, history = []) {
     markdownArtifactDensity: countMarkdownArtifacts(text) / Math.max(1, wordCount),
     promptResidueDensity: density('promptResidue'),
     templateClosureDensity: density('templateClosure'),
+    polishedConnectorDensity: density('polishedConnectors'),
+    certaintyDensity: density('certainty'),
+    uncertaintyDensity: density('uncertainty'),
+    mechanicsDensity: density('mechanics'),
     directAiDensity: density('directAi'),
     directAiMentionDensity: density('directAi'),
     directAiUseDensity: density('directAiUse'),
@@ -180,6 +193,9 @@ function extractFeatures(text, context = {}, history = []) {
     styleDrift,
     lengthUniformity,
     responseLatencyMs: Number.isFinite(responseLatencyMs) ? responseLatencyMs : 0,
+    priorSilenceGapMs: Number.isFinite(priorSilenceGapMs) ? priorSilenceGapMs : null,
+    baselineDisfluency,
+    disfluencyBaselineCount: disfluencyHistory.length,
     secondsSinceAiEvent: Number.isFinite(secondsSinceAiEvent) ? secondsSinceAiEvent : Infinity,
     behavioralAiEventCount: Number.isFinite(behavioralAiEventCount) ? behavioralAiEventCount : 0,
     postAiEventProximity: Number.isFinite(secondsSinceAiEvent) ? clamp((120 - secondsSinceAiEvent) / 120) : 0,

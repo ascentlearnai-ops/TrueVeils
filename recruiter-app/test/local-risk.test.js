@@ -90,6 +90,38 @@ test('role vocabulary and ownership lower false positives for technical answers'
   assert.ok(result.humanSignals.includes('First-person ownership of work'));
 });
 
+test('behavior-correlated polished scaffolding scores higher than style alone', () => {
+  const answer = 'There are three key considerations when designing scalable systems for enterprise stakeholders. First, robust architecture ensures seamless delivery across teams. Second, best practices around alignment streamline collaboration and efficiency. Finally, holistic strategy ensures that objectives and requirements drive impact over the long term.';
+
+  Risk.resetHistory();
+  const styleOnly = Risk.analyzeTranscript(answer, { transcriptConfidence: 0.95 });
+  Risk.resetHistory();
+  const correlated = Risk.analyzeTranscript(answer, {
+    transcriptConfidence: 0.95,
+    secondsSinceAiEvent: 15,
+    behavioralAiEventCount: 1
+  });
+
+  assert.equal(styleOnly.scorable, true);
+  assert.equal(correlated.scorable, true);
+  assert.ok(styleOnly.score <= 68);
+  assert.ok(correlated.score > styleOnly.score + 10);
+  assert.ok(correlated.aiSignals.includes('Response followed a restricted AI-tool event'));
+});
+
+test('implementation mechanics and qualified reasoning act as counter-signals', () => {
+  const result = Risk.analyzeTranscript(
+    'I think it depends on the workload. In my last project I reproduced the timeout in staging, traced the slow Postgres query, added a canary rollout behind a feature flag, and my team rolled it back once before we shipped the fix.',
+    { transcriptConfidence: 0.95, technicalVocabulary: ['Postgres', 'feature flag', 'staging'] }
+  );
+
+  assert.equal(result.scorable, true);
+  assert.equal(result.label, 'low_ai_assistance_risk');
+  assert.ok(result.score < 35);
+  assert.ok(result.humanSignals.includes('First-person incident or project anchor'));
+  assert.ok(result.humanSignals.includes('Concrete implementation mechanics'));
+});
+
 test('style drift from earlier answers adds review signal without overriding evidence rules', () => {
   [
     'Um, I usually start by checking the logs and then I test the API with my team after I find the failing request.',

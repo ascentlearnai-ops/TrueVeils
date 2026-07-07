@@ -20,6 +20,7 @@ const { LocalTranscriber } = require('./src/audio/local-transcriber');
 const { DeepgramTranscriber } = require('./src/audio/deepgram-transcriber');
 const { GroqTranscriber } = require('./src/audio/groq-transcriber');
 const { evaluateReview } = require('./src/review/evidence');
+const { computeSessionVerdict } = require('./src/review/verdict');
 
 let mainWindow;
 let tray;
@@ -1426,6 +1427,9 @@ ipcMain.handle('session:end', async () => {
       telemetry: sessionData.telemetry || {}
     });
     sessionData.review = review;
+    const behavior = ReportGenerator.behavioralEvidence(sessionData.flags);
+    const verdict = computeSessionVerdict({ scores: sessionData.scores, review, behavior });
+    sessionData.verdict = verdict;
     const reportPath = await ReportGenerator.generate(sessionData);
     const client = getSupabase();
     if (client && sessionData.session.internalId) {
@@ -1439,6 +1443,7 @@ ipcMain.handle('session:end', async () => {
           candidateName: sessionData.session.candidateName,
           role: sessionData.session.role,
           review: review.summary,
+          verdict,
           startedAt: sessionData.startedAt,
           endedAt: sessionData.endedAt
         },

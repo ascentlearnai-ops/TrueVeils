@@ -344,7 +344,36 @@ function currentReviewBand() {
   return { key: 'clear', label: 'Clear', reason: 'No meaningful integrity evidence has been recorded.' };
 }
 
+function liveVerdictEstimate() {
+  const band = currentReviewBand();
+  const floor = band.key === 'high_priority_review' ? 80 : band.key === 'review' ? 55 : 0;
+  const score = Math.max(currentTranscriptAverage(), floor);
+  const windows = scoreCount;
+  if (!windows && !floor) {
+    return { label: 'Insufficient evidence', cls: '', meta: 'Verdict estimate builds as scored responses arrive' };
+  }
+  const confidence = floor >= 80
+    ? (windows >= 3 ? 'high' : 'medium')
+    : windows < 3 ? 'low' : windows < 6 ? 'medium' : 'high';
+  const label = score >= 70 ? 'Likely AI-assisted'
+    : score <= 35 && windows >= 3 ? 'Likely unassisted'
+      : 'Uncertain — needs review';
+  const cls = score >= 70 ? 'high' : label === 'Likely unassisted' ? 'low' : 'med';
+  return { label, cls, meta: `Confidence ${confidence} · ${windows} scored window${windows === 1 ? '' : 's'} · advisory only` };
+}
+
+function refreshVerdictStrip() {
+  const chip = $('verdictChip');
+  const meta = $('verdictMeta');
+  if (!chip || !meta) return;
+  const verdict = liveVerdictEstimate();
+  chip.textContent = verdict.label;
+  chip.className = `verdict-chip ${verdict.cls}`;
+  meta.textContent = verdict.meta;
+}
+
 function refreshOverallRiskMetric() {
+  refreshVerdictStrip();
   const band = currentReviewBand();
   statsScore.textContent = band.label;
   statsScore.className = 'mm-val ' + (band.key === 'high_priority_review' ? 'risk-high' : band.key === 'review' ? 'risk-med' : 'risk-low');
@@ -656,7 +685,7 @@ async function commitFinalTranscript(text) {
 }
 
 function renderAnalysis(entryEl, result) {
-  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], source, scorable, scoreWeight } = result;
+  const { aiScore, reasoning, flags, error, displayLabel, aiSignals = [], humanSignals = [], topContributors = [], source, scorable, scoreWeight } = result;
   const scoreEl = entryEl.querySelector('.entry-score');
   const reasoningEl = entryEl.querySelector('.entry-reasoning');
 
@@ -675,7 +704,17 @@ function renderAnalysis(entryEl, result) {
   if (reasoning) {
     const evidence = aiSignals.length ? aiSignals.slice(0, 2).join(' + ') : 'No strong signal';
     const sourceText = source ? `Source: ${source}` : 'Source: live transcript';
-    reasoningEl.textContent = `${evidence}. ${sourceText}.`;
+    const signalChips = [
+      ...aiSignals.slice(0, 3).map(label => ({ label, kind: 'ai' })),
+      ...humanSignals.slice(0, 2).map(label => ({ label, kind: 'human' }))
+    ];
+    const contributorText = topContributors.length
+      ? `<div class="entry-contributors">${topContributors.map(item => `${esc(item.kind)} ${esc(item.contribution)} ${esc(item.label)}`).join(' / ')}</div>`
+      : '';
+    reasoningEl.innerHTML = `
+      <div>${esc(evidence)}. ${esc(sourceText)}.</div>
+      ${signalChips.length ? `<div class="entry-signal-stack">${signalChips.map(item => `<span class="signal-chip ${item.kind}">${esc(item.label)}</span>`).join('')}</div>` : ''}
+      ${contributorText}`;
     reasoningEl.classList.remove('hidden');
   }
 
@@ -956,7 +995,9 @@ async function endSession() {
   statusText.textContent = 'Complete';
 
   const band = currentReviewBand();
+  const verdict = liveVerdictEstimate();
   $('endedStats').innerHTML = `
+    <div class="es-item"><span>${verdict.label}</span>Session verdict</div>
     <div class="es-item"><span>${band.label}</span>Review band</div>
     <div class="es-item"><span>${totalResponses}</span>Responses</div>
     <div class="es-item"><span>${totalTranscriptSignals}</span>Text Signals</div>

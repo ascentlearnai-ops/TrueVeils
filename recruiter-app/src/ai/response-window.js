@@ -19,11 +19,13 @@ class ResponseWindowAnalyzer {
     this.minimumWords = minimumWords;
     this.pending = [];
     this.windowIndex = 0;
+    this.lastWindowEndedAt = null;
   }
 
   reset() {
     this.pending = [];
     this.windowIndex = 0;
+    this.lastWindowEndedAt = null;
   }
 
   addSegment(segment = {}, analyzeFn, baseContext = {}) {
@@ -56,6 +58,12 @@ class ResponseWindowAnalyzer {
     const analysisWindowId = `rw-${++this.windowIndex}`;
     const transcriptConfidence = average(windowItems.map(item => item.transcriptConfidence));
     const durationMs = windowItems.reduce((sum, item) => sum + (Number(item.durationMs) || 0), 0);
+    const windowStartedAt = Number(windowItems[0]?.timestamp) || null;
+    const priorSilenceGapMs = this.lastWindowEndedAt && windowStartedAt && windowStartedAt > this.lastWindowEndedAt
+      ? windowStartedAt - this.lastWindowEndedAt
+      : null;
+    const lastItem = windowItems[windowItems.length - 1];
+    this.lastWindowEndedAt = (Number(lastItem?.timestamp) || Date.now()) + (Number(lastItem?.durationMs) || 0);
     const context = {
       ...baseContext,
       durationMs: durationMs || segment.durationMs,
@@ -65,6 +73,7 @@ class ResponseWindowAnalyzer {
       streamEpoch: segment.streamEpoch,
       utteranceId: segment.utteranceId,
       finalReason: segment.finalReason,
+      priorSilenceGapMs,
       responseWindow: true,
       responseWindowWordCount: wordCount(combinedText)
     };

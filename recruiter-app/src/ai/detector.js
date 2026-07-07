@@ -17,6 +17,13 @@ Signals of AI-assisted speech:
 8. Technical terms applied with textbook precision (real experts hedge)
 9. Answer length is uniformly "just right"
 10. Robotic rhythm / reading cadence
+11. Assistant or prompt residue, markdown artifacts, or "here is a polished answer" framing
+12. Multiple weak signals appearing together: polished scaffold + low disfluency + little concrete grounding
+
+False-positive guardrails:
+- Do not treat a single ChatGPT/Claude/Gemini mention as proof of assistance.
+- Lower the score when the candidate gives first-person incident detail, self-corrects, names concrete tools, or explains implementation mechanics.
+- Generic polished speech alone should usually be review context, not high confidence.
 
 Return ONLY this JSON, no markdown, no prose outside the JSON:
 {

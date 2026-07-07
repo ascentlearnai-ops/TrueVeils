@@ -23,8 +23,12 @@ test('packaged recruiter runtime config never contains provider secrets', () => 
   assert.doesNotMatch(writer, /deepgramApiKey|groqApiKey/);
 });
 
-test('candidate-facing copy does not expose an AI score', () => {
-  const html = fs.readFileSync('D:/Truveil-Client/src/renderer/index.html', 'utf8');
+const clientRepo = process.env.TRUVEIL_CLIENT_DIR
+  || ['C:/Truveil/Truveil-Client', 'D:/Truveil-Client', path.join(repo, '..', 'Truveil-Client')]
+    .find(dir => fs.existsSync(path.join(dir, 'src/renderer/index.html')));
+
+test('candidate-facing copy does not expose an AI score', { skip: !clientRepo }, () => {
+  const html = fs.readFileSync(path.join(clientRepo, 'src/renderer/index.html'), 'utf8');
   assert.doesNotMatch(html, /AI-assistance risk|integrity percent|cheating score/i);
 });
 
