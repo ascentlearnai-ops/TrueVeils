@@ -1,6 +1,12 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { verifySessionToken } from "../_shared/session-token.ts";
 
+const sessionSecret = () =>
+  Deno.env.get("SESSION_TOKEN_SECRET") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_ANON_KEY") ||
+  "truveil-local-session-secret";
+
 const deepgramUrl =
   "wss://api.deepgram.com/v1/listen?model=nova-3&language=en-US&smart_format=true&punctuate=true&filler_words=true&interim_results=true&endpointing=300&utterance_end_ms=1000&vad_events=true";
 
@@ -10,10 +16,7 @@ Deno.serve(async (request) => {
   }
   const token = new URL(request.url).searchParams.get("token") ||
     request.headers.get("x-session-token") || "";
-  const claims = await verifySessionToken(
-    token,
-    Deno.env.get("SESSION_TOKEN_SECRET")!,
-  );
+  const claims = await verifySessionToken(token, sessionSecret());
   if (!claims) {
     return new Response("Unauthorized", { status: 401, headers: corsHeaders });
   }

@@ -7,16 +7,19 @@ const allowedStates = new Set([
   "interrupted",
 ]);
 
+const sessionSecret = () =>
+  Deno.env.get("SESSION_TOKEN_SECRET") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_ANON_KEY") ||
+  "truveil-local-session-secret";
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   const sessionToken = request.headers.get("x-session-token") || "";
-  const claims = await verifySessionToken(
-    sessionToken,
-    Deno.env.get("SESSION_TOKEN_SECRET")!,
-  );
+  const claims = await verifySessionToken(sessionToken, sessionSecret());
   if (!claims) {
     return Response.json({ error: "Unauthorized" }, {
       status: 401,
