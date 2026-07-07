@@ -1,27 +1,21 @@
-import { corsHeaders } from "../_shared/cors.ts";
-import { verifySessionToken } from "../_shared/session-token.ts";
+import { corsHeadersFor } from "../_shared/cors.ts";
+import { resolveSessionSecret, verifySessionToken } from "../_shared/session-token.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const sessionSecret = () =>
-  Deno.env.get("SESSION_TOKEN_SECRET") ||
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-  Deno.env.get("SUPABASE_ANON_KEY") ||
-  "truveil-local-session-secret";
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(request) });
   }
 
   const sessionToken = request.headers.get("x-session-token") || "";
   const claims = await verifySessionToken(
     sessionToken,
-    sessionSecret(),
+    resolveSessionSecret(),
   );
   if (!claims) {
     return Response.json({ error: "Unauthorized" }, {
       status: 401,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -35,7 +29,7 @@ Deno.serve(async (request) => {
   if (!session || !["candidate_ready", "active"].includes(session.status)) {
     return Response.json({ error: "Transcription is only available after candidate check-in." }, {
       status: 409,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -43,7 +37,7 @@ Deno.serve(async (request) => {
   if (!deepgramKey) {
     return Response.json({ error: "Deepgram is not configured in Supabase Edge Function secrets." }, {
       status: 502,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -63,7 +57,7 @@ Deno.serve(async (request) => {
       providerStatus: grant.status,
     }, {
       status: 502,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -73,7 +67,7 @@ Deno.serve(async (request) => {
     sessionId: claims.sessionId,
   }, {
     headers: {
-      ...corsHeaders,
+      ...corsHeadersFor(request),
       "content-type": "application/json",
       "cache-control": "no-store",
     },

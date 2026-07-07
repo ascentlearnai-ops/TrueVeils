@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeadersFor } from "../_shared/cors.ts";
 
 function joinCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -11,7 +11,7 @@ function joinCode() {
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(request) });
   }
   const authorization = request.headers.get("authorization") || "";
   let authUser: { id: string; email?: string | null } | null = null;
@@ -112,7 +112,7 @@ Deno.serve(async (request) => {
       if (participantError) throw participantError;
     }
     return Response.json({ session }, {
-      headers: { ...corsHeaders, "content-type": "application/json" },
+      headers: { ...corsHeadersFor(request), "content-type": "application/json" },
     });
   } catch (error) {
     const message = error instanceof Error
@@ -120,7 +120,7 @@ Deno.serve(async (request) => {
       : "Could not create session.";
     return Response.json({ error: message }, {
       status: 400,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 });

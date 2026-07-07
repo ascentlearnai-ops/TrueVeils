@@ -1,14 +1,8 @@
-import { corsHeaders } from "../_shared/cors.ts";
-import { verifySessionToken } from "../_shared/session-token.ts";
+import { corsHeadersFor } from "../_shared/cors.ts";
+import { resolveSessionSecret, verifySessionToken } from "../_shared/session-token.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const MAX_AUDIO_BYTES = 2_500_000;
-
-const sessionSecret = () =>
-  Deno.env.get("SESSION_TOKEN_SECRET") ||
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-  Deno.env.get("SUPABASE_ANON_KEY") ||
-  "truveil-local-session-secret";
 
 const cleanTranscript = (value: unknown) =>
   String(value || "").replace(/\s+/g, " ").trim();
@@ -20,24 +14,24 @@ const knownHallucination = (text: string) =>
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(request) });
   }
   const token = request.headers.get("x-session-token") || "";
   const claims = await verifySessionToken(
     token,
-    sessionSecret(),
+    resolveSessionSecret(),
   );
   if (!claims) {
     return Response.json({ error: "Unauthorized" }, {
       status: 401,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
   const contentLength = Number(request.headers.get("content-length") || 0);
   if (contentLength > MAX_AUDIO_BYTES) {
     return Response.json({ error: "Audio segment is too large." }, {
       status: 413,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
   const service = createClient(
@@ -50,20 +44,20 @@ Deno.serve(async (request) => {
   if (!session || !["candidate_ready", "active"].includes(session.status)) {
     return Response.json({ error: "Transcription is only available after candidate check-in." }, {
       status: 409,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
   const audio = await request.arrayBuffer();
   if (!audio.byteLength) {
     return Response.json({ error: "Audio was empty." }, {
       status: 400,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
   if (audio.byteLength > MAX_AUDIO_BYTES) {
     return Response.json({ error: "Audio segment is too large." }, {
       status: 413,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -91,7 +85,7 @@ Deno.serve(async (request) => {
           text: confidence >= 0.52 && !knownHallucination(text) ? text : "",
           confidence,
           source: "deepgram-nova-3-chunk",
-        }, { headers: corsHeaders });
+        }, { headers: corsHeadersFor(request) });
       }
     }
   } catch {}
@@ -100,7 +94,7 @@ Deno.serve(async (request) => {
   if (!groqKey) {
     return Response.json(
       { error: "No transcription provider is configured in Supabase Edge Function secrets." },
-      { status: 502, headers: corsHeaders },
+      { status: 502, headers: corsHeadersFor(request) },
     );
   }
 
@@ -120,7 +114,7 @@ Deno.serve(async (request) => {
   if (!groq.ok) {
     return Response.json(
       { error: "No transcription provider was available." },
-      { status: 502, headers: corsHeaders },
+      { status: 502, headers: corsHeadersFor(request) },
     );
   }
   const body = await groq.json();
@@ -129,5 +123,5 @@ Deno.serve(async (request) => {
     text: knownHallucination(text) ? "" : text,
     confidence: null,
     source: "groq-whisper-chunk",
-  }, { headers: corsHeaders });
+  }, { headers: corsHeadersFor(request) });
 });

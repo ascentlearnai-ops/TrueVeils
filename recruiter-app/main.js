@@ -1082,12 +1082,24 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: true
     },
     show: false
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src/renderer/index.html'));
+
+  // Keep the window pinned to the bundled app: no renderer-spawned windows,
+  // no navigation off the local file:// renderer. External links go through the
+  // allow-listed shell:open-external IPC handler instead.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const guardNavigation = (event, url) => {
+    if (!String(url || '').startsWith('file://')) event.preventDefault();
+  };
+  mainWindow.webContents.on('will-navigate', guardNavigation);
+  mainWindow.webContents.on('will-redirect', guardNavigation);
+  mainWindow.webContents.on('will-attach-webview', event => event.preventDefault());
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.maximize();
     mainWindow.show();

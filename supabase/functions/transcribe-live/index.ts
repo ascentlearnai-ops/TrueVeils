@@ -1,29 +1,23 @@
-import { corsHeaders } from "../_shared/cors.ts";
-import { verifySessionToken } from "../_shared/session-token.ts";
-
-const sessionSecret = () =>
-  Deno.env.get("SESSION_TOKEN_SECRET") ||
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-  Deno.env.get("SUPABASE_ANON_KEY") ||
-  "truveil-local-session-secret";
+import { corsHeadersFor } from "../_shared/cors.ts";
+import { resolveSessionSecret, verifySessionToken } from "../_shared/session-token.ts";
 
 const deepgramUrl =
   "wss://api.deepgram.com/v1/listen?model=nova-3&language=en-US&smart_format=true&punctuate=true&filler_words=true&interim_results=true&endpointing=300&utterance_end_ms=1000&vad_events=true";
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(request) });
   }
   const token = new URL(request.url).searchParams.get("token") ||
     request.headers.get("x-session-token") || "";
-  const claims = await verifySessionToken(token, sessionSecret());
+  const claims = await verifySessionToken(token, resolveSessionSecret());
   if (!claims) {
-    return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+    return new Response("Unauthorized", { status: 401, headers: corsHeadersFor(request) });
   }
   if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
     return new Response("WebSocket required", {
       status: 426,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 

@@ -1,29 +1,23 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { verifySessionToken } from "../_shared/session-token.ts";
+import { corsHeadersFor } from "../_shared/cors.ts";
+import { resolveSessionSecret, verifySessionToken } from "../_shared/session-token.ts";
 
 const allowedStates = new Set([
   "candidate_ready",
   "interrupted",
 ]);
 
-const sessionSecret = () =>
-  Deno.env.get("SESSION_TOKEN_SECRET") ||
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-  Deno.env.get("SUPABASE_ANON_KEY") ||
-  "truveil-local-session-secret";
-
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(request) });
   }
 
   const sessionToken = request.headers.get("x-session-token") || "";
-  const claims = await verifySessionToken(sessionToken, sessionSecret());
+  const claims = await verifySessionToken(sessionToken, resolveSessionSecret());
   if (!claims) {
     return Response.json({ error: "Unauthorized" }, {
       status: 401,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -32,7 +26,7 @@ Deno.serve(async (request) => {
   if (!allowedStates.has(status)) {
     return Response.json({ error: "Invalid session state." }, {
       status: 400,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 
@@ -52,8 +46,8 @@ Deno.serve(async (request) => {
   if (error) {
     return Response.json({ error: error.message }, {
       status: 400,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
-  return Response.json({ ok: true, status }, { headers: corsHeaders });
+  return Response.json({ ok: true, status }, { headers: corsHeadersFor(request) });
 });

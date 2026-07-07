@@ -1,16 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { issueSessionToken } from "../_shared/session-token.ts";
-
-const sessionSecret = () =>
-  Deno.env.get("SESSION_TOKEN_SECRET") ||
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-  Deno.env.get("SUPABASE_ANON_KEY") ||
-  "truveil-local-session-secret";
+import { corsHeadersFor } from "../_shared/cors.ts";
+import { issueSessionToken, resolveSessionSecret } from "../_shared/session-token.ts";
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(request) });
   }
   try {
     const { joinCode, candidateName } = await request.json();
@@ -35,19 +29,19 @@ Deno.serve(async (request) => {
     if (!session) {
       return Response.json({ error: "Session not found." }, {
         status: 404,
-        headers: corsHeaders,
+        headers: corsHeadersFor(request),
       });
     }
     if (!["waiting", "candidate_ready"].includes(session.status)) {
       return Response.json({ error: "This session has ended." }, {
         status: 409,
-        headers: corsHeaders,
+        headers: corsHeadersFor(request),
       });
     }
     if (session.expires_at && Date.parse(session.expires_at) < Date.now()) {
       return Response.json({ error: "This session code has expired." }, {
         status: 410,
-        headers: corsHeaders,
+        headers: corsHeadersFor(request),
       });
     }
 
@@ -70,7 +64,7 @@ Deno.serve(async (request) => {
       candidateName: String(candidateName || "").slice(0, 120),
       userId: candidateId,
       exp,
-    }, sessionSecret());
+    }, resolveSessionSecret());
 
     return Response.json({
       session: {
@@ -88,14 +82,14 @@ Deno.serve(async (request) => {
       },
       sessionToken,
       expiresAt: new Date(exp * 1000).toISOString(),
-    }, { headers: { ...corsHeaders, "content-type": "application/json" } });
+    }, { headers: { ...corsHeadersFor(request), "content-type": "application/json" } });
   } catch (error) {
     const message = error instanceof Error
       ? error.message
       : "Could not join session.";
     return Response.json({ error: message }, {
       status: 400,
-      headers: corsHeaders,
+      headers: corsHeadersFor(request),
     });
   }
 });
