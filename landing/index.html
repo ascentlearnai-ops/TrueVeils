@@ -9,6 +9,10 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <canvas id="cyberRain" aria-hidden="true"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="grid-overlay" aria-hidden="true"></div>
+
   <header class="site-nav">
     <a class="brand" href="#top" aria-label="Truveil home"><span class="brand-glyph">T</span><span>Truveil</span></a>
     <nav aria-label="Primary navigation">
@@ -21,8 +25,13 @@
 
   <main>
     <section class="hero" id="top">
-      <div class="hero-glow"></div>
-      <div class="hero-beam" aria-hidden="true"><span></span><span></span></div>
+      <pre class="ascii-moon" aria-hidden="true">
+        .---.
+       /     \
+      |       |
+       \     /
+        '---'
+      </pre>
       <div class="hero-copy reveal">
         <span class="eyebrow">Interview verification for careful teams</span>
         <h1>See the interview as it happens.</h1>
@@ -177,7 +186,7 @@
     <a href="/downloads/TruveilRecruiter-Setup-1.0.0.exe.sha256" download>SHA-256 checksum</a>
     <a href="/privacy.html">Privacy</a>
     <a href="/terms.html">Terms</a>
-    <a href="/legal.html">Trust & Legal</a>
+    <a href="/legal.html">Trust &amp; Legal</a>
     <a href="/support.html">Support</a>
     <span>2026 Truveil</span>
   </footer>

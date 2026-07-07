@@ -1732,3 +1732,6 @@ body {
 .review-tools {
   box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
 }
+
+/* Optional-field tag (was unstyled) */
+.field-opt{display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid var(--line);border-radius:999px;color:#8a8f98;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;vertical-align:middle}

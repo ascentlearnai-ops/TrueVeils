@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, dialog, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, clipboard, dialog, safeStorage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -1071,11 +1071,17 @@ async function cleanupRemoteAudioChunks() {
 }
 
 function createWindow() {
+  // Size to the display's work area so the window never opens larger than the
+  // screen (e.g. a 1366x768 laptop). Minimums are small enough to fit compact
+  // laptops; the renderer CSS reflows below these widths.
+  const { width: areaW, height: areaH } = screen.getPrimaryDisplay().workAreaSize;
+  const winW = Math.min(1440, Math.max(960, areaW - 80));
+  const winH = Math.min(900, Math.max(600, areaH - 80));
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1100,
-    minHeight: 720,
+    width: winW,
+    height: winH,
+    minWidth: Math.min(960, areaW),
+    minHeight: Math.min(600, areaH),
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#050507',
     webPreferences: {
@@ -1086,6 +1092,7 @@ function createWindow() {
     },
     show: false
   });
+  mainWindow.center();
 
   mainWindow.loadFile(path.join(__dirname, 'src/renderer/index.html'));
 
