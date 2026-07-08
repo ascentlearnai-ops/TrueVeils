@@ -1735,3 +1735,30 @@ body {
 
 /* Optional-field tag (was unstyled) */
 .field-opt{display:inline-block;margin-left:6px;padding:1px 6px;border:1px solid var(--line);border-radius:999px;color:#8a8f98;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;vertical-align:middle}
+
+/* ── Cross-cutting polish (appended) ─────────────────────────── */
+/* Themed scrollbars so panels match the dark surface */
+*{scrollbar-width:thin;scrollbar-color:#2a2c31 transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#26282d;border:2px solid #0f1011;border-radius:8px}
+*::-webkit-scrollbar-thumb:hover{background:#34373d}
+
+/* Visible keyboard focus without affecting mouse users */
+:focus-visible{outline:2px solid #6b7bff;outline-offset:2px;border-radius:4px}
+.btn:focus-visible,.tb-btn:focus-visible,.workspace-nav-btn:focus-visible{outline-offset:2px}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
+
+/* Live transcript / event / audio items ease in as they arrive */
+@keyframes tvEnter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.transcript-entry,.flag-item,.audio-item{animation:tvEnter .28s cubic-bezier(.22,.61,.36,1) both}
+
+/* Buttons feel responsive on press */
+.btn,.tb-btn,.workspace-nav-btn,.flag-actions button,.suggested-followups button{transition:border-color .15s ease,background .15s ease,color .15s ease,transform .08s ease}
+.btn:active,.tb-btn:active,.flag-actions button:active,.suggested-followups button:active{transform:translateY(1px)}
+.btn-primary:hover{box-shadow:0 8px 26px rgba(255,255,255,.1)}
+
+/* Metric values transition when the review band changes */
+.mm-val{transition:color .3s ease}
+
+@media(prefers-reduced-motion:reduce){.transcript-entry,.flag-item,.audio-item{animation:none}}
