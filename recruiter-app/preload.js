@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('truveil', {
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   openReportsFolder: () => ipcRenderer.invoke('report:openFolder'),
   listReports: () => ipcRenderer.invoke('report:list'),
+  openReport: (file) => ipcRenderer.invoke('report:open', file),
   deleteReport: (id) => ipcRenderer.invoke('report:delete', id),
   getAudioSources: () => ipcRenderer.invoke('get-audio-sources'),
 });

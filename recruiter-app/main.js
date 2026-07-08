@@ -1463,6 +1463,7 @@ ipcMain.handle('session:end', async () => {
           role: sessionData.session.role,
           review: review.summary,
           verdict,
+          reportFile: path.basename(reportPath),
           startedAt: sessionData.startedAt,
           endedAt: sessionData.endedAt
         },
@@ -1507,6 +1508,20 @@ ipcMain.handle('report:list', async () => {
     const stat = fs.statSync(path.join(dir, name));
     return { id: name, review_band: 'incomplete_evidence', summary: { candidateName: name }, created_at: stat.mtime.toISOString() };
   });
+});
+
+ipcMain.handle('report:open', async (_, file) => {
+  // Report HTML lives locally in userData/reports. Resolve the basename inside
+  // that directory only (path-traversal guard) and open it if present. Reports
+  // are machine-local (the HTML is never uploaded), so a row from another
+  // machine simply has no local file here.
+  const root = path.resolve(app.getPath('userData'), 'reports');
+  const target = path.resolve(root, path.basename(String(file || '')));
+  if (!file || !target.startsWith(root + path.sep) || !target.endsWith('.html') || !fs.existsSync(target)) {
+    return { opened: false, missing: true };
+  }
+  shell.openPath(target);
+  return { opened: true };
 });
 
 ipcMain.handle('report:delete', async (_, id) => {

@@ -1762,3 +1762,9 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
 .mm-val{transition:color .3s ease}
 
 @media(prefers-reduced-motion:reduce){.transcript-entry,.flag-item,.audio-item{animation:none}}
+
+/* Reports screen: search toolbar + row actions */
+.reports-toolbar{display:flex;gap:10px;align-items:center;margin:26px 0 4px}
+.reports-toolbar #reportSearch{flex:1;min-height:40px;border:1px solid #23252a;border-radius:8px;background:#08090a;padding:0 14px;color:var(--text);outline:0;font-size:13px}
+.reports-toolbar #reportSearch:focus{border-color:#5e6ad2;box-shadow:0 0 0 2px rgba(94,106,210,.22)}
+.report-actions{display:flex;gap:8px;align-items:center}

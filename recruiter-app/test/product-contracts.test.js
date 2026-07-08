@@ -107,3 +107,21 @@ test('admin transcript scoring uses response windows and session vocabulary', ()
   assert.match(main, /finalReason/);
   assert.match(main, /responseWindowWordCount/);
 });
+
+test('reports screen can re-open and search past interview reports', () => {
+  const html = read('recruiter-app/src/renderer/index.html');
+  const renderer = read('recruiter-app/src/renderer/dashboard.js');
+  const preload = read('recruiter-app/preload.js');
+  const main = read('recruiter-app/main.js');
+  // Search affordance backs the "Searchable" copy on the reports screen.
+  assert.match(html, /id="reportSearch"/);
+  assert.match(renderer, /renderReportRows/);
+  assert.match(renderer, /data-open-report/);
+  // Re-open path is wired through the bridge to a guarded main-process handler.
+  assert.match(preload, /openReport:/);
+  assert.match(main, /ipcMain\.handle\('report:open'/);
+  // Path-traversal guard: only .html files inside the reports dir may open.
+  assert.match(main, /target\.startsWith\(root \+ path\.sep\)/);
+  // New reports record their local filename so the row can re-open them.
+  assert.match(main, /reportFile: path\.basename\(reportPath\)/);
+});

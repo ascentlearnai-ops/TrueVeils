@@ -1049,28 +1049,55 @@ document.querySelectorAll('[data-followup]').forEach(button => button.addEventLi
   addNote(false, `Suggested follow-up copied: ${question}`);
 }));
 
-async function loadReports() {
+let allReports = [];
+
+function renderReportRows() {
   const list = $('reportList');
-  list.innerHTML = '<div class="empty-state">Loading reports...</div>';
-  const reports = await window.truveil.listReports();
-  if (!reports.length) {
-    list.innerHTML = '<div class="empty-state">No reports yet</div>';
+  const query = ($('reportSearch')?.value || '').trim().toLowerCase();
+  const rows = query
+    ? allReports.filter(report => {
+        const hay = `${report.summary?.candidateName || ''} ${report.summary?.role || ''} ${report.review_band || ''}`.toLowerCase();
+        return hay.includes(query);
+      })
+    : allReports;
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-state">${query ? 'No reports match your search' : 'No reports yet'}</div>`;
     return;
   }
-  list.innerHTML = reports.map(report => `
-    <div class="report-row" data-report-id="${esc(report.id)}">
+  list.innerHTML = rows.map(report => `
+    <div class="report-row" data-report-id="${esc(report.id)}" data-report-file="${esc(report.summary?.reportFile || report.id)}">
       <div><strong>${esc(report.summary?.candidateName || 'Interview report')}</strong><span>${esc(report.summary?.role || '')} / ${new Date(report.created_at).toLocaleString()}</span></div>
       <div class="review-band">${esc(String(report.review_band || 'incomplete_evidence').replaceAll('_', ' '))}</div>
-      <button class="btn sm" data-delete-report>Delete</button>
+      <div class="report-actions">
+        <button class="btn sm" data-open-report>Open</button>
+        <button class="btn sm btn-ghost" data-delete-report>Delete</button>
+      </div>
     </div>`).join('');
 }
 
+async function loadReports() {
+  const list = $('reportList');
+  list.innerHTML = '<div class="empty-state">Loading reports...</div>';
+  allReports = await window.truveil.listReports();
+  renderReportRows();
+}
+
+$('reportSearch')?.addEventListener('input', renderReportRows);
+$('openReportsFolderBtn2')?.addEventListener('click', () => window.truveil.openReportsFolder());
+
 $('reportList')?.addEventListener('click', async event => {
-  const button = event.target.closest('[data-delete-report]');
-  if (!button) return;
-  const row = button.closest('.report-row');
-  await window.truveil.deleteReport(row.dataset.reportId);
-  row.remove();
+  const row = event.target.closest('.report-row');
+  if (!row) return;
+  if (event.target.closest('[data-open-report]')) {
+    const result = await window.truveil.openReport(row.dataset.reportFile);
+    if (result?.missing) toast('That report file is on the machine where the session ran.', 'error');
+    return;
+  }
+  if (event.target.closest('[data-delete-report]')) {
+    await window.truveil.deleteReport(row.dataset.reportId);
+    allReports = allReports.filter(report => String(report.id) !== row.dataset.reportId);
+    row.remove();
+  }
 });
 
 $('navNewSession')?.addEventListener('click', () => showScreen(currentSession ? 'setup' : 'idle'));
