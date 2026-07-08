@@ -1,5 +1,7 @@
 # TrueVeils Codex Handoff
 
+> **Read `MASTERPLAN.md` (repo root) first — it holds the end goal (YC + 100 companies), the roadmap, the marketing plan, and the model delegation playbook. This file is the technical state log; that file is the strategy.**
+
 Last updated: 2026-07-06
 
 ## Project Map
