@@ -1039,3 +1039,71 @@ footer {
 .expect-help a{color:var(--ink);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.18);padding-bottom:1px}
 .expect-help a:hover{border-bottom-color:var(--ink)}
 @media(max-width:620px){.expect-band{padding:64px 18px 60px}.expect-list li{padding:18px 18px 16px 56px}.expect-list li::before{left:14px;top:14px}}
+
+/* Sellable beta pass: client proof and pilot-readiness sections */
+.buyer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 1450px;
+  margin: 34px auto 0;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--hairline);
+}
+.buyer-grid article,
+.readiness-list article {
+  padding: 24px;
+  background: #0f1011;
+}
+.buyer-grid span,
+.readiness-list span {
+  display: block;
+  color: #858b95;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.buyer-grid strong,
+.readiness-list strong {
+  display: block;
+  margin-top: 28px;
+  color: var(--ink);
+  font-size: 20px;
+}
+.buyer-grid p,
+.readiness-list p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  line-height: 1.65;
+  font-size: 14px;
+}
+.readiness-band {
+  padding: clamp(86px, 10vw, 150px) clamp(22px,7vw,130px);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--hairline);
+  background: linear-gradient(180deg, #08090a, #0d0e10);
+}
+.readiness-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  max-width: 1180px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--hairline);
+}
+@media(max-width:980px) {
+  .buyer-grid,
+  .readiness-list {
+    grid-template-columns: 1fr;
+  }
+}
+@media(max-width:620px) {
+  .readiness-band {
+    padding: 70px 18px;
+  }
+}
