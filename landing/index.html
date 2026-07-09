@@ -9,6 +9,14 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <aside class="beta-notice" role="status" aria-label="Truveil Command Center is in public beta">
+    <span class="beta-notice-tag">Public beta</span>
+    <span class="beta-notice-text"><strong>Windows paid beta.</strong> Core reviewer workflows are stable &mdash; please report anything unexpected so we can keep iterating with you.</span>
+    <a class="beta-notice-link" href="/support.html">Report an issue</a>
+  </aside>
+
   <header class="site-nav">
     <a class="brand" href="#top" aria-label="Truveil home"><span class="brand-glyph">T</span><span>Truveil</span></a>
     <nav aria-label="Primary navigation">
@@ -19,7 +27,7 @@
     <a class="nav-cta" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download for Windows</a>
   </header>
 
-  <main>
+  <main id="main">
     <section class="hero" id="top">
       <div class="hero-glow"></div>
       <div class="hero-beam" aria-hidden="true"><span></span><span></span></div>
@@ -162,6 +170,21 @@
           <li>Desktop-only enforcement disclosed honestly</li>
         </ul>
       </div>
+    </section>
+
+    <section class="expect-band" aria-label="What to expect from the beta">
+      <div class="section-intro reveal">
+        <span class="eyebrow">First run in beta</span>
+        <h2>Create your first verified interview in five clear steps.</h2>
+      </div>
+      <ol class="expect-list">
+        <li><strong>Sign in once.</strong> Use the email link or paste the 6-digit code from your inbox.</li>
+        <li><strong>Create a session.</strong> Truveil generates a short TRV code and a candidate invite link.</li>
+        <li><strong>Review the policy.</strong> Choose allowed sites, restricted AI destinations, and a role vocabulary list.</li>
+        <li><strong>Start only after preflight.</strong> The candidate's microphone and consent must be confirmed first.</li>
+        <li><strong>Read the report afterwards.</strong> Evidence, transcript context, and interviewer notes &mdash; saved locally.</li>
+      </ol>
+      <p class="expect-help">Stuck or something looks off? <a href="/support.html">Send a quick report</a> &mdash; we read every one.</p>
     </section>
 
     <section class="closing-band reveal">
