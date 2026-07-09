@@ -951,6 +951,16 @@ footer a:hover { color: var(--text); }
 }
 @keyframes signalLift { to { transform: scaleY(0.58); opacity: 0.55; } }
 
+/* ── SKIP LINK & LEGAL NAV ── */
+.skip-link{position:absolute;left:16px;top:-100px;z-index:120;padding:10px 16px;min-height:42px;display:inline-flex;align-items:center;gap:8px;border-radius:999px;background:#f7f8f8;color:#08090a;font-size:12px;font-weight:620;text-decoration:none;transition:top .2s ease;box-shadow:0 14px 38px rgba(0,0,0,.4)}
+.skip-link:focus,.skip-link:focus-visible{top:16px;outline:2px solid #5e6ad2;outline-offset:3px}
+.legal-header{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding:22px clamp(24px,5vw,80px) 14px;border-bottom:1px solid var(--line);background:rgba(5,5,5,.66);backdrop-filter:blur(18px)}
+.legal-header nav{display:flex;gap:22px;flex-wrap:wrap;color:var(--muted-light);font-size:13px}
+.legal-header nav a:hover{color:var(--text-bright)}
+.legal-header+.legal-page{padding-top:64px}
+@media(max-width:620px){.legal-header{padding:18px 18px 10px}.legal-header nav{gap:16px;font-size:12px}.legal-header+.legal-page{padding-top:48px}}
+@media(prefers-reduced-motion:reduce){.skip-link{transition:none}}
+
 /* ── LEGAL PAGES ── */
 .legal-page {
   width: min(860px, calc(100% - 40px));
@@ -1052,7 +1062,7 @@ footer a:hover { color: var(--text); }
   .hero h1 { font-size: clamp(42px, 13vw, 58px); }
   .hero-copy p { font-size: 15px; }
   .hero-actions { flex-direction: column; align-items: flex-start; gap: 15px; }
-  .hero-facts { flex-wrap: wrap; gap: 12px; display: none; }
+  .hero-facts { flex-wrap: wrap; gap: 10px 16px; display: flex; }
   .scroll-cue { display: none; }
   .console-metrics { grid-template-columns: 1fr; }
   .console-metrics div { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -1073,3 +1083,24 @@ footer a:hover { color: var(--text); }
   .hero-console::after, .workflow-cinema::after, .signal-showcase::after { animation: none; }
   .wave-strip i { animation: none; }
 }
+
+/* What-to-expect-from-the-beta section (pass 4) */
+.expect-band{padding:80px clamp(22px,7vw,130px) 90px;border-top:1px solid var(--line-subtle)}
+.expect-band .section-intro{margin-bottom:36px;max-width:760px}
+.expect-list{counter-reset:expect-step;display:grid;gap:14px;max-width:760px;margin:0;padding:0;list-style:none}
+.expect-list li{counter-increment:expect-step;padding:20px 22px 20px 64px;position:relative;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);line-height:1.65;color:var(--muted-light)}
+.expect-list li strong{color:var(--text-bright);font-weight:620}
+.expect-list li::before{content:"0" counter(expect-step);position:absolute;left:18px;top:18px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.expect-help{margin:24px 0 0;max-width:760px;color:var(--muted-light);font-size:14px;line-height:1.6}
+.expect-help a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px}
+.expect-help a:hover{border-bottom-color:var(--text-bright)}
+@media(max-width:620px){.expect-band{padding:64px 18px 60px}.expect-list li{padding:18px 18px 16px 56px}.expect-list li::before{left:14px;top:14px}}
+
+/* Public beta notice (non-blocking, first-viewport) */
+.beta-notice{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:11px clamp(22px,7vw,130px);margin:0;background:rgba(245,193,66,.05);border-bottom:1px solid rgba(245,193,66,.22);color:#c8d0dc;font-size:13px;letter-spacing:.01em;position:relative;z-index:80}
+.beta-notice-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(245,193,66,.16);border:1px solid rgba(245,193,66,.5);color:#f5c142;font-weight:620;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;line-height:1;white-space:nowrap}
+.beta-notice-text strong{color:#f7f9ff;font-weight:620}
+.beta-notice-text{flex:1 1 auto;min-width:200px;line-height:1.55}
+.beta-notice-link{color:#9ea7be;text-decoration:none;font-size:12px;border-bottom:1px dotted rgba(158,167,190,.4);padding-bottom:1px;white-space:nowrap}
+.beta-notice-link:hover{color:#f7f9ff;border-bottom-color:#f7f9ff}
+@media(max-width:620px){.beta-notice{padding:10px 18px;font-size:12px;gap:6px 10px;background:rgba(245,193,66,.08);flex-direction:column;align-items:flex-start}.beta-notice-text{flex-basis:auto;order:2}.beta-notice-tag{order:1}.beta-notice-link{order:3;margin-top:2px}}

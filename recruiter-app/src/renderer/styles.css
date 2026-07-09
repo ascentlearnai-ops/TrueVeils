@@ -5,6 +5,9 @@
 }
 *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:0}
 button,input,textarea,select{font:inherit;color:inherit}.orb,.noise-overlay{display:none}
+.skip-link{position:fixed;left:16px;top:-100px;z-index:200;padding:10px 16px;min-height:42px;display:inline-flex;align-items:center;gap:8px;border-radius:999px;background:#f7f8f8;color:#08090a;font-size:12px;font-weight:620;text-decoration:none;transition:top .2s ease;box-shadow:0 14px 38px rgba(0,0,0,.4);-webkit-app-region:no-drag}
+.skip-link:focus,.skip-link:focus-visible{top:60px;outline:2px solid #5e6ad2;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.skip-link{transition:none}}
 .titlebar{position:fixed;z-index:50;inset:0 0 auto;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(7,9,18,.9);backdrop-filter:blur(18px);-webkit-app-region:drag}
 .tb-left,.tb-right{display:flex;align-items:center;gap:10px}.logo{font-weight:720}.tb-app,.status-text,.auth-user{color:var(--muted);font-size:12px}.tb-divider{width:1px;height:14px;background:var(--line)}.status-dot{width:7px;height:7px;border-radius:50%;background:#5a6272}.status-dot.active,.status-dot.recording{background:var(--blue);box-shadow:0 0 14px var(--blue)}.tb-btn{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;-webkit-app-region:no-drag}.tb-btn:hover{color:var(--text);border-color:var(--line-strong)}.text-btn{width:auto;padding:0 10px}
 .screen{position:fixed;inset:48px 0 0;display:none;overflow:auto}.screen.active{display:block}
@@ -1768,3 +1771,6 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
 .reports-toolbar #reportSearch{flex:1;min-height:40px;border:1px solid #23252a;border-radius:8px;background:#08090a;padding:0 14px;color:var(--text);outline:0;font-size:13px}
 .reports-toolbar #reportSearch:focus{border-color:#5e6ad2;box-shadow:0 0 0 2px rgba(94,106,210,.22)}
 .report-actions{display:flex;gap:8px;align-items:center}
+
+/* Public beta badge (compact, in-titlebar) */
+.tb-beta-badge{display:inline-flex;align-items:center;padding:3px 8px;margin-left:8px;border-radius:999px;background:rgba(245,193,66,.14);border:1px solid rgba(245,193,66,.45);color:#f5c142;font-size:10px;font-weight:620;letter-spacing:.1em;text-transform:uppercase;line-height:1;vertical-align:middle;cursor:help}
