@@ -1019,13 +1019,13 @@ footer {
 .legal-header nav{display:flex;gap:22px;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .legal-header nav a:hover{color:var(--ink)}
 .legal-header+.legal-page{padding-top:64px}
-.beta-notice{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:11px clamp(22px,7vw,130px);margin:0;background:rgba(245,193,66,.05);border-bottom:1px solid rgba(245,193,66,.22);color:var(--muted);font-size:13px;letter-spacing:.01em;position:relative;z-index:80}
+.beta-notice{width:min(720px,100%);display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin:26px 0 0;padding:12px 15px;border:1px solid rgba(245,193,66,.28);border-radius:16px;background:linear-gradient(180deg,rgba(245,193,66,.095),rgba(245,193,66,.035));box-shadow:0 22px 70px rgba(0,0,0,.22);color:var(--muted);font-size:13px;letter-spacing:.01em;position:relative;z-index:3}
 .beta-notice-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(245,193,66,.16);border:1px solid rgba(245,193,66,.5);color:#f5c142;font-weight:620;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;line-height:1;white-space:nowrap}
 .beta-notice-text strong{color:var(--ink);font-weight:620}
-.beta-notice-text{flex:1 1 auto;min-width:200px;line-height:1.55}
-.beta-notice-link{color:var(--muted);text-decoration:none;font-size:12px;border-bottom:1px dotted rgba(156,167,187,.45);padding-bottom:1px;white-space:nowrap}
+.beta-notice-text{line-height:1.55}
+.beta-notice-link{color:#f0d18a;text-decoration:none;font-size:12px;border-bottom:1px dotted rgba(240,209,138,.45);padding-bottom:1px;white-space:nowrap}
 .beta-notice-link:hover{color:var(--ink);border-bottom-color:var(--ink)}
-@media(max-width:620px){.legal-header{padding:18px 18px 10px}.legal-header nav{gap:16px;font-size:12px}.legal-header+.legal-page{padding-top:48px}.beta-notice{padding:10px 18px;font-size:12px;gap:6px 10px;background:rgba(245,193,66,.08);flex-direction:column;align-items:flex-start}.beta-notice-text{flex-basis:auto;order:2}.beta-notice-tag{order:1}.beta-notice-link{order:3;margin-top:2px}}
+@media(max-width:620px){.legal-header{padding:18px 18px 10px}.legal-header nav{gap:16px;font-size:12px}.legal-header+.legal-page{padding-top:48px}.beta-notice{margin-top:22px;padding:12px 13px;font-size:12px;gap:7px 10px}.beta-notice-text{width:100%;order:2}.beta-notice-tag{order:1}.beta-notice-link{order:3;margin-top:0}}
 @media(prefers-reduced-motion:reduce){.skip-link{transition:none}}
 
 /* What-to-expect-from-the-beta section */
