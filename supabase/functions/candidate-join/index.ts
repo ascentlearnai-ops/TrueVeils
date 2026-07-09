@@ -7,6 +7,7 @@ Deno.serve(async (request) => {
     return new Response("ok", { headers: corsHeadersFor(request) });
   }
   try {
+    const authorization = request.headers.get("authorization") || "";
     const { joinCode, candidateName } = await request.json();
     const code = String(joinCode || "").trim().toUpperCase();
     if (!/^TRV-[A-Z0-9]{6}$/.test(code)) {
@@ -18,6 +19,24 @@ Deno.serve(async (request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } },
     );
+
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      {
+        global: { headers: { Authorization: authorization } },
+        auth: { persistSession: false },
+      },
+    );
+    const { data: authData } = await userClient.auth.getUser();
+    const candidateUser = authData.user;
+    if (!candidateUser) {
+      return Response.json({ error: "Candidate sign-in is required before joining." }, {
+        status: 401,
+        headers: corsHeadersFor(request),
+      });
+    }
+
     const { data: session, error } = await client
       .from("sessions")
       .select(
@@ -57,12 +76,22 @@ Deno.serve(async (request) => {
       "technical_vocabulary,candidate_name,role_title,policy_preset",
     ).eq("internal_id", session.internal_id).maybeSingle();
 
+    const { error: participantError } = await client.from("session_participants")
+      .upsert({
+        session_id: session.internal_id,
+        user_id: candidateUser.id,
+        participant_role: "candidate",
+        candidate_name: String(candidateName || "").slice(0, 120),
+        expires_at: new Date(exp * 1000).toISOString(),
+      }, { onConflict: "session_id,user_id" });
+    if (participantError) throw participantError;
+
     const sessionToken = await issueSessionToken({
       sessionId: session.internal_id,
       channelId: session.id,
       joinCode: code,
       candidateName: String(candidateName || "").slice(0, 120),
-      userId: candidateId,
+      userId: candidateUser.id || candidateId,
       exp,
     }, resolveSessionSecret());
 

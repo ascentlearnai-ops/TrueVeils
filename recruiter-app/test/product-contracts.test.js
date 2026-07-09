@@ -90,11 +90,22 @@ test('admin legal pages disclose advisory use and collection boundaries', () => 
 
 test('production hardening removes legacy anonymous session and audio access', () => {
   const migration = read('supabase/final-access-hardening.sql');
+  const cleanup = read('supabase/paid_beta_backend_access_cleanup.sql');
   assert.match(migration, /drop policy if exists "Truveil recent session-code access"/);
   assert.match(migration, /revoke all on public\.sessions, public\.audio_chunks from anon/);
   assert.match(migration, /private\.can_access_session\(s\.internal_id\)/);
   assert.match(migration, /revoke all on function public\.cleanup_expired_session_audio\(interval\)/);
+  assert.match(cleanup, /drop policy if exists "Truveil sessions access"/);
+  assert.match(cleanup, /drop policy if exists "session access events"/);
+  assert.match(cleanup, /drop policy if exists "session access transcripts"/);
+  assert.match(cleanup, /drop policy if exists "organization access reports"/);
   assert.doesNotMatch(migration, /to anon/);
+});
+
+test('admin joins private realtime when secure session id exists', () => {
+  const main = read('recruiter-app/main.js');
+  assert.match(main, /privateChannel:\s*Boolean\(session\.internalId\)/);
+  assert.match(main, /session\.internalId \|\| session\.sessionId/);
 });
 
 test('admin transcript scoring uses response windows and session vocabulary', () => {

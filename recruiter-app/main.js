@@ -1232,7 +1232,7 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy, techni
     console.warn('[Supabase] created local code without remote session:', session.remoteError);
   }
   if (remoteReady) {
-    joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: false }).catch((err) => {
+    joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: Boolean(session.internalId) }).catch((err) => {
       console.warn('[Realtime]', err.message);
     });
   } else {
