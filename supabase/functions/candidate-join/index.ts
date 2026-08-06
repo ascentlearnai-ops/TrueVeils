@@ -64,18 +64,27 @@ Deno.serve(async (request) => {
       });
     }
 
-    const exp = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
-    const candidateId = crypto.randomUUID();
-    const { error: readyError } = await client.from("sessions").update({ status: "candidate_ready" }).eq(
-      "internal_id",
-      session.internal_id,
-    );
-    if (readyError) throw readyError;
-
     const { data: sessionDetails } = await client.from("sessions").select(
       "technical_vocabulary,candidate_name,role_title,policy_preset",
     ).eq("internal_id", session.internal_id).maybeSingle();
 
+    const { data: existingCandidates, error: existingCandidateError } = await client
+      .from("session_participants")
+      .select("user_id")
+      .eq("session_id", session.internal_id)
+      .eq("participant_role", "candidate");
+    if (existingCandidateError) throw existingCandidateError;
+    const otherCandidate = (existingCandidates || []).find((participant) =>
+      participant.user_id && participant.user_id !== candidateUser.id
+    );
+    if (otherCandidate) {
+      return Response.json({ error: "This session is already linked to another candidate." }, {
+        status: 409,
+        headers: corsHeadersFor(request),
+      });
+    }
+
+    const exp = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
     const { error: participantError } = await client.from("session_participants")
       .upsert({
         session_id: session.internal_id,
@@ -86,12 +95,18 @@ Deno.serve(async (request) => {
       }, { onConflict: "session_id,user_id" });
     if (participantError) throw participantError;
 
+    const { error: readyError } = await client.from("sessions").update({ status: "candidate_ready" }).eq(
+      "internal_id",
+      session.internal_id,
+    );
+    if (readyError) throw readyError;
+
     const sessionToken = await issueSessionToken({
       sessionId: session.internal_id,
       channelId: session.id,
       joinCode: code,
       candidateName: String(candidateName || "").slice(0, 120),
-      userId: candidateUser.id || candidateId,
+      userId: candidateUser.id,
       exp,
     }, resolveSessionSecret());
 
@@ -113,10 +128,8 @@ Deno.serve(async (request) => {
       expiresAt: new Date(exp * 1000).toISOString(),
     }, { headers: { ...corsHeadersFor(request), "content-type": "application/json" } });
   } catch (error) {
-    const message = error instanceof Error
-      ? error.message
-      : "Could not join session.";
-    return Response.json({ error: message }, {
+    console.error("candidate-join failed", error);
+    return Response.json({ error: "Could not join session." }, {
       status: 400,
       headers: corsHeadersFor(request),
     });

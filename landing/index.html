@@ -3,223 +3,334 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Truveil gives interview teams live transcripts, monitored session events, notes, bookmarks, and evidence-first review reports.">
-  <title>Truveil - Interview verification for careful teams</title>
+  <meta name="description" content="Truveil gives hiring teams a timestamped, reviewable record of remote technical interviews. Evidence, not accusations.">
+  <meta name="theme-color" content="#04080a">
+  <title>Truveil - Evidence for every interview</title>
   <link rel="icon" type="image/png" href="img/brand/truveil-lock-transparent.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <header class="site-nav">
-    <a class="brand" href="#top" aria-label="Truveil home"><span class="brand-glyph">T</span><span>Truveil</span></a>
+  <div class="boot-sequence" aria-hidden="true">
+    <span class="boot-copy">Establishing session</span>
+    <i></i>
+  </div>
+
+  <header class="site-nav" data-site-nav>
+    <a class="brand" href="#top" aria-label="Truveil home"><span class="brand-glyph" aria-hidden="true">T</span><span>Truveil</span></a>
     <nav aria-label="Primary navigation">
       <a href="#product">Product</a>
       <a href="#how">How it works</a>
+      <a href="#evidence">Evidence</a>
       <a href="#privacy">Privacy</a>
+      <a href="#pricing">Pricing</a>
     </nav>
-    <a class="nav-cta" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download for Windows</a>
+    <div class="nav-actions">
+      <a class="nav-link" href="/support.html">Sign in</a>
+      <a class="nav-cta" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download for Windows</a>
+    </div>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
-      <div class="hero-glow"></div>
-      <div class="hero-beam" aria-hidden="true"><span></span><span></span></div>
+      <div class="ambient-grid" aria-hidden="true"></div>
       <div class="hero-copy reveal">
         <span class="eyebrow">Interview verification for careful teams</span>
-        <h1>See the interview as it happens.</h1>
-        <p>Live transcript, exact session events, interviewer notes, and evidence-first review in one focused recruiter workspace.</p>
+        <h1><span>Truveil</span> is interview verification for teams that need evidence.</h1>
+        <p>Live transcript, timestamped session events, and interviewer notes in one reviewer workspace. Truveil records what happened. You decide what it means.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download for Windows</a>
+          <a class="button button-ghost" href="#how">See the workflow</a>
+        </div>
         <aside class="beta-notice" role="status" aria-label="Truveil Command Center is in public beta">
           <span class="beta-notice-tag">Public beta</span>
-          <span class="beta-notice-text"><strong>Windows paid beta.</strong> Core reviewer workflows are stable; small issues can still appear.</span>
-          <a class="beta-notice-link" href="/support.html">Report issue</a>
+          <span><strong>Windows paid beta.</strong> Core reviewer workflows are stable; small issues can still appear.</span>
+          <a href="/support.html">Report issue</a>
         </aside>
-        <div class="hero-actions">
-          <a class="primary-action" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download Command Center</a>
-          <a class="text-action" href="#product">Explore the workflow <span aria-hidden="true">+</span></a>
-        </div>
-        <div class="hero-facts">
-          <span>Windows paid beta</span>
-          <span>No stored raw audio</span>
-          <span>Advisory evidence, not accusations</span>
-        </div>
       </div>
-      <div class="hero-console reveal" data-parallax="0.04" aria-label="Live Truveil Command Center preview">
-        <div class="console-bar">
-          <div class="console-brand"><span class="brand-glyph mini">T</span><strong>Command Center</strong></div>
-          <span class="console-session">TRV-482910</span>
-          <span class="console-live"><i></i>Live</span>
-        </div>
-        <div class="console-metrics">
-          <div><span>Transcript</span><strong>Streaming</strong></div>
-          <div><span>Evidence</span><strong>3 events</strong></div>
-          <div><span>Source</span><strong>Deepgram live</strong></div>
-        </div>
-        <div class="console-body">
-          <div class="console-transcript">
-            <div class="console-label"><span>Live transcript</span><em>Interim text</em></div>
-            <article class="transcript-question">
-              <span>Interviewer</span>
-              <p>Tell me about a difficult production incident you helped resolve.</p>
-            </article>
-            <article class="transcript-answer">
-              <span>Candidate</span>
-              <p id="liveTypeText" aria-live="off"></p><b class="typing-caret" aria-hidden="true"></b>
-            </article>
-            <div class="risk-note">
-              <span>Interviewer workflow</span>
-              <strong>Follow-up question suggested</strong>
-              <p>Ask the candidate to explain the queue tradeoff using a different example.</p>
+
+      <div class="desk-scene reveal" aria-label="Live Truveil Command Center product preview">
+        <img class="desk-plate" src="assets/generated/hero-desk.jpeg" alt="A dark walnut studio desk with a centered desktop monitor, generated for Truveil by Magic Hour">
+        <div class="room-light" aria-hidden="true"></div>
+        <div class="monitor-assembly">
+          <div class="monitor">
+            <div class="monitor-screen">
+              <div class="command-shell" aria-hidden="true">
+                <div class="command-bar">
+                  <div><span class="brand-glyph mini">T</span><strong>Command Center</strong></div>
+                  <span class="session-code">TRV-482910</span>
+                  <span class="live-label"><i class="dot dot-clear"></i>Live</span>
+                </div>
+                <div class="command-stats">
+                  <div><span>Transcript</span><strong>Streaming</strong></div>
+                  <div><span>Evidence</span><strong>4 events</strong></div>
+                  <div><span>Source</span><strong>Deepgram live</strong></div>
+                </div>
+                <div class="command-body">
+                  <section class="transcript-pane">
+                    <header><span>Live transcript</span><em>Interim text</em></header>
+                    <article><span class="speaker speaker-system">Interviewer</span><p>Tell me about a difficult production incident you helped resolve.</p></article>
+                    <article class="candidate-answer"><span class="speaker">Candidate</span><p data-live-transcript>We had a queue backlog after a schema change, so I first rolled back the release...</p><b class="typing-caret"></b></article>
+                    <div class="follow-up"><span>Suggested follow-up</span><p>Ask the candidate to explain the queue tradeoff using a different example.</p></div>
+                  </section>
+                  <aside class="evidence-pane">
+                    <header><span>Session evidence</span><em>Live</em></header>
+                    <div class="event-row"><i class="dot dot-clear"></i><time>11:42:03</time><span>Candidate joined</span></div>
+                    <div class="event-row event-flag"><i class="dot dot-flag"></i><time>11:43:51</time><span>Restricted site closed<small>chatgpt.com / Chrome</small></span></div>
+                    <div class="event-row"><i class="dot"></i><time>11:44:18</time><span>Returned to interview</span></div>
+                    <div class="event-row"><i class="dot dot-system"></i><time>11:44:20</time><span>Transcript healthy<small>Latency 1.4s</small></span></div>
+                  </aside>
+                </div>
+                <div class="command-footer"><span><i class="dot dot-clear"></i>Transcript relay healthy</span><span>Human review required</span></div>
+              </div>
             </div>
           </div>
-          <aside class="console-evidence">
-            <div class="console-label"><span>Session evidence</span><em>Live</em></div>
-            <div class="evidence-event safe"><i></i><div><strong>Candidate joined</strong><span>11:42:03</span></div></div>
-            <div class="evidence-event alert pulse-event"><i></i><div><strong>Restricted site closed</strong><span>chatgpt.com / Chrome</span></div></div>
-            <div class="evidence-event"><i></i><div><strong>Returned to interview</strong><span>11:44:18</span></div></div>
-            <div class="evidence-event"><i></i><div><strong>Transcript healthy</strong><span>Latency 1.4s</span></div></div>
-          </aside>
+          <div class="monitor-neck" aria-hidden="true"></div>
+          <div class="monitor-foot" aria-hidden="true"></div>
         </div>
-        <div class="console-footer"><span><i></i>Transcript relay healthy</span><span>Human review required</span></div>
+        <div class="desk-keyboard" aria-hidden="true"></div>
       </div>
-      <a class="scroll-cue" href="#product">Scroll to inspect</a>
+      <span class="scroll-cue" aria-hidden="true">Scroll</span>
     </section>
 
-    <section class="product-band" id="product">
-      <div class="section-intro reveal">
-        <span class="eyebrow">One operating view</span>
-        <h2>Signal arrives live. Context stays attached.</h2>
-        <p>Transcript evidence and monitored behavior remain separate, so interviewers can understand what happened without treating a score as truth.</p>
+    <section class="proof-strip" aria-label="Truveil proof points">
+      <div><strong>1.4s</strong><span>Latency</span></div>
+      <div><strong>4</strong><span>Event types</span></div>
+      <div><strong>0</strong><span>Video stored</span></div>
+      <div><strong>100%</strong><span>Human review</span></div>
+    </section>
+
+    <section class="scroll-flight" data-scroll-flight aria-labelledby="flight-title">
+      <div class="scroll-flight-sticky">
+        <div class="flight-media" aria-hidden="true">
+          <video class="active" data-flight-video data-src="assets/generated/video/truveil-scroll-01-desk-arrival.mp4" poster="assets/generated/hero-desk.jpeg" muted playsinline preload="none"></video>
+          <video data-flight-video data-src="assets/generated/video/truveil-scroll-02-screen-threshold.mp4" poster="assets/generated/evidence.jpeg" muted playsinline preload="none"></video>
+          <video data-flight-video data-src="assets/generated/video/truveil-scroll-03-signal-surface.mp4" poster="assets/generated/finish-steel.jpeg" muted playsinline preload="none"></video>
+          <video data-flight-video data-src="assets/generated/video/truveil-scroll-04-vault-flight.mp4" poster="assets/generated/vault.jpeg" muted playsinline preload="none"></video>
+          <video data-flight-video data-src="assets/generated/video/truveil-scroll-05-privacy-chamber.mp4" poster="assets/generated/privacy-room.jpeg" muted playsinline preload="none"></video>
+          <video data-flight-video data-src="assets/generated/video/truveil-scroll-06-review-surface.mp4" poster="assets/generated/finish-walnut.jpeg" muted playsinline preload="none"></video>
+          <video data-flight-video data-src="assets/generated/video/truveil-scroll-07-verified-exit.mp4" poster="assets/generated/footer-void.jpeg" muted playsinline preload="none"></video>
+        </div>
+        <div class="flight-shade" aria-hidden="true"></div>
+        <div class="flight-head">
+          <span class="eyebrow">Inside a verified session</span>
+          <strong id="flight-title">From conversation to reviewable record.</strong>
+        </div>
+        <div class="flight-copy" aria-live="polite">
+          <article class="active" data-flight-copy><span>01 / 07</span><h2>The session begins in a room, not a black box.</h2><p>Truveil stays visible while the interview remains human.</p></article>
+          <article data-flight-copy><span>02 / 07</span><h2>The live conversation becomes structured evidence.</h2><p>Transcript, source, and timing remain connected.</p></article>
+          <article data-flight-copy><span>03 / 07</span><h2>Signals keep their edges.</h2><p>No confidence theater. No hidden score. Just what happened.</p></article>
+          <article data-flight-copy><span>04 / 07</span><h2>Every event enters the Vault.</h2><p>A durable session record, arranged for review.</p></article>
+          <article data-flight-copy><span>05 / 07</span><h2>Private by architecture.</h2><p>Narrow inputs, explicit consent, and no camera recording.</p></article>
+          <article data-flight-copy><span>06 / 07</span><h2>Context returns to the reviewer.</h2><p>The interface supports judgment. It does not replace it.</p></article>
+          <article data-flight-copy><span>07 / 07</span><h2>Evidence in. Human decision out.</h2><p>That is the entire promise.</p></article>
+        </div>
+        <div class="flight-progress" aria-hidden="true"><i data-flight-progress></i><span data-flight-index>01</span></div>
       </div>
-      <div class="workflow-cinema reveal" aria-label="Designed Truveil product workflow preview">
-        <section class="cinema-panel invite-demo">
-          <div class="cinema-label">Create session</div>
-          <div class="code-slab"><span>Candidate code</span><strong>TRV-482910</strong></div>
-          <div class="invite-demo-grid">
-            <span>Policy preset</span><strong>Standard technical</strong>
-            <span>Candidate status</span><strong class="ready-text">Preflight ready</strong>
-            <span>Transcription</span><strong>Deepgram live</strong>
+      <div class="flight-fallback">
+        <img src="assets/generated/vault.jpeg" alt="A long, illuminated evidence vault generated for Truveil by Magic Hour">
+        <span class="eyebrow">Inside a verified session</span>
+        <h2>Conversation becomes evidence, then returns to a human reviewer.</h2>
+        <p>Seven generated scenes trace the record from the interview desk through the evidence Vault.</p>
+      </div>
+    </section>
+
+    <section class="problem-section section" id="product">
+      <div class="vault-wrap" aria-hidden="true">
+        <img class="section-plate vault-plate" src="assets/generated/vault.jpeg" alt="">
+        <div class="session-vault">
+          <span class="vault-face face-a"></span><span class="vault-face face-b"></span><span class="vault-face face-c"></span>
+          <span class="vault-face face-d"></span><span class="vault-face face-e"></span><span class="vault-face face-f"></span>
+          <strong>TRV</strong>
+        </div>
+      </div>
+      <div class="problem-copy reveal">
+        <span class="eyebrow">The gap</span>
+        <h2>Assistance got very good, very fast. Hiring didn&apos;t get better evidence.</h2>
+        <div class="problem-lines">
+          <p>Assistance tools like Cluely made real-time interview help a product category.</p>
+          <p>Most teams still respond by guessing from pauses, eye movement, or a feeling they cannot defend.</p>
+          <p>A hunch is not reviewable. It is not fair to the candidate, and it does not hold up when someone asks why.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="workflow-section section" id="how">
+      <div class="section-heading reveal">
+        <span class="eyebrow">How it works</span>
+        <h2>A record builds itself while people talk.</h2>
+        <p>Three deliberate steps. No hidden certainty, no automatic verdict.</p>
+      </div>
+      <div class="workflow-cinema">
+        <article class="cinema-panel reveal">
+          <span class="step-number">01</span>
+          <div class="step-copy"><h3>Candidate checks in.</h3><p>Your recruiter sends a session code. The candidate opens Truveil Secure, enters it, and consents before anything starts.</p></div>
+          <div class="secure-card">
+            <span class="secure-kicker">Interview check-in</span>
+            <strong>Enter your session code</strong>
+            <code>TRV-482910</code>
+            <span class="secure-button">Start secure session</span>
           </div>
-          <button type="button">Copy invite message</button>
-        </section>
-        <section class="cinema-panel transcript-demo">
-          <div class="cinema-label">Live transcript</div>
-          <div class="speaker-line interviewer"><span>Interviewer</span><p>Walk me through a production incident you owned.</p></div>
-          <div class="speaker-line candidate"><span>Candidate</span><p>I rolled back the deploy first, then checked the queue consumers because the schema mismatch was still replaying failed jobs.</p></div>
-          <div class="wave-strip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        </section>
-        <section class="cinema-panel evidence-demo">
-          <div class="cinema-label">Evidence timeline</div>
-          <div class="evidence-line ok"><span>11:42</span><strong>Candidate joined</strong></div>
-          <div class="evidence-line high"><span>11:44</span><strong>chatgpt.com closed</strong></div>
-          <div class="evidence-line"><span>11:45</span><strong>Returned to interview</strong></div>
-          <div class="report-chip">Report band: Review</div>
-        </section>
-      </div>
-      <div class="signal-showcase reveal">
-        <div class="signal-column">
-          <div class="showcase-label">Foreground monitoring</div>
-          <div class="signal-row active"><span>Restricted destination</span><strong>chatgpt.com</strong><em>Closed + reported</em></div>
-          <div class="signal-row"><span>Meeting tool</span><strong>meet.google.com</strong><em>Allowed</em></div>
-          <div class="signal-row"><span>Foreground app</span><strong>Visual Studio Code</strong><em>Review event</em></div>
-          <div class="signal-row"><span>Transcript relay</span><strong>Deepgram streaming</strong><em>Healthy</em></div>
-        </div>
-        <div class="analysis-column">
-          <div class="showcase-label">Reviewable transcript evidence</div>
-          <blockquote>"I first rolled back the release, then realized the queue consumers were still holding the old schema. We drained those, replayed the failed jobs, and added a compatibility check afterward."</blockquote>
-          <div class="analysis-summary">
-            <span>Latest response</span>
-            <strong>Transcript context available</strong>
-            <p>Specific sequence and grounded remediation details are preserved for interviewer review. Transcript patterns never override observed behavior.</p>
+        </article>
+        <article class="cinema-panel reveal">
+          <span class="step-number">02</span>
+          <div class="step-copy"><h3>The session records itself.</h3><p>Transcript streams live. Events are logged with timestamps and sources. Nothing is inferred, nothing is scored.</p></div>
+          <div class="mini-ledger">
+            <div><time>11:42:03</time><span>Candidate joined</span></div>
+            <div><time>11:43:51</time><span>Restricted site closed</span></div>
+            <div><time>11:44:18</time><span>Returned to interview</span></div>
           </div>
-          <div class="analysis-tags"><span>Specific example</span><span>Natural correction</span><span>Sequence detail</span></div>
+        </article>
+        <article class="cinema-panel reveal">
+          <span class="step-number">03</span>
+          <div class="step-copy"><h3>A human reviews the evidence.</h3><p>Command Center hands your team a timeline, not a verdict. Every flag has a time, a source, and what happened next.</p></div>
+          <div class="review-card"><span>Flag reviewed</span><strong>chatgpt.com / Chrome</strong><time>11:43:51</time><p>Resolved: returned to interview at 11:44:18</p></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="tour-section section" aria-labelledby="tour-title">
+      <div class="section-heading reveal">
+        <span class="eyebrow">Command Center</span>
+        <h2 id="tour-title">One operating view. Four review tools.</h2>
+      </div>
+      <div class="feature-tour" data-feature-tour tabindex="0" aria-label="Command Center feature tour">
+        <article><span>01</span><h3>Live transcript</h3><p>Interim and final text stays speaker-labeled at sub-two-second latency.</p><div class="tour-fragment transcript-fragment"><b>Interviewer</b><p>What did you check first?</p><b>Candidate</b><p>The queue consumers and the schema version.</p></div></article>
+        <article><span>02</span><h3>Session evidence</h3><p>Every event carries a timestamp, source application, and resolution.</p><div class="tour-fragment ledger-fragment"><time>11:43:51</time><strong>Restricted site closed</strong><small>Chrome / chatgpt.com</small></div></article>
+        <article><span>03</span><h3>Interviewer workflow</h3><p>Suggested follow-ups turn a signal into a better interview question.</p><blockquote>Ask for the queue tradeoff using a different example.</blockquote></article>
+        <article><span>04</span><h3>Review and export</h3><p>A shareable record your hiring team and legal reviewer can both read.</p><div class="tour-fragment export-fragment"><span>Session record</span><strong>Ready for human review</strong><i>PDF</i></div></article>
+      </div>
+      <div class="tour-progress" aria-hidden="true"><i data-tour-progress></i></div>
+    </section>
+
+    <section class="finish-section section" aria-labelledby="finish-title">
+      <div class="section-heading centered reveal">
+        <span class="eyebrow">Make it yours</span>
+        <h2 id="finish-title">Four finishes. One set of signals.</h2>
+        <p>Command Center adapts to your room. Evidence colors do not. A flag looks the same in every theme.</p>
+      </div>
+      <div class="finish-picker reveal">
+        <div class="swatch-row" role="radiogroup" aria-label="Command Center finish" data-finish-picker>
+          <span class="selection-ring" aria-hidden="true"></span>
+          <button class="swatch obsidian" type="button" role="radio" aria-checked="true" aria-label="Obsidian" data-finish="obsidian"></button>
+          <button class="swatch walnut" type="button" role="radio" aria-checked="false" aria-label="Walnut" data-finish="walnut" tabindex="-1"></button>
+          <button class="swatch bone" type="button" role="radio" aria-checked="false" aria-label="Bone" data-finish="bone" tabindex="-1"></button>
+          <button class="swatch steel" type="button" role="radio" aria-checked="false" aria-label="Steel" data-finish="steel" tabindex="-1"></button>
+        </div>
+        <span class="finish-name" data-finish-name>Obsidian</span>
+      </div>
+      <div class="finish-stage reveal" data-finish-stage data-finish="obsidian">
+        <div class="finish-plates" aria-hidden="true">
+          <img class="active" data-finish-plate="obsidian" src="assets/generated/finish-obsidian.jpeg" alt="">
+          <img data-finish-plate="walnut" src="assets/generated/finish-walnut.jpeg" alt="">
+          <img data-finish-plate="bone" src="assets/generated/finish-bone.jpeg" alt="">
+          <img data-finish-plate="steel" src="assets/generated/finish-steel.jpeg" alt="">
+        </div>
+        <div class="finish-device">
+          <div class="finish-titlebar"><span><i class="dot dot-clear"></i>Command Center</span><code>TRV-482910</code></div>
+          <div class="finish-grid">
+            <section><span>Live transcript</span><p><b>Interviewer</b> Tell me what you did when the queue began backing up.</p><p><b>Candidate</b> I rolled back first, then drained the old consumers.</p></section>
+            <aside><span>Session evidence</span><div><i class="dot dot-clear"></i><time>11:42:03</time>Candidate joined</div><div class="finish-alert"><i class="dot dot-flag"></i><time>11:43:51</time>Restricted site closed</div><div><i class="dot"></i><time>11:44:18</time>Returned to interview</div></aside>
+          </div>
         </div>
       </div>
-      <div class="buyer-grid reveal" aria-label="Client readiness points">
-        <article><span>For pilots</span><strong>Clear beta boundary</strong><p>Recruiters see what is stable, what is advisory, and where human review is required.</p></article>
-        <article><span>For compliance</span><strong>Candidate-respectful scope</strong><p>No camera, no screen recording, no file access, and no automated hiring decision.</p></article>
-        <article><span>For operations</span><strong>Evidence stays attached</strong><p>Session code, transcript health, foreground events, and reviewer notes stay in one workflow.</p></article>
-      </div>
     </section>
 
-    <section class="flow-band" id="how">
-      <div class="flow-heading reveal">
-        <span class="eyebrow">A deliberate workflow</span>
-        <h2>Set policy. Share code. Stay in control.</h2>
+    <section class="candidate-section section">
+      <div class="candidate-device reveal" aria-label="Truveil Secure candidate app preview">
+        <div class="candidate-titlebar"><span class="brand-glyph mini">T</span><strong>Truveil Secure</strong><span><i class="dot dot-clear"></i>Ready</span></div>
+        <div class="candidate-body">
+          <div class="candidate-vault" aria-hidden="true"><strong>TRV</strong></div>
+          <span class="eyebrow">Interview check-in</span>
+          <h3>Enter your session code</h3>
+          <code>TRV-482910</code>
+          <span class="secure-button">Start secure session</span>
+        </div>
       </div>
-      <ol class="flow-list">
-        <li class="reveal"><span>01</span><div><h3>Configure the session</h3><p>Select allowed meeting tools and restricted destinations before the candidate joins.</p></div></li>
-        <li class="reveal"><span>02</span><div><h3>Candidate consents</h3><p>Truveil Secure explains the session check, requests microphone access, and joins with a short-lived code.</p></div></li>
-        <li class="reveal"><span>03</span><div><h3>Review live evidence</h3><p>See transcript health, exact foreground changes, and restricted-destination events as they happen.</p></div></li>
-        <li class="reveal"><span>04</span><div><h3>Export a careful report</h3><p>The report preserves transcript and event evidence while making clear that the assessment is probabilistic.</p></div></li>
-      </ol>
-    </section>
-
-    <section class="privacy-band" id="privacy">
-      <div class="privacy-visual privacy-stack reveal">
-        <div class="privacy-row"><span>No camera</span><strong>Off by design</strong></div>
-        <div class="privacy-row"><span>No screen recording</span><strong>Events only</strong></div>
-        <div class="privacy-row"><span>No file or clipboard access</span><strong>Outside scope</strong></div>
-        <div class="privacy-row"><span>No raw audio report</span><strong>Transcript retained</strong></div>
-        <div class="privacy-row"><span>Candidate consent</span><strong>Required first</strong></div>
-      </div>
-      <div class="privacy-copy reveal">
-        <span class="eyebrow">Candidate-respectful by design</span>
-        <h2>Strong verification should still be understandable.</h2>
-        <p>Candidates consent before monitoring begins. Truveil is designed without camera, screen recording, file access, or clipboard collection. Raw fallback audio is deleted after transcription. Reports retain evidence for 30 days by default and can be deleted sooner.</p>
-        <ul>
-          <li>Explicit session consent</li>
-          <li>Clear restricted-site policy</li>
-          <li>No hidden certainty claims or automated hiring decision</li>
-          <li>Desktop-only enforcement disclosed honestly</li>
+      <div class="candidate-copy reveal">
+        <span class="eyebrow">The other side of the table</span>
+        <h2>One code. A clear check-in. Then your interview.</h2>
+        <p>Truveil Secure asks for consent, shows connection health, and gets out of the way. No stress meters, no eye tracking, no scoring the candidate as a person.</p>
+        <ul class="check-list">
+          <li>Explicit consent before the session starts</li>
+          <li>Visible status the whole time</li>
+          <li>Uninstallable the moment the interview ends</li>
+          <li>No video or biometric data collected</li>
         </ul>
       </div>
     </section>
 
-    <section class="expect-band" aria-label="What to expect from the beta">
-      <div class="section-intro reveal">
-        <span class="eyebrow">First run in beta</span>
-        <h2>Create your first verified interview in five clear steps.</h2>
-      </div>
-      <ol class="expect-list">
-        <li><strong>Sign in once.</strong> Use the email link or paste the 6-digit code from your inbox.</li>
-        <li><strong>Create a session.</strong> Truveil generates a short TRV code and a candidate invite link.</li>
-        <li><strong>Review the policy.</strong> Choose allowed sites, restricted AI destinations, and a role vocabulary list.</li>
-        <li><strong>Start only after preflight.</strong> The candidate's microphone and consent must be confirmed first.</li>
-        <li><strong>Read the report afterwards.</strong> Evidence, transcript context, and interviewer notes &mdash; saved locally.</li>
-      </ol>
-      <p class="expect-help">Stuck or something looks off? <a href="/support.html">Send a quick report</a> &mdash; we read every one.</p>
-    </section>
-
-    <section class="readiness-band" aria-label="Deployment readiness">
-      <div class="section-intro reveal">
-        <span class="eyebrow">Sellable beta readiness</span>
-        <h2>Designed for paid pilots, not vague demos.</h2>
-        <p>Truveil focuses on the pieces a real client asks about first: consent, evidence quality, limited collection, reviewer control, and support when a beta edge case appears.</p>
-      </div>
-      <div class="readiness-list">
-        <article class="reveal"><span>Trust</span><strong>Privacy claims are specific</strong><p>The product says exactly what it does not collect and keeps certainty claims out of the report.</p></article>
-        <article class="reveal"><span>Workflow</span><strong>Recruiters get one operating view</strong><p>Create the session, monitor the candidate check-in, follow the transcript, and review evidence without switching contexts.</p></article>
-        <article class="reveal"><span>Support</span><strong>Beta feedback has a path</strong><p>Issue reporting is visible, simple, and connected to the first-run experience.</p></article>
+    <section class="ledger-section section" id="evidence">
+      <div class="ledger-vault" aria-hidden="true"></div>
+      <div class="signature-ledger reveal">
+        <div><time>11:42:03</time><span>Candidate joined</span></div>
+        <div><time>11:42:05</time><span>Consent confirmed</span></div>
+        <div><time>11:42:07</time><span>Transcript relay healthy</span></div>
+        <div><time>11:43:51</time><span>Restricted site closed - chatgpt.com / Chrome</span></div>
+        <div><time>11:44:18</time><span>Returned to interview</span></div>
+        <div><time>11:52:40</time><span>Session closed</span></div>
+        <div><time>11:52:40</time><span>Record sealed - awaiting human review</span></div>
+        <p>Evidence, not accusations.</p>
       </div>
     </section>
 
-    <section class="closing-band reveal">
-      <span class="eyebrow">Windows paid beta</span>
-      <h2>Make the next interview easier to trust.</h2>
-      <a class="primary-action" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download Truveil Command Center</a>
+    <section class="privacy-section section" id="privacy">
+      <figure class="privacy-media reveal">
+        <img src="assets/generated/privacy-room.jpeg" alt="A sealed glass review room inside a dark evidence archive, generated for Truveil by Magic Hour">
+        <figcaption>Private by architecture <span>Generated with Magic Hour</span></figcaption>
+      </figure>
+      <div class="privacy-card reveal">
+        <span class="eyebrow">Privacy, in plain language</span>
+        <h2>What Truveil doesn&apos;t do.</h2>
+        <div class="privacy-grid">
+          <article><h3>No video recording</h3><p>No camera feed and no screen recording. Truveil stores timestamped events, not a film of the candidate.</p></article>
+          <article><h3>No biometric analysis</h3><p>No eye tracking, emotion detection, facial scoring, or claims about what a person feels.</p></article>
+          <article><h3>No automated pass or fail</h3><p>Advisory evidence supports a human review. Truveil never makes the hiring decision.</p></article>
+        </div>
+        <p class="privacy-note">Consent is collected in-app before any session begins. Candidates can end a session at any time.</p>
+      </div>
+    </section>
+
+    <section class="pricing-section section" id="pricing">
+      <div class="section-heading reveal">
+        <span class="eyebrow">Windows paid beta</span>
+        <h2>Start small. Keep the record.</h2>
+        <p>Per interview or monthly. No surprise fees.</p>
+      </div>
+      <div class="pricing-grid">
+        <article class="reveal"><span>Starter</span><strong>$9<small>/month</small></strong><p>For teams running occasional technical interviews.</p><ul><li>10 interview sessions</li><li>Live transcript and evidence</li><li>PDF record per session</li><li>Email support</li></ul><a class="button button-ghost" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Choose Starter</a></article>
+        <article class="featured reveal"><span>Growth <em>Most teams</em></span><strong>$29<small>/month</small></strong><p>For teams with an active engineering pipeline.</p><ul><li>Unlimited sessions</li><li>Up to five reviewers</li><li>Priority transcript relay</li><li>CSV export</li></ul><a class="button button-primary" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Choose Growth</a></article>
+        <article class="reveal"><span>Enterprise</span><strong>Custom</strong><p>For staffing groups and larger talent teams.</p><ul><li>Unlimited reviewers</li><li>SSO and SAML planning</li><li>Compliance reports</li><li>Dedicated support</li></ul><a class="button button-ghost" href="/support.html">Talk to us</a></article>
+      </div>
+    </section>
+
+    <section class="faq-section section" aria-labelledby="faq-title">
+      <div class="section-heading reveal"><span class="eyebrow">FAQ</span><h2 id="faq-title">Questions careful teams ask first.</h2></div>
+      <div class="faq-list reveal">
+        <details><summary>What does the candidate see?<span>+</span></summary><p>A clear consent notice, session-code field, microphone health, connection status, and restricted-site policy. They never see a risk score.</p></details>
+        <details><summary>What data is stored?<span>+</span></summary><p>The review record can include transcript text, timestamped session events, sources, notes, and follow-up prompts. Raw fallback audio is deleted after transcription.</p></details>
+        <details><summary>Does Truveil work on Mac?<span>+</span></summary><p>The paid beta is Windows only. We would rather state that plainly than promise a platform we are not ready to support.</p></details>
+        <details><summary>How do you handle false positives?<span>+</span></summary><p>Truveil does not produce an accusation or automatic rejection. Every signal remains attached to context and requires human review.</p></details>
+        <details><summary>Does Truveil make hiring decisions?<span>+</span></summary><p>No. It produces a reviewable record. The hiring team decides what the evidence means.</p></details>
+        <details><summary>How stable is the beta?<span>+</span></summary><p>Core reviewer workflows are stable. Small issues can still appear, and support is visible in both apps and on this site.</p></details>
+      </div>
+    </section>
+
+    <section class="closing-section section reveal">
+      <span class="eyebrow">Evidence, not accusations</span>
+      <h2>Run your next interview on evidence.</h2>
+      <p>Give your hiring team a record they can review and your candidates a process they can understand.</p>
+      <div class="hero-actions"><a class="button button-primary" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download for Windows</a><a class="button button-ghost" href="/support.html">Talk to us</a></div>
+      <code>Windows 10/11 - Paid beta - Cancel anytime</code>
     </section>
   </main>
 
   <footer>
-    <a class="brand" href="#top"><span class="brand-glyph">T</span><span>Truveil</span></a>
-    <p>Advisory interview verification. Human review required.</p>
-    <a href="/downloads/TruveilRecruiter-Setup-1.0.0.exe.sha256" download>SHA-256 checksum</a>
-    <a href="/privacy.html">Privacy</a>
-    <a href="/terms.html">Terms</a>
-    <a href="/legal.html">Trust & Legal</a>
-    <a href="/support.html">Support</a>
-    <span>2026 Truveil</span>
+    <div class="footer-brand"><a class="brand" href="#top"><span class="brand-glyph" aria-hidden="true">T</span><span>Truveil</span></a><p>Evidence for careful hiring teams.</p><span>&copy; 2026 Truveil</span></div>
+    <div><strong>Product</strong><a href="#product">Command Center</a><a href="#how">How it works</a><a href="#pricing">Pricing</a></div>
+    <div><strong>Company</strong><a href="/support.html">Support</a><a href="/downloads/TruveilRecruiter-Setup-1.0.0.exe" download>Download</a><a href="/downloads/TruveilRecruiter-Setup-1.0.0.exe.sha256" download>Checksum</a></div>
+    <div><strong>Legal</strong><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/legal.html">Trust &amp; Legal</a></div>
   </footer>
   <script src="site.js"></script>
 </body>

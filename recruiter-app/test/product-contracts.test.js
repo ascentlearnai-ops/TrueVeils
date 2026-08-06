@@ -91,6 +91,7 @@ test('admin legal pages disclose advisory use and collection boundaries', () => 
 test('production hardening removes legacy anonymous session and audio access', () => {
   const migration = read('supabase/final-access-hardening.sql');
   const cleanup = read('supabase/paid_beta_backend_access_cleanup.sql');
+  const repair = read('supabase/paid_beta_p0_repair.sql');
   assert.match(migration, /drop policy if exists "Truveil recent session-code access"/);
   assert.match(migration, /revoke all on public\.sessions, public\.audio_chunks from anon/);
   assert.match(migration, /private\.can_access_session\(s\.internal_id\)/);
@@ -99,6 +100,10 @@ test('production hardening removes legacy anonymous session and audio access', (
   assert.match(cleanup, /drop policy if exists "session access events"/);
   assert.match(cleanup, /drop policy if exists "session access transcripts"/);
   assert.match(cleanup, /drop policy if exists "organization access reports"/);
+  assert.match(repair, /create policy "session participants insert audio chunks"/);
+  assert.match(repair, /private\.can_access_session\(s\.internal_id\)/);
+  assert.match(repair, /s\.status in \('candidate_ready', 'active'\)/);
+  assert.doesNotMatch(repair, /to anon/);
   assert.doesNotMatch(migration, /to anon/);
 });
 
@@ -106,6 +111,19 @@ test('admin joins private realtime when secure session id exists', () => {
   const main = read('recruiter-app/main.js');
   assert.match(main, /privateChannel:\s*Boolean\(session\.internalId\)/);
   assert.match(main, /session\.internalId \|\| session\.sessionId/);
+});
+
+test('candidate join blocks duplicate candidate participants before setting session ready', () => {
+  const source = read('supabase/functions/candidate-join/index.ts');
+  assert.match(source, /session_participants/);
+  assert.match(source, /participant_role"\), "candidate"|participant_role", "candidate"/);
+  assert.match(source, /This session is already linked to another candidate/);
+  assert.match(source, /otherCandidate/);
+  assert.ok(
+    source.indexOf('session_participants') < source.indexOf('status: "candidate_ready"'),
+    'participant membership should be checked before candidate_ready update',
+  );
+  assert.doesNotMatch(source, /crypto\.randomUUID\(\)/);
 });
 
 test('admin transcript scoring uses response windows and session vocabulary', () => {
