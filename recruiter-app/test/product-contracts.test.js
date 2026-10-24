@@ -12,8 +12,10 @@ test('admin website uses a site-local installer and honest advisory language', (
   assert.doesNotMatch(html, /github\.com\/.*releases/i);
   assert.match(html, /Advisory evidence/i);
   assert.doesNotMatch(html, /img\/candidate\.png/i);
-  assert.match(html, /workflow-cinema/i);
-  assert.match(html, /cinema-panel/i);
+  assert.match(html, /role="tablist"/i);
+  assert.match(html, /Interactive product preview/i);
+  assert.match(html, /waitlist\.html/i);
+  assert.match(html, /assets\/brand\/tavi/i);
   assert.doesNotMatch(html, /admin-app-real\.png|candidate-app-real\.png/i);
   assert.doesNotMatch(html, /truveil-horizontal-transparent\.png/i);
 });

@@ -5,6 +5,7 @@
   "main": "main.js",
   "author": "Truveil Inc.",
   "scripts": {
+    "build:website-demo": "node scripts/build-website-demo.js",
     "test": "node --test test/*.test.js",
     "release:check": "node scripts/check-release.js",
     "prestart": "node scripts/write-runtime-config.js",
@@ -26,6 +27,8 @@
   },
   "devDependencies": {
     "electron": "^31.7.7",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "esbuild": "^0.25.0",
+    "linkedom": "^0.18.13"
   }
 }

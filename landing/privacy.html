@@ -1,60 +1,232 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Truveil Privacy Notice</title>
-  <link rel="icon" type="image/png" href="img/brand/truveil-lock-transparent.png">
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <a class="skip-link" href="#legal-main">Skip to content</a>
-  <header class="legal-header">
-    <a class="brand" href="/" aria-label="Truveil home"><span class="brand-glyph">T</span><span>Truveil</span></a>
-    <nav aria-label="Legal navigation">
-      <a href="/privacy.html">Privacy</a>
-      <a href="/terms.html">Terms</a>
-      <a href="/legal.html">Trust &amp; Legal</a>
-      <a href="/support.html">Support</a>
-    </nav>
-  </header>
-  <main class="legal-page" id="legal-main">
-    <a class="legal-back" href="/">Back to Truveil</a>
-    <p class="legal-kicker">Privacy notice</p>
-    <h1>Interview evidence should be clear before the session starts.</h1>
-    <p>Truveil is a consent-based interview verification product for technical hiring teams. This notice explains the information Truveil is designed to process during a verified interview.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Truveil beta product information, privacy, and support."
+    />
+    <meta name="theme-color" content="#edf7fd" />
+    <meta property="og:title" content="Truveil Privacy Notice" />
+    <meta
+      property="og:description"
+      content="Truveil beta product information, privacy, and support."
+    />
+    <meta
+      property="og:image"
+      content="https://truveil-recruiter.vercel.app/assets/brand/hero.webp"
+    />
+    <title>Truveil Privacy Notice</title>
+    <link rel="icon" type="image/png" href="assets/brand/favicon.png" />
+    <link
+      rel="preload"
+      href="assets/fonts/manrope-regular.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="site.js" defer></script>
+  </head>
+  <body data-audience="recruiter">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav wrap">
+      <a class="brand" href="index.html" aria-label="Truveil home"
+        ><img src="assets/brand/mark.png" width="36" height="34" alt="" /><span
+          >truveil</span
+        ></a
+      >
+      <nav class="nav-center" id="main-navigation" aria-label="Main navigation">
+        <a href="index.html#product">The product</a
+        ><a href="guide.html">How it works</a
+        ><a href="privacy.html">Our approach</a
+        ><a href="https://truveil-secure.vercel.app">For candidates</a>
+        <a class="mobile-login" href="login.html">Sign in</a>
+      </nav>
+      <div class="nav-account">
+        <a href="login.html">Sign in</a
+        ><a class="btn small" href="waitlist.html"
+          >Join the waitlist
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-6-6 6 6-6 6" /></svg
+        ></a>
+      </div>
+      <button
+        class="menu-toggle"
+        aria-label="Open navigation"
+        aria-expanded="false"
+        aria-controls="main-navigation"
+      >
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+    </header>
+    <main class="legal-wrap" id="main">
+      <a class="legal-back text-link" href="/">Back to Truveil</a>
+      <p class="legal-kicker eyebrow">Privacy notice</p>
+      <h1>Interview evidence should be clear before the session starts.</h1>
+      <p>
+        Truveil is a consent-based interview verification product for technical
+        hiring teams. This notice explains the information Truveil is designed
+        to process during a verified interview.
+      </p>
 
-    <h2>Information processed during a session</h2>
-    <ul>
-      <li>Session details such as recruiter, candidate name, role, join code, policy preset, allowed destinations, and restricted destinations.</li>
-      <li>Live transcript text, transcript source, timestamps, confidence metadata when available, and response-window analysis context.</li>
-      <li>Foreground application names, window titles, browser host or URL when Windows exposes it, detection source, matched policy rule, and restricted-target events.</li>
-      <li>Interviewer notes, bookmarks, follow-up prompts, report metadata, and review-band output.</li>
-    </ul>
+      <h2>Information processed during a session</h2>
+      <ul>
+        <li>
+          Session details such as recruiter, candidate name, role, join code,
+          policy preset, allowed destinations, and restricted destinations.
+        </li>
+        <li>
+          Live transcript text, transcript source, timestamps, confidence
+          metadata when available, and response-window analysis context.
+        </li>
+        <li>
+          Foreground application names, window titles, browser host or URL when
+          Windows exposes it, detection source, matched policy rule, and
+          restricted-target events.
+        </li>
+        <li>
+          Interviewer notes, bookmarks, follow-up prompts, report metadata, and
+          review-band output.
+        </li>
+      </ul>
 
-    <h2>Audio handling</h2>
-    <p>Truveil is designed to use microphone audio for live transcription. Raw audio is not included in reports. Temporary fallback audio, when used, should be deleted after transcription or failure handling.</p>
+      <h2>Audio handling</h2>
+      <p>
+        Truveil is designed to use microphone audio for live transcription. Raw
+        audio is not included in reports. Temporary fallback audio, when used,
+        should be deleted after transcription or failure handling.
+      </p>
 
-    <h2>Information not intentionally collected</h2>
-    <ul>
-      <li>No camera video.</li>
-      <li>No screen recording.</li>
-      <li>No file-system access to candidate documents.</li>
-      <li>No clipboard collection.</li>
-      <li>No browser-history scraping outside the active foreground detection available during the session.</li>
-    </ul>
+      <h2>Information not intentionally collected</h2>
+      <ul>
+        <li>No camera video.</li>
+        <li>No screen recording.</li>
+        <li>No file-system access to candidate documents.</li>
+        <li>No clipboard collection.</li>
+        <li>
+          No browser-history scraping outside the active foreground detection
+          available during the session.
+        </li>
+      </ul>
 
-    <h2>Retention</h2>
-    <p>Reports and transcript evidence are retained for up to 30 days by default during beta unless the customer deletes them sooner or requests deletion through support.</p>
+      <h2>Retention</h2>
+      <p>
+        Reports and transcript evidence are retained for up to 30 days by
+        default during beta unless the customer deletes them sooner or requests
+        deletion through support.
+      </p>
 
-    <h2>Customer responsibilities</h2>
-    <p>Customers are responsible for giving candidates appropriate notice, obtaining consent, configuring policies fairly, and using Truveil evidence as human-reviewed context rather than an automated hiring decision.</p>
+      <h2>Customer responsibilities</h2>
+      <p>
+        Customers are responsible for giving candidates appropriate notice,
+        obtaining consent, configuring policies fairly, and using Truveil
+        evidence as human-reviewed context rather than an automated hiring
+        decision.
+      </p>
 
-    <h2>Requests</h2>
-    <p>For deletion, privacy, or support requests, contact <a href="mailto:support@truveil.com">support@truveil.com</a>.</p>
+      <h2>Requests</h2>
+      <p>
+        For deletion, privacy, or support requests, contact
+        <a href="mailto:support@truveil.com">support@truveil.com</a>.
+      </p>
 
-    <p class="legal-note">This beta notice is provided for product transparency and does not replace legal advice for your organization.</p>
-    <p><a href="/terms.html">Terms</a> · <a href="/legal.html">Trust & Legal</a> · <a href="/support.html">Support</a></p>
-  </main>
-</body>
+      <section>
+        <h2>Website waitlist and sign-in</h2>
+        <p>
+          When you join the waitlist, we store your email, audience selection,
+          optional name and company, and consent timestamp so we can contact you
+          about early access and product updates. To help prevent abuse, we use
+          short-lived keyed hashes of request IP addresses for rate limiting;
+          the waitlist does not store raw IP addresses.
+        </p>
+        <p>
+          Website sign-in uses a short-lived, secure session cookie. Preparation
+          checklist choices are saved only in this browser. Contact
+          <a href="mailto:support@truveil.com">support@truveil.com</a> to opt
+          out of updates or request deletion of your waitlist details.
+        </p>
+      </section>
+      <p class="legal-note">
+        This beta notice is provided for product transparency and does not
+        replace legal advice for your organization.
+      </p>
+      <p>
+        <a href="/terms.html">Terms</a> ·
+        <a href="/legal.html">Trust &amp; Legal</a> ·
+        <a href="/support.html">Support</a>
+      </p>
+    </main>
+    <footer class="footer wrap">
+      <div class="footer-top">
+        <div>
+          <a class="brand" href="index.html"
+            ><img
+              src="assets/brand/mark.png"
+              width="36"
+              height="34"
+              alt=""
+            /><span>truveil</span></a
+          >
+          <p>Interview integrity.<br />Evidence for people, not verdicts.</p>
+        </div>
+        <div class="footer-links">
+          <strong>GET TO KNOW US</strong
+          ><a href="index.html">For hiring teams</a
+          ><a href="guide.html">Getting started</a
+          ><a href="waitlist.html">Join the waitlist</a
+          ><a href="login.html">Sign in</a
+          ><a download="" href="/downloads/TruveilRecruiter-Setup-1.0.0.exe"
+            >Download for Windows</a
+          >
+        </div>
+        <div class="footer-links">
+          <strong>THE IMPORTANT DETAILS</strong
+          ><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a
+          ><a href="legal.html">Trust &amp; transparency</a
+          ><a href="support.html">Get in touch</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Truveil. Made for thoughtful conversations.</span
+        ><span>Windows beta · Human review required</span>
+      </div>
+      <div class="footer-wordmark" aria-hidden="true">truveil.</div>
+    </footer>
+    <aside class="helper">
+      <div class="helper-panel" id="tavi-help" hidden>
+        <button class="helper-close" aria-label="Close help">×</button>
+        <h3>A little help?</h3>
+        <p>
+          I'm Tavi, your Truveil guide. Learn how session monitoring works and
+          get ready for your interview.
+        </p>
+        <a href="guide.html"
+          >Get ready for your first session
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-6-6 6 6-6 6" /></svg></a
+        ><a href="privacy.html"
+          >Understand your privacy
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-6-6 6 6-6 6" /></svg></a
+        ><a href="support.html"
+          >Talk to the Truveil team
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-6-6 6 6-6 6" /></svg
+        ></a>
+      </div>
+      <button
+        class="helper-toggle"
+        aria-label="Get help from Tavi"
+        aria-expanded="false"
+        aria-controls="tavi-help"
+      >
+        <img src="assets/brand/tavi-wave.webp" width="50" height="50" alt="" />
+      </button>
+    </aside>
+    <div class="toast" role="status" hidden></div>
+  </body>
 </html>

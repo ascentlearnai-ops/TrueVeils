@@ -1,231 +1,465 @@
-const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const saveData = Boolean(navigator.connection?.saveData);
+"use strict";
 
-function runBootSequence() {
-  const boot = document.querySelector('.boot-sequence');
-  const copy = boot?.querySelector('.boot-copy');
-  if (!boot) return;
+const audience = document.body.dataset.audience;
+const candidateSite = audience === "candidate";
+const motionQuery = matchMedia("(prefers-reduced-motion: reduce)");
+const navButton = document.querySelector(".menu-toggle");
+const navigation = document.querySelector("#main-navigation");
 
-  if (reducedMotion || sessionStorage.getItem('truveil-boot-seen')) {
-    boot.remove();
-    return;
-  }
-
-  const messages = ['Establishing session', 'Verifying transcript relay', 'Ready'];
-  let index = 0;
-  const advance = () => {
-    if (!copy) return;
-    copy.textContent = messages[index];
-    index += 1;
-    if (index < messages.length) {
-      setTimeout(advance, 330);
-      return;
+if (navButton && navigation) {
+  navButton.addEventListener("click", () => {
+    const open = navButton.getAttribute("aria-expanded") !== "true";
+    navButton.setAttribute("aria-expanded", String(open));
+    navButton.setAttribute(
+      "aria-label",
+      open ? "Close navigation" : "Open navigation",
+    );
+    navigation.classList.toggle("is-open", open);
+  });
+  navigation.addEventListener("click", (event) => {
+    if (event.target.closest("a")) {
+      navigation.classList.remove("is-open");
+      navButton.setAttribute("aria-expanded", "false");
+      navButton.setAttribute("aria-label", "Open navigation");
     }
-    setTimeout(() => boot.classList.add('sweep'), 180);
-    setTimeout(() => {
-      boot.classList.add('done');
-      sessionStorage.setItem('truveil-boot-seen', '1');
-    }, 580);
-  };
-  advance();
+  });
 }
 
-runBootSequence();
-
-const nav = document.querySelector('[data-site-nav]');
-const updateNav = () => nav?.classList.toggle('scrolled', scrollY > 80);
-addEventListener('scroll', updateNav, { passive: true });
-updateNav();
-
-const revealObserver = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (!entry.isIntersecting) return;
-    entry.target.classList.add('visible');
-    revealObserver.unobserve(entry.target);
-  });
-}, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
-
-document.querySelectorAll('.reveal').forEach((element, index) => {
-  element.style.transitionDelay = reducedMotion ? '0ms' : `${Math.min(index % 3, 2) * 70}ms`;
-  revealObserver.observe(element);
-});
-
-const navLinks = [...document.querySelectorAll('.site-nav nav a')];
-const trackedSections = navLinks
-  .map(link => document.querySelector(link.getAttribute('href')))
-  .filter(Boolean);
-
-const sectionObserver = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if (!entry.isIntersecting) return;
-    navLinks.forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`));
-  });
-}, { rootMargin: '-35% 0px -58% 0px' });
-trackedSections.forEach(section => sectionObserver.observe(section));
-
-const transcript = document.querySelector('[data-live-transcript]');
-const transcriptLines = [
-  'We had a queue backlog after a schema change, so I first rolled back the release...',
-  'The consumers were still holding the old schema. We drained those and replayed the failed jobs.',
-  'Afterward I added a compatibility check to the deploy pipeline so the same failure could not repeat.'
-];
-
-if (transcript && !reducedMotion) {
-  let line = 0;
-  let character = 0;
-  const type = () => {
-    const current = transcriptLines[line];
-    transcript.textContent = current.slice(0, character);
-    if (character <= current.length) {
-      character += 1;
-      setTimeout(type, 28);
-      return;
-    }
-    setTimeout(() => {
-      line = (line + 1) % transcriptLines.length;
-      character = 0;
-      type();
-    }, 2200);
-  };
-  type();
-}
-
-const heroEvents = [...document.querySelectorAll('.evidence-pane .event-row')];
-heroEvents.forEach((event, index) => {
-  event.animate(
-    [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }],
-    { duration: reducedMotion ? 1 : 550, delay: reducedMotion ? 0 : 700 + index * 550, fill: 'both', easing: 'cubic-bezier(.16,1,.3,1)' }
+if (
+  "IntersectionObserver" in window &&
+  !motionQuery.matches &&
+  !navigator.connection?.saveData
+) {
+  document.documentElement.classList.add("js");
+  document
+    .querySelectorAll(
+      "main h2, main .section-kicker, main .boundary-list > li, main .workflow-list > li",
+    )
+    .forEach((element) => {
+      if (!element.closest(".cinema-hero, .scroll-story, .tour, .reveal"))
+        element.classList.add("reveal");
+    });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.remove("pending");
+          entry.target.classList.add("revealed");
+          observer.unobserve(entry.target);
+        }
+      }
+    },
+    { threshold: 0.05 },
   );
+  document.querySelectorAll(".reveal").forEach((element) => {
+    if (element.getBoundingClientRect().top > innerHeight)
+      element.classList.add("pending");
+    observer.observe(element);
+  });
+  motionQuery.addEventListener("change", () => {
+    if (motionQuery.matches)
+      document
+        .querySelectorAll(".pending")
+        .forEach((element) => element.classList.remove("pending"));
+  });
+}
+
+const sceneMascots = [...document.querySelectorAll('main img[src*="/tavi"]')];
+if ("IntersectionObserver" in window && sceneMascots.length) {
+  const mascotObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries)
+        entry.target.classList.toggle("mascot-in-view", entry.isIntersecting);
+    },
+    { threshold: 0.25 },
+  );
+  sceneMascots.forEach((element) => {
+    element.classList.add("mascot-motion");
+    mascotObserver.observe(element);
+  });
+  const syncSceneMotion = () =>
+    document.body.classList.toggle(
+      "ambient-still",
+      document.hidden ||
+        motionQuery.matches ||
+        Boolean(navigator.connection?.saveData),
+    );
+  document.addEventListener("visibilitychange", syncSceneMotion);
+  motionQuery.addEventListener("change", syncSceneMotion);
+  navigator.connection?.addEventListener?.("change", syncSceneMotion);
+  syncSceneMotion();
+}
+
+const helperButton = document.querySelector(".helper-toggle");
+const helperPanel = document.querySelector(".helper-panel");
+function closeHelp() {
+  if (!helperPanel || !helperButton) return;
+  helperPanel.hidden = true;
+  helperButton.setAttribute("aria-expanded", "false");
+}
+if (helperButton && helperPanel) {
+  helperButton.addEventListener("click", () => {
+    const open = helperPanel.hidden;
+    helperPanel.hidden = !open;
+    helperButton.setAttribute("aria-expanded", String(open));
+    if (open) helperPanel.querySelector(".helper-close").focus();
+  });
+  helperPanel.querySelector(".helper-close").addEventListener("click", () => {
+    closeHelp();
+    helperButton.focus();
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".helper")) closeHelp();
+  });
+}
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (helperPanel && !helperPanel.hidden) {
+    closeHelp();
+    helperButton.focus();
+  }
+  if (navigation?.classList.contains("is-open")) {
+    navigation.classList.remove("is-open");
+    navButton.setAttribute("aria-expanded", "false");
+    navButton.setAttribute("aria-label", "Open navigation");
+    navButton.focus();
+  }
 });
 
-if (!reducedMotion) {
-  const monitor = document.querySelector('.monitor-assembly');
-  const vault = document.querySelector('.session-vault');
-  let ticking = false;
-  const updateScenes = () => {
-    const heroProgress = Math.min(scrollY / Math.max(innerHeight, 1), 1);
-    if (monitor) monitor.style.transform = `translate(-50%, ${heroProgress * -46}px)`;
-    if (vault) {
-      const bounds = vault.closest('.problem-section')?.getBoundingClientRect();
-      const progress = bounds ? Math.min(1, Math.max(0, (innerHeight - bounds.top) / (innerHeight + bounds.height))) : 0;
-      vault.style.opacity = String(0.82 - progress * 0.42);
-    }
-    ticking = false;
-  };
-  addEventListener('scroll', () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(updateScenes);
-  }, { passive: true });
-}
-
-const tour = document.querySelector('[data-feature-tour]');
-const tourProgress = document.querySelector('[data-tour-progress]');
-if (tour && tourProgress) {
-  const updateTour = () => {
-    const distance = tour.scrollWidth - tour.clientWidth;
-    const progress = distance > 0 ? tour.scrollLeft / distance : 0;
-    tourProgress.style.width = `${25 + progress * 75}%`;
-  };
-  tour.addEventListener('scroll', updateTour, { passive: true });
-  updateTour();
-}
-
-const picker = document.querySelector('[data-finish-picker]');
-const finishButtons = picker ? [...picker.querySelectorAll('[data-finish]')] : [];
-const selectionRing = picker?.querySelector('.selection-ring');
-const finishStage = document.querySelector('[data-finish-stage]');
-const finishName = document.querySelector('[data-finish-name]');
-const finishPlates = [...document.querySelectorAll('[data-finish-plate]')];
-
-function selectFinish(index, focus = false) {
-  const button = finishButtons[index];
-  if (!button || !finishStage) return;
-  finishButtons.forEach((item, itemIndex) => {
-    const selected = itemIndex === index;
-    item.setAttribute('aria-checked', String(selected));
+const tourTabs = [...document.querySelectorAll("[data-tour]")];
+function selectTour(tab) {
+  for (const item of tourTabs) {
+    const selected = item === tab;
+    item.setAttribute("aria-selected", String(selected));
     item.tabIndex = selected ? 0 : -1;
-  });
-  finishStage.dataset.finish = button.dataset.finish;
-  finishPlates.forEach(plate => plate.classList.toggle('active', plate.dataset.finishPlate === button.dataset.finish));
-  if (finishName) finishName.textContent = button.getAttribute('aria-label');
-  if (selectionRing) selectionRing.style.transform = `translateX(${index * 58}px)`;
-  if (focus) button.focus();
+    document.getElementById(item.getAttribute("aria-controls")).hidden =
+      !selected;
+  }
 }
-
-finishButtons.forEach((button, index) => {
-  button.addEventListener('click', () => selectFinish(index));
-  button.addEventListener('keydown', event => {
-    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End', ' ', 'Enter'].includes(event.key)) return;
-    event.preventDefault();
+tourTabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => selectTour(tab));
+  tab.addEventListener("keydown", (event) => {
     let next = index;
-    if (event.key === 'ArrowRight') next = (index + 1) % finishButtons.length;
-    if (event.key === 'ArrowLeft') next = (index - 1 + finishButtons.length) % finishButtons.length;
-    if (event.key === 'Home') next = 0;
-    if (event.key === 'End') next = finishButtons.length - 1;
-    selectFinish(next, true);
+    if (event.key === "ArrowRight" || event.key === "ArrowDown")
+      next = (index + 1) % tourTabs.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp")
+      next = (index - 1 + tourTabs.length) % tourTabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tourTabs.length - 1;
+    else return;
+    event.preventDefault();
+    selectTour(tourTabs[next]);
+    tourTabs[next].focus();
   });
 });
 
-const flight = document.querySelector('[data-scroll-flight]');
-const flightVideos = [...document.querySelectorAll('[data-flight-video]')];
-const flightCopy = [...document.querySelectorAll('[data-flight-copy]')];
-const flightProgress = document.querySelector('[data-flight-progress]');
-const flightIndex = document.querySelector('[data-flight-index]');
-const flightEnabled = flight && flightVideos.length && !reducedMotion && !saveData && matchMedia('(min-width: 761px)').matches;
-
-if (flightEnabled) {
-  flightVideos.forEach(video => {
-    video.src = video.dataset.src;
-    video.preload = 'metadata';
-    video.load();
+let toastTimer;
+function showToast(message) {
+  const element = document.querySelector(".toast");
+  if (!element) return;
+  clearTimeout(toastTimer);
+  element.textContent = message;
+  element.hidden = false;
+  toastTimer = setTimeout(() => {
+    element.hidden = true;
+  }, 4500);
+}
+document
+  .querySelector("[data-copy-invite]")
+  ?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(
+        "Sample Truveil invitation: TRV-482910. This code is a demo only. Your interviewer will send your real invitation.",
+      );
+      showToast("Sample invitation copied. This is a demo code.");
+    } catch {
+      showToast("Clipboard unavailable. Sample code: TRV-482910.");
+    }
   });
 
-  let flightTicking = false;
-  const updateFlight = () => {
-    const bounds = flight.getBoundingClientRect();
-    const travel = Math.max(flight.offsetHeight - innerHeight, 1);
-    const progress = Math.min(1, Math.max(0, -bounds.top / travel));
-    const scaled = progress * flightVideos.length;
-    const activeIndex = Math.min(flightVideos.length - 1, Math.floor(scaled));
-    const localProgress = Math.min(1, scaled - activeIndex);
+function normalizeCode(raw) {
+  const cleaned = raw.trim().toUpperCase();
+  return /^[A-Z0-9]{6}$/.test(cleaned) ? "TRV-" + cleaned : cleaned;
+}
+function validInviteCode(code) {
+  return /^TRV-[A-Z0-9]{6}$/.test(code);
+}
+const inviteParams = new URLSearchParams(location.search);
+const inviteCode = normalizeCode(inviteParams.get("code") || "");
+function applyInvitation(code) {
+  const protocolUrl = "truveil://join?code=" + encodeURIComponent(code);
+  document.querySelectorAll(".code-preview").forEach((element) => {
+    element.textContent = code;
+  });
+  document.querySelectorAll("[data-invite-open]").forEach((link) => {
+    link.href = protocolUrl;
+  });
+  document.querySelectorAll("[data-invite-banner]").forEach((element) => {
+    element.hidden = false;
+  });
+  document.querySelectorAll('input[name="code"]').forEach((input) => {
+    input.value = code;
+  });
+  document.querySelectorAll("a[href]").forEach((link) => {
+    const target = new URL(link.href);
+    if (
+      target.origin !== location.origin ||
+      !/\/(?:login|guide)\.html$/.test(target.pathname)
+    )
+      return;
+    target.searchParams.set("code", code);
+    link.href = target.href;
+  });
+}
+if (candidateSite && validInviteCode(inviteCode)) applyInvitation(inviteCode);
 
-    flightVideos.forEach((video, index) => {
-      const active = index === activeIndex;
-      video.classList.toggle('active', active);
-      if (!active) {
-        video.pause();
-        return;
-      }
-      if (!Number.isFinite(video.duration) || video.readyState < 1) return;
-      if (video.seekable.length) {
-        const target = Math.min(video.duration - 0.04, Math.max(0, localProgress * video.duration));
-        if (Math.abs(video.currentTime - target) > 0.08) video.currentTime = target;
-        return;
-      }
-      video.play().catch(() => {});
-    });
-    flightCopy.forEach((copy, index) => copy.classList.toggle('active', index === activeIndex));
-    if (flightProgress) flightProgress.style.width = `${progress * 100}%`;
-    if (flightIndex) flightIndex.textContent = String(activeIndex + 1).padStart(2, '0');
-    flightTicking = false;
-  };
+document.querySelectorAll("[data-invite-form]").forEach((form) => {
+  const input = form.elements.namedItem("code");
+  const error = form.querySelector("[data-invite-error]");
+  input.addEventListener("input", () => {
+    input.setCustomValidity("");
+    input.removeAttribute("aria-invalid");
+    if (error) error.textContent = "";
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const code = normalizeCode(input.value);
+    if (!validInviteCode(code)) {
+      input.setAttribute("aria-invalid", "true");
+      if (error)
+        error.textContent =
+          "Use the TRV code in your invitation, for example TRV-123456.";
+      input.focus();
+      return;
+    }
+    applyInvitation(code);
+    if (form.hasAttribute("data-open-desktop")) {
+      const result = document.querySelector("[data-invite-result]");
+      const open = result.querySelector("[data-invite-open]");
+      open.href = "truveil://join?code=" + encodeURIComponent(code);
+      result.querySelector(".code-preview").textContent = code;
+      result.hidden = false;
+      open.focus();
+    } else {
+      location.href = "login.html?code=" + encodeURIComponent(code);
+    }
+  });
+});
 
-  addEventListener('scroll', () => {
-    if (flightTicking) return;
-    flightTicking = true;
-    requestAnimationFrame(updateFlight);
-  }, { passive: true });
-  addEventListener('resize', updateFlight, { passive: true });
-  flightVideos.forEach(video => video.addEventListener('loadedmetadata', updateFlight, { once: true }));
-  updateFlight();
+async function request(endpoint, payload) {
+  const response = await fetch(endpoint, {
+    method: payload ? "POST" : "GET",
+    credentials: "same-origin",
+    headers: payload ? { "Content-Type": "application/json" } : undefined,
+    body: payload ? JSON.stringify(payload) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+  if (response.status === 429)
+    throw new Error(
+      "A few too many attempts. Please wait before trying again.",
+    );
+  if (response.status === 503)
+    throw new Error(
+      "This service is temporarily unavailable. Please try again later or contact support@truveil.com.",
+    );
+  if (!response.ok) {
+    if (
+      response.status === 400 ||
+      response.status === 401 ||
+      response.status === 422
+    )
+      throw new Error(
+        endpoint === "/api/auth"
+          ? "Check your details and try again. Email codes may have expired."
+          : "Check your signup details and consent, then try again.",
+      );
+    throw new Error(
+      "We could not complete that request. Please try again shortly.",
+    );
+  }
+  return response.json();
+}
+const buttonContents = new WeakMap();
+function busy(form, pending) {
+  const submit = form.querySelector('button[type="submit"]');
+  if (!submit) return;
+  submit.disabled = pending;
+  form.setAttribute("aria-busy", String(pending));
+  if (pending) {
+    buttonContents.set(submit, [...submit.childNodes]);
+    submit.replaceChildren("One moment...");
+  } else if (buttonContents.has(submit)) {
+    submit.replaceChildren(...buttonContents.get(submit));
+    buttonContents.delete(submit);
+  }
+}
+function showFormError(element, error) {
+  element.classList.add("error");
+  element.textContent =
+    error.name === "TimeoutError" || error.name === "TypeError"
+      ? "We could not connect. Check your connection and try again."
+      : error.message;
+}
+const waitlistForm = document.querySelector("[data-waitlist-form]");
+if (waitlistForm) {
+  waitlistForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (
+      waitlistForm.getAttribute("aria-busy") === "true" ||
+      !waitlistForm.reportValidity()
+    )
+      return;
+    const status = waitlistForm.querySelector('[role="status"]');
+    const data = new FormData(waitlistForm);
+    status.textContent = "";
+    busy(waitlistForm, true);
+    try {
+      await request("/api/waitlist", {
+        email: data.get("email").trim(),
+        name: data.get("name").trim(),
+        company: data.get("company")?.trim() || "",
+        audience: data.get("audience"),
+        consent: data.get("consent") === "on",
+        website: data.get("website"),
+      });
+      waitlistForm.hidden = true;
+      const success = document.querySelector("[data-waitlist-success]");
+      success.hidden = false;
+      success.querySelector("h2").focus();
+    } catch (error) {
+      showFormError(status, error);
+    } finally {
+      busy(waitlistForm, false);
+    }
+  });
 }
 
-document.querySelectorAll('.faq-list details').forEach(detail => {
-  detail.addEventListener('toggle', () => {
-    if (!detail.open) return;
-    document.querySelectorAll('.faq-list details').forEach(other => {
-      if (other !== detail) other.open = false;
-    });
+const loginForm = document.querySelector("[data-login-form]");
+const verifyForm = document.querySelector("[data-verify-form]");
+let loginEmail = "";
+if (loginForm && verifyForm) {
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (
+      loginForm.getAttribute("aria-busy") === "true" ||
+      !loginForm.reportValidity()
+    )
+      return;
+    const status = loginForm.querySelector('[role="status"]');
+    status.textContent = "";
+    loginEmail = new FormData(loginForm).get("email").trim();
+    busy(loginForm, true);
+    try {
+      await request("/api/auth", { action: "send", email: loginEmail });
+      loginForm.hidden = true;
+      verifyForm.hidden = false;
+      document.querySelector("[data-login-email]").textContent = loginEmail;
+      verifyForm.querySelector("input").focus();
+    } catch (error) {
+      showFormError(status, error);
+    } finally {
+      busy(loginForm, false);
+    }
   });
-});
+  verifyForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (
+      verifyForm.getAttribute("aria-busy") === "true" ||
+      !verifyForm.reportValidity()
+    )
+      return;
+    const status = verifyForm.querySelector('[role="status"]');
+    status.textContent = "";
+    busy(verifyForm, true);
+    try {
+      const data = await request("/api/auth", {
+        action: "verify",
+        email: loginEmail,
+        code: new FormData(verifyForm).get("code").trim(),
+      });
+      verifyForm.hidden = true;
+      showAccount(data.user.email);
+    } catch (error) {
+      showFormError(status, error);
+    } finally {
+      busy(verifyForm, false);
+    }
+  });
+  document
+    .querySelector("[data-change-email]")
+    .addEventListener("click", () => {
+      verifyForm.hidden = true;
+      loginForm.hidden = false;
+      loginForm.querySelector("input").focus();
+    });
+  request("/api/auth")
+    .then((data) => {
+      if (data.user) {
+        loginForm.hidden = true;
+        showAccount(data.user.email);
+      }
+    })
+    .catch(() => {
+      /* The email form remains available when session lookup fails. */
+    });
+}
+function showAccount(email) {
+  const account = document.querySelector("[data-account]");
+  if (!account) return;
+  account.hidden = false;
+  account.querySelector("[data-account-email]").textContent = email;
+  account.querySelector("h2").focus();
+}
+document
+  .querySelector("[data-signout]")
+  ?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await request("/api/auth", { action: "logout" });
+      location.reload();
+    } catch {
+      button.disabled = false;
+      showToast("Could not sign out. Please try again.");
+    }
+  });
+
+const checks = [...document.querySelectorAll("[data-prep-check]")];
+if (checks.length) {
+  let stored = [];
+  try {
+    stored = JSON.parse(
+      localStorage.getItem("truveil-prep-" + audience) || "[]",
+    );
+  } catch {
+    stored = [];
+  }
+  if (Array.isArray(stored))
+    checks.forEach((input) => {
+      input.checked = stored.includes(input.value);
+    });
+  function updatePreparation() {
+    const completed = checks
+      .filter((input) => input.checked)
+      .map((input) => input.value);
+    const progress = document.querySelector("[data-prep-progress]");
+    progress.style.width = (completed.length / checks.length) * 100 + "%";
+    const label = document.querySelector("[data-prep-count]");
+    label.textContent =
+      completed.length + " of " + checks.length + " steps ready";
+    document.querySelector("[data-prep-complete]").hidden =
+      completed.length !== checks.length;
+    try {
+      localStorage.setItem(
+        "truveil-prep-" + audience,
+        JSON.stringify(completed),
+      );
+    } catch {
+      /* The checklist still works when local storage is unavailable. */
+    }
+  }
+  checks.forEach((input) =>
+    input.addEventListener("change", updatePreparation),
+  );
+  updatePreparation();
+}

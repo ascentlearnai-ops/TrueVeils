@@ -1,0 +1,84 @@
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const { readFileSync } = require("node:fs");
+const path = require("node:path");
+const {
+  assess,
+  samples,
+  MAX_LENGTH,
+  MODEL_VERSION,
+} = require("../src/website/demo-model");
+const engine = require("../src/ai/local-risk");
+
+test("website preview uses the actual Truveil engine version and score", () => {
+  engine.resetHistory();
+  const expected = engine.analyzeTranscript(samples.grounded.text);
+  const actual = assess(samples.grounded.text);
+  assert.equal(actual.score, expected.score);
+  assert.equal(actual.modelVersion, MODEL_VERSION);
+});
+test("empty and short inputs abstain, not zero percent AI", () => {
+  for (const text of ["", "hello", "I fixed the issue yesterday."]) {
+    assert.equal(assess(text).score, null);
+    assert.equal(assess(text).scorable, false);
+  }
+});
+test("incremental edits do not create artificial history or typing-speed evidence", () => {
+  const text = samples.assisted.text;
+  const expected = assess(text);
+  for (let i = 0; i < text.length; i += 10) assess(text.slice(0, i));
+  const final = assess(text);
+  assert.equal(final.score, expected.score);
+  for (const key of [
+    "historySimilarity",
+    "styleDrift",
+    "wordsPerMinute",
+    "behavioralAiEventCount",
+  ]) {
+    assert.equal(final.features[key], 0, key);
+  }
+});
+test("polished phrasing alone is capped; sample session evidence is explicitly opt-in", () => {
+  const textOnly = assess(samples.assisted.text);
+  const withEvent = assess(samples.assisted.text, true);
+  assert.ok(textOnly.score <= 68);
+  assert.ok(withEvent.score > textOnly.score);
+  assert.equal(withEvent.features.behavioralAiEventCount, 1);
+  assert.equal(
+    assess(samples.assisted.text).features.behavioralAiEventCount,
+    0,
+  );
+});
+test("grounded example includes counter-evidence and scores lower", () => {
+  const grounded = assess(samples.grounded.text);
+  assert.ok(grounded.score < assess(samples.assisted.text).score);
+  assert.ok(grounded.humanSignals.length > 0);
+});
+test("long input is bounded and deterministic", () => {
+  const long = samples.assisted.text.repeat(100);
+  assert.equal(assess(long).score, assess(long.slice(0, MAX_LENGTH)).score);
+});
+test("numeric fragments do not produce an authorship verdict", () => {
+  assert.equal(assess("123 456").scorable, false);
+});
+test("browser bundle contains no network calls or browser persistence for answers", () => {
+  const bundle = readFileSync(
+    path.join(__dirname, "../../landing/interview-demo.js"),
+    "utf8",
+  );
+  assert.ok(bundle.includes(MODEL_VERSION));
+  assert.doesNotMatch(
+    bundle,
+    /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|sendBeacon)\b/,
+  );
+  assert.doesNotMatch(bundle, /\.innerHTML\s*=/);
+});
+test("sample preview continuously advances through its scenarios", () => {
+  const bundle = readFileSync(
+    path.join(__dirname, "../../landing/interview-demo.js"),
+    "utf8",
+  );
+  assert.match(bundle, /Next sample soon/);
+  assert.match(bundle, /Loading next sample/);
+  assert.match(bundle, /currentIndex/);
+});
