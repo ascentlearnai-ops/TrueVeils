@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "app": "truveil-recruiter",
+  "version": "1.0.0",
+  "builtAt": "2026-10-26T03:53:39.536Z",
+  "installer": "TruveilRecruiter-Setup-1.0.0.exe",
+  "installerSha256": "0df2ca5f98e753f2b150777c280d895748cc719080a9278c381cb847e2c9ffaa",
+  "archiveSha256": "962484231dc559da58ee627818bfc75909ac31a3fd1f7299d5175f645809db0b",
+  "sourceHash": "cf68a956dab04ad0589e962a6bfbf1e9dd97bd2ad66a02a492ba3f53fbd6947e"
+}

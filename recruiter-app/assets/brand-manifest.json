@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "brand": "truveil",
+  "logoSource": "brand/mark.png",
+  "logoSourceSha256": "67dc29ef1d8c3af1d6beae66cc05f8440fb966f6f7d396be7b00d97451c8f16f",
+  "sourceInventoryHash": "5b55ddc5901e2bd8c4443b5449b47aca80e568cf9ea1aff937843774a22ca75c",
+  "files": [
+    {
+      "path": "assets/app-ui/instrument-serif-italic.ttf",
+      "sha256": "fecf4861d5202405b8bd45c683858b6870642a026784fe0dbf88ff55dedee8a0",
+      "source": "fonts/instrument-serif-italic.ttf"
+    },
+    {
+      "path": "assets/app-ui/instrumentserif-OFL.txt",
+      "sha256": "129ed7618959716959f2941fdd5b49e0ad6e6c1d78726761786a00253d865521",
+      "source": "fonts/instrumentserif-OFL.txt"
+    },
+    {
+      "path": "assets/app-ui/manrope-bold.ttf",
+      "sha256": "b9584e099e0e7f1e1e914c3037aabb9010c50346a3ce8df5eeeeecc0563044d8",
+      "source": "fonts/manrope-bold.ttf"
+    },
+    {
+      "path": "assets/app-ui/manrope-OFL.txt",
+      "sha256": "e01b637272e0cbdfb240184dd98ea5cc671556d9894dae2668d92ab2c906787c",
+      "source": "fonts/manrope-OFL.txt"
+    },
+    {
+      "path": "assets/app-ui/manrope-regular.ttf",
+      "sha256": "a13d9b41b0a471ce58f0e46d377fa3cc76615e4632c3b15eb397caadf7a13f0a",
+      "source": "fonts/manrope-regular.ttf"
+    },
+    {
+      "path": "assets/app-ui/manrope-semibold.ttf",
+      "sha256": "6bad1a774228464cc88b8b0271555b266f7a3c64a7bedf15e165fdab4f6ac0ce",
+      "source": "fonts/manrope-semibold.ttf"
+    },
+    {
+      "path": "assets/app-ui/tavi-celebrate.webp",
+      "sha256": "e7d59895673e963a6d0037b9a9aa95240b9791ae46f1c8574298dea6ecca9a8e",
+      "source": "brand/tavi-celebrate.webp"
+    },
+    {
+      "path": "assets/app-ui/tavi-checklist.webp",
+      "sha256": "edd0525c6a9369f950c3cadc7acfa3a9e41089e31772586d3c02c6431fb11cbd",
+      "source": "brand/tavi-checklist.webp"
+    },
+    {
+      "path": "assets/app-ui/tavi-cursor.webp",
+      "sha256": "f3f0f73ad9bce238c0c48bb3991e28cb8f908c2321de0b0404f2c12cbf2ca267",
+      "source": "brand/tavi-cursor.webp"
+    },
+    {
+      "path": "assets/app-ui/tavi-listen.webp",
+      "sha256": "65bb38da801db93482f28e89ba327e93cd0be7f98a6d9dcfa7c419aa7d897bc0",
+      "source": "brand/tavi-listen.webp"
+    },
+    {
+      "path": "assets/app-ui/tavi-wave.webp",
+      "sha256": "d734cc0ca0cc7f8f0d65013c305fd4ee59e2c49649cfa6404867fba79b8157d6",
+      "source": "brand/tavi-wave.webp"
+    },
+    {
+      "path": "assets/app-ui/tavi.webp",
+      "sha256": "951ec4121b2ba5b4434e103afe7b5c1f1ddeb7247d6028be2c7da269404cc660",
+      "source": "brand/tavi.webp"
+    },
+    {
+      "path": "assets/brand/app-icon.png",
+      "sha256": "22a0349e534f0b85999d393bfe619c77dc953c4cc7f51da510d738e08cf9c081",
+      "source": "brand/mark.png",
+      "derived": true
+    },
+    {
+      "path": "assets/brand/favicon.png",
+      "sha256": "d74ced9b42722e85b80919ae15c3138f63a3241369856afb97a14f1541a5df82",
+      "source": "brand/favicon.png"
+    },
+    {
+      "path": "assets/brand/mark.png",
+      "sha256": "67dc29ef1d8c3af1d6beae66cc05f8440fb966f6f7d396be7b00d97451c8f16f",
+      "source": "brand/mark.png"
+    },
+    {
+      "path": "assets/mac/icon.icns",
+      "sha256": "5d74bdce44c452ef50dfd5ef04cfbfe7243416eb6b91f8e58cc54ac575a7350d",
+      "source": "brand/mark.png",
+      "derived": true
+    },
+    {
+      "path": "assets/truveil.ico",
+      "sha256": "c7bff65e04059bab68a224b478f7ca126fe56b2708178764228aababaebae4b1",
+      "source": "brand/mark.png",
+      "derived": true
+    }
+  ]
+}

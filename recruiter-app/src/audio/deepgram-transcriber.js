@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { confidenceValue } = require('../ai/transcript-quality');
 
 const DEEPGRAM_MODEL = 'nova-3';
-const DEEPGRAM_ENDPOINT = `/v1/listen?model=${DEEPGRAM_MODEL}&language=en&smart_format=true&punctuate=true&filler_words=true`;
+const DEEPGRAM_ENDPOINT = `/v1/listen?model=${DEEPGRAM_MODEL}&language=en&smart_format=true&punctuate=true&filler_words=true&mip_opt_out=true`;
 
 function extToMime(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -92,8 +93,16 @@ class DeepgramTranscriber {
     });
 
     const text = extractTranscript(response);
+    const alternative = response?.results?.channels?.[0]?.alternatives?.[0];
+    const words = Array.isArray(alternative?.words) ? alternative.words : [];
+    const confidences = words.map(word => confidenceValue(word.confidence));
+    const confidence = confidences.length && confidences.every(value => value != null)
+      ? confidences.reduce((sum, value) => sum + value, 0) / confidences.length
+      : confidenceValue(alternative?.confidence);
+    const lowConfidenceWordRatio = confidences.length
+      ? confidences.filter(value => value == null || value < 0.55).length / confidences.length : null;
     this.emitStatus({ state: 'ready', message: 'Deepgram fallback ready', chunkId: metadata.chunkId });
-    return { ok: true, text, raw: response };
+    return { ok: true, text, confidence, lowConfidenceWordRatio, raw: response };
   }
 }
 

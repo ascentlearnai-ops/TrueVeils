@@ -6,6 +6,20 @@ const { evaluateReview } = require('../src/review/evidence');
 const { analyzeTranscript, resetHistory } = require('../src/ai/local-risk');
 const { ResponseWindowAnalyzer } = require('../src/ai/response-window');
 
+test('allowed tool-brand tab notifications cannot become hidden-overlay or assisted evidence', () => {
+  for (const allowance of [{ policyDecision: 'allowed' }, { reviewStatus: 'allowed' }]) {
+    const events = [{ eventType: 'browser_tab_navigated', text: 'Shared tab navigated: cluely.com', ...allowance }];
+    const review = evaluateReview({ events, telemetry: { connected: true, transcription: 'healthy', monitoring: 'healthy' } });
+    assert.equal(review.reviewBand, 'clear');
+    assert.equal(computeSessionVerdict({ scores: [], review }).verdictScore, null);
+  }
+});
+
+test('a selected tool destination is not evidence that a hidden overlay exists', () => {
+  const review = evaluateReview({ events: [{ eventType: 'browser_tab_navigated', text: 'Shared tab navigated: cluely.com', policyDecision: 'restricted' }] });
+  assert.doesNotMatch(JSON.stringify(review), /hidden-overlay event/);
+});
+
 test('verdict says likely unassisted for consistent low scores with no behavioral evidence', () => {
   const review = { reviewBand: 'clear' };
   const verdict = computeSessionVerdict({
@@ -88,7 +102,7 @@ test('disfluency collapse against the candidate baseline raises the score of a p
   );
 });
 
-test('a near-instant long answer scores higher than the same answer after a natural pause', () => {
+test('short gaps between transcription windows are not treated as answer latency', () => {
   const answer = 'I would start by clarifying the traffic pattern and the failure mode. Then I would add caching around the slow read path, measure the database load, and roll it out gradually so the team could compare error rates before and after the change.';
   resetHistory();
   const instant = analyzeTranscript(answer, { transcriptConfidence: 0.95, priorSilenceGapMs: 150 });
@@ -96,10 +110,7 @@ test('a near-instant long answer scores higher than the same answer after a natu
   const paused = analyzeTranscript(answer, { transcriptConfidence: 0.95, priorSilenceGapMs: 9000 });
   resetHistory();
   assert.ok(instant.scorable && paused.scorable);
-  assert.ok(
-    instant.rawScore > paused.rawScore,
-    `expected instant raw score (${instant.rawScore}) > paused raw score (${paused.rawScore})`
-  );
+  assert.equal(instant.rawScore, paused.rawScore);
 });
 
 test('response window analyzer passes the silence gap between windows into analysis context', () => {
@@ -110,8 +121,8 @@ test('response window analyzer passes the silence gap between windows into analy
     return { score: 10, scorable: true };
   };
   const start = Date.now();
-  analyzer.addSegment({ text: 'one two three four five six', timestamp: start, durationMs: 3000 }, analyzeFn);
-  analyzer.addSegment({ text: 'seven eight nine ten eleven twelve', timestamp: start + 10000, durationMs: 3000 }, analyzeFn);
+  analyzer.addSegment({ text: 'one two three four five six', startedAt: start, endedAt: start + 3000, timestamp: start + 5000, durationMs: 3000, transcriptConfidence: 0.95 }, analyzeFn);
+  analyzer.addSegment({ text: 'seven eight nine ten eleven twelve', startedAt: start + 10000, endedAt: start + 13000, timestamp: start + 15000, durationMs: 3000, transcriptConfidence: 0.95 }, analyzeFn);
   assert.equal(contexts.length, 2);
   assert.equal(contexts[0].priorSilenceGapMs, null);
   assert.equal(contexts[1].priorSilenceGapMs, 7000);

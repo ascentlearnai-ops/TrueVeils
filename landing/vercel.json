@@ -1,4 +1,8 @@
 {
+  "redirects": [
+    { "source": "/waitlist.html", "destination": "/download.html", "permanent": true },
+    { "source": "/waitlist", "destination": "/download.html", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",

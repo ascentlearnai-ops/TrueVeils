@@ -5,41 +5,32 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Truveil Command Center</title>
-  <link rel="icon" type="image/png" href="../../assets/brand/truveil-lock-transparent.png">
+  <link rel="icon" type="image/png" href="../../assets/brand/favicon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-screen="access">
 
-  <a class="skip-link" href="#auth-screen">Skip to content</a>
-
-  <!-- Ambient gradient orbs -->
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-
-  <!-- Noise overlay -->
-  <svg class="noise-overlay" xmlns="http://www.w3.org/2000/svg">
-    <filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter>
-    <rect width="100%" height="100%" filter="url(#noiseFilter)"/>
-  </svg>
+  <a class="skip-link" href="#access-screen">Skip to content</a>
 
   <!-- Title Bar -->
   <div class="titlebar">
     <div class="tb-left">
-      <span class="app-brand"><span class="app-glyph">T</span><strong>Truveil</strong></span>
+      <span class="app-brand"><img src="../../assets/brand/mark.png" width="32" height="32" alt=""><strong>truveil</strong></span>
       <span class="tb-divider"></span>
       <span class="tb-app">Command Center</span>
       <span class="tb-beta-badge" title="Truveil is in public beta" aria-label="Truveil is in public beta">Beta</span>
       <nav class="workspace-nav" aria-label="Workspace">
-        <button class="workspace-nav-btn active" id="navNewSession">New session</button>
-        <button class="workspace-nav-btn" id="navLiveSession">Live session</button>
-        <button class="workspace-nav-btn" id="navReports">Reports</button>
+        <span class="nav-heading">Your workspace</span>
+        <button class="workspace-nav-btn active" id="navNewSession"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New interview</button>
+        <button class="workspace-nav-btn" id="navLiveSession" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3l3-6 6 12 3-6h3"/></svg>Current interview</button>
+        <button class="workspace-nav-btn" id="navReports"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4"/></svg>Reports</button>
+        <div class="nav-footer"><span class="nav-footer-dot"></span>Context, then confidence.<small>Human review always comes first.</small></div>
       </nav>
     </div>
     <div class="tb-right">
       <span class="auth-user" id="authUser" hidden></span>
       <button class="tb-btn text-btn" id="signOutBtn" hidden>Sign out</button>
-      <button class="tb-btn" id="openSettingsBtn" title="Settings">
+      <button class="tb-btn" id="openSettingsBtn" title="Workspace settings" aria-label="Workspace settings">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
       <span class="tb-divider"></span>
@@ -48,36 +39,72 @@
     </div>
   </div>
 
-  <!-- Idle Screen -->
-  <div class="screen active" id="auth-screen">
+  <div class="screen active" id="access-screen">
+    <main class="access-layout">
+      <form class="access-panel" id="demoAccessForm" novalidate>
+        <span class="eyebrow">Truveil for recruiters</span>
+        <h1>Open your workspace.</h1>
+        <div data-guide-slot="access">
+          <aside class="tavi-guide" id="recruiterGuide" aria-label="Tavi's next step">
+            <img id="recruiterGuideImage" src="../../assets/app-ui/tavi-checklist.webp" width="72" height="72" alt="">
+            <div class="tavi-bubble"><span class="tavi-label">Tavi</span><p id="recruiterGuideBody" aria-live="polite" aria-atomic="true">Enter your private access code here. Keep it separate from the candidate's code.</p></div>
+          </aside>
+        </div>
+        <label class="field" for="demoHostCodeInput">
+          <span>Host access code</span>
+          <input id="demoHostCodeInput" type="password" autocomplete="off" maxlength="512" placeholder="Enter your access code" aria-describedby="demoAccessHint demoAccessMessage">
+        </label>
+        <p class="field-hint" id="demoAccessHint">Keep this separate from the candidate's interview code.</p>
+        <button type="submit" class="btn btn-primary lg" id="continueDemoBtn">Continue to workspace</button>
+        <div class="access-message" id="demoAccessMessage" role="alert"></div>
+        <details class="access-connection" id="demoConnectionSettings">
+          <summary>Connection settings</summary>
+          <label class="field" for="demoRelayInput"><span>Session server address</span>
+            <input id="demoRelayInput" type="url" placeholder="wss://your-session-server.example" autocomplete="off" spellcheck="false">
+          </label>
+        </details>
+      </form>
+    </main>
+  </div>
+
+  <div class="screen" id="auth-screen">
     <main class="auth-layout">
       <section class="auth-copy">
-        <span class="eyebrow">Recruiter workspace</span>
-        <h1>Evidence you can review. Decisions you still own.</h1>
-        <p>Run consent-based interview verification with live transcripts, monitored session events, and advisory review evidence.</p>
+        <span class="eyebrow">A little context. A better conversation.</span>
+        <h1>See the interview.<br><em>Keep the human.</em></h1>
+        <p>Live transcripts, session context, and your own notes. A clearer picture of the conversation, with the decision still yours.</p>
+        <img class="auth-mascot" src="../../assets/app-ui/tavi-listen.webp" alt="Tavi, the blue Truveil lock, holding a microphone">
         <div class="auth-proof">
-          <span>Windows paid beta</span>
+          <span>Consent comes first</span>
           <span>30-day report retention</span>
           <span>No stored raw audio</span>
         </div>
       </section>
       <section class="auth-panel">
-        <span class="eyebrow">Secure sign in</span>
-        <h2>Open Command Center</h2>
-        <p>We will email a one-time sign-in link to your work address.</p>
+        <span class="eyebrow">Truveil for recruiters</span>
+        <h2>Welcome back.</h2>
+        <p>Sign in to your interview workspace.</p>
         <label class="field">
           <span>Work email</span>
           <input type="email" id="authEmailInput" placeholder="you@company.com" autocomplete="email">
         </label>
-        <button class="btn btn-primary lg" id="sendSignInLinkBtn">Send secure sign-in link</button>
-        <div class="otp-divider"><span>or paste the email code</span></div>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="authPasswordInput" autocomplete="current-password">
+        </label>
+        <button class="btn btn-primary lg" id="signInPasswordBtn">Sign in</button>
+        <details class="email-signin">
+        <summary>Use an email code instead</summary>
+        <button class="btn btn-ghost lg" id="sendSignInLinkBtn">Email a sign-in code</button>
         <label class="field">
           <span>6 digit code</span>
           <input type="text" id="authCodeInput" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
         </label>
         <button class="btn btn-ghost lg" id="verifySignInCodeBtn">Verify code</button>
-        <button class="btn btn-ghost lg" id="continueOfflineBtn">Create interview code without email</button>
-        <p class="auth-help">The 6 digit code signs you into this admin app. The candidate receives the TRV session code after you create a session.</p>
+        <p class="auth-help">For supported beta accounts only. Public email delivery is not enabled yet.</p>
+        </details>
+        <div class="auth-secondary"><span>Just taking a look?</span><button class="text-link" id="continueOfflineBtn">Open the interactive product preview <span aria-hidden="true">&#8599;</span></button></div>
+        <p class="auth-help">Use your provisioned recruiter account. The candidate receives the TRV session code and joins separately in Truveil Secure.</p>
         <div class="auth-message" id="authMessage" aria-live="polite"></div>
       </section>
     </main>
@@ -85,18 +112,12 @@
 
   <div class="screen" id="idle-screen">
     <div class="idle-card glass-card">
-      <div class="idle-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          <polyline points="9 12 11 14 15 10"/>
-        </svg>
-      </div>
-      <div class="trust-badge"><span class="dot"></span>READY</div>
-      <h1>Run verified interviews<br><span class="gradient-text">in real time.</span></h1>
-      <p class="idle-sub">Create a session code, watch live transcript text, and review concise events when restricted tools or unusual answer patterns appear.</p>
+      <div class="trust-badge"><span class="dot"></span>Your interview workspace</div>
+      <h1>Start an interview.</h1>
+      <div data-guide-slot="idle"></div>
       <button class="btn btn-primary lg" id="newSessionBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-        New Interview Session
+        New interview
       </button>
       <div class="idle-features">
         <div class="if"><span class="if-dot"></span> Live Transcription</div>
@@ -105,9 +126,10 @@
         <div class="if"><span class="if-dot"></span> Instant HTML Report</div>
       </div>
       <div class="ops-strip">
-        <div><span>MODE</span><strong>Transcript</strong></div>
-        <div><span>RELAY</span><strong>Supabase</strong></div>
-        <div><span>RETENTION</span><strong>No audio files</strong></div>
+        <div><span>01 / CREATE</span><strong>Choose New interview</strong></div>
+        <div><span>02 / INVITE</span><strong>Send the invitation</strong></div>
+        <div><span>03 / START</span><strong>Approve and start</strong></div>
+        <div><span>04 / REVIEW</span><strong>End and open the report</strong></div>
       </div>
     </div>
   </div>
@@ -122,13 +144,13 @@
           <span class="pulse-core"></span>
         </div>
         <div class="trust-badge"><span class="dot"></span>SESSION READY</div>
-        <h2>Create interview</h2>
-        <p class="idle-sub">Set the candidate, share the TRV code, then start only after preflight is complete.</p>
+        <h2>Your invitation</h2>
+        <p class="idle-sub">Send the invitation, then approve your candidate.</p>
 
         <div class="session-code-card">
           <label>Candidate code</label>
           <div class="session-code" id="sessionCode">TRV-XXXXXX</div>
-          <p>This is the candidate code. The candidate enters it in Truveil Secure; the invite link pre-fills it.</p>
+          <p>Share this code with your candidate to join in Truveil Secure.</p>
           <div class="session-service-notice" id="sessionServiceNotice" hidden></div>
           <div class="code-actions">
             <button class="btn sm" id="copySessionCodeBtn">Copy code</button>
@@ -136,14 +158,15 @@
           </div>
         </div>
 
-        <div class="setup-flow">
-          <div><span>01</span><strong>Add details</strong><small>Name, role, and role vocabulary.</small></div>
-          <div><span>02</span><strong>Share invite</strong><small>Copy code, link, or email draft.</small></div>
-          <div><span>03</span><strong>Review policy</strong><small>Allowed meeting sites and restricted AI tools.</small></div>
-        </div>
       </aside>
 
       <section class="setup-main form">
+        <div data-guide-slot="setup"></div>
+        <section class="demo-approval" id="demoApproval" hidden aria-labelledby="demoApprovalTitle">
+          <h3 id="demoApprovalTitle">Candidate waiting to join</h3>
+          <p id="demoJoinName"></p>
+          <div class="code-actions"><button class="btn btn-primary" id="approveDemoBtn">Approve candidate</button><button class="btn" id="declineDemoBtn">Decline</button></div>
+        </section>
         <div class="setup-section">
           <div class="setup-section-head">
             <span>01</span>
@@ -152,24 +175,6 @@
               <p>Send one clear code/link before the call. The candidate must complete consent and microphone preflight before you can start.</p>
             </div>
           </div>
-          <div class="field two-up">
-            <div>
-              <label>Candidate name</label>
-              <input type="text" id="candidateNameInput" placeholder="e.g. Alex Chen" autocomplete="off">
-            </div>
-            <div>
-              <label>Role / Position</label>
-              <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
-            </div>
-          </div>
-          <div class="field">
-            <label>Candidate email <span class="field-opt">optional</span></label>
-            <div class="invite-row">
-              <input type="email" id="candidateEmailInput" placeholder="candidate@email.com" autocomplete="off">
-              <button class="btn" id="emailCandidateLinkBtn" type="button">Email invite</button>
-            </div>
-            <div class="field-hint">Uses your email app to send the TRV code and invite link. It does not send a Supabase sign-in email.</div>
-          </div>
           <div class="field invite-panel">
             <div class="invite-panel-head">
               <label>Share interview invite</label>
@@ -177,15 +182,33 @@
             </div>
             <div class="invite-link-box" id="inviteLinkPreview">Your candidate invite link will appear here.</div>
             <div class="invite-action-grid">
-              <button class="btn sm" id="copyInviteMessageBtn" type="button">Copy message</button>
+              <button class="btn btn-primary sm" id="copyInviteMessageBtn" type="button">Copy invitation</button>
               <button class="btn sm" id="openCandidateLinkBtn" type="button">Open link</button>
               <button class="btn sm" id="refreshInviteMessageBtn" type="button">Refresh</button>
             </div>
             <details class="message-preview">
               <summary>Preview full candidate message</summary>
-              <textarea id="candidateInviteMessage" rows="4" readonly spellcheck="false">Create a session to generate the candidate invite message.</textarea>
+              <textarea id="candidateInviteMessage" aria-label="Candidate invite message" rows="4" readonly spellcheck="false">Create a session to generate the candidate invite message.</textarea>
             </details>
             <div class="field-hint">Send this through Gmail, Outlook, SMS, Slack, or your calendar invite.</div>
+          </div>
+          <div class="field two-up">
+            <div>
+              <label for="candidateNameInput">Candidate name</label>
+              <input type="text" id="candidateNameInput" placeholder="e.g. Alex Chen" autocomplete="off">
+            </div>
+            <div>
+              <label for="roleInput">Role / Position</label>
+              <input type="text" id="roleInput" placeholder="e.g. Senior Backend Engineer" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label for="candidateEmailInput">Candidate email <span class="field-opt">optional</span></label>
+            <div class="invite-row">
+              <input type="email" id="candidateEmailInput" placeholder="candidate@email.com" autocomplete="off">
+              <button class="btn" id="emailCandidateLinkBtn" type="button">Email invite</button>
+            </div>
+            <div class="field-hint">Opens your email app with the invitation. You review and send it yourself.</div>
           </div>
         </div>
 
@@ -194,79 +217,50 @@
             <span>02</span>
             <div>
               <h3>Interview policy</h3>
-              <p>Choose what is allowed during the call. Known AI tools are closed/refocused when detected; normal switches are logged for review.</p>
+              <p>All apps and websites are allowed by default. Add restrictions only when the interview requires them.</p>
             </div>
           </div>
-          <div class="policy-toolbar">
           <div class="field">
-            <label>Policy preset</label>
-            <select id="policyPresetSelect">
-              <option value="standard_technical">Standard technical</option>
-              <option value="open_book">Open-book</option>
-              <option value="strict">Strict</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Technical vocabulary</label>
+            <label for="technicalVocabularyInput">Technical vocabulary</label>
             <input type="text" id="technicalVocabularyInput" placeholder="e.g. Kubernetes, PostgreSQL, TypeScript">
             <div class="field-hint">Improves live transcription for role-specific terms.</div>
-          </div>
           </div>
           <div class="field">
             <label>Transcript relay</label>
             <div class="relay-note">
               <span class="relay-dot"></span>
-              Candidate speech appears in the live dashboard. Fallback audio is temporary and deleted after transcription.
+              <span id="transcriptRelayNote">Candidate speech appears as live captions on both screens. Raw audio is not saved in this session.</span>
             </div>
           </div>
-          <div class="policy-grid">
-            <div class="field">
-              <label>Allowed apps</label>
-              <div class="policy-list-builder">
-                <div class="policy-chip-list" id="allowedAppsChips"></div>
-                <div class="policy-add-row">
-                  <input type="text" id="allowedAppDraft" placeholder="Add app name, e.g. Chrome">
-                  <button class="btn sm" id="addAllowedAppBtn" type="button">Add</button>
-                </div>
-              </div>
-              <textarea id="allowedAppsInput" class="policy-source" rows="4" spellcheck="false">TruveilSecure
-Zoom
-Microsoft Teams
-Google Chrome
-Microsoft Edge</textarea>
-              <div class="field-hint">Allowed apps can stay open. Known AI tools still close/refocus when detected.</div>
-            </div>
-            <div class="field">
-              <label>Allowed sites</label>
-              <div class="policy-list-builder">
-                <div class="policy-chip-list" id="allowedSitesChips"></div>
-                <div class="policy-add-row">
-                  <input type="text" id="allowedSiteDraft" placeholder="Add domain, e.g. docs.google.com">
-                  <button class="btn sm" id="addAllowedSiteBtn" type="button">Add</button>
-                </div>
-              </div>
-              <textarea id="allowedSitesInput" class="policy-source" rows="4" spellcheck="false">meet.google.com
-zoom.us
-teams.microsoft.com</textarea>
-              <div class="field-hint">Allowed domains are observed but not closed as restricted destinations.</div>
-            </div>
+          <div class="restriction-settings">
+            <label class="compliance-check"><input type="checkbox" id="restrictionsEnabledInput"><span>Set restrictions for this interview</span></label>
+            <p class="field-hint" id="restrictionState">All apps and websites allowed.</p>
           </div>
+          <div id="restrictionControls" hidden>
+            <div class="field">
+              <label for="policyPresetSelect">Restriction preset</label>
+              <select id="policyPresetSelect">
+                <option value="custom">Choose individually</option>
+                <option value="standard_technical">Standard technical</option>
+                <option value="open_book">Open-book</option>
+                <option value="strict">All listed tools</option>
+              </select>
+            </div>
           <div class="field">
-            <label>Restricted AI tools</label>
+            <label>Restricted destinations</label>
             <div class="blocked-site-grid" id="blockedSiteGrid">
-              <label class="check-tile"><input type="checkbox" data-blocked-site="chatgpt.com" checked><span>ChatGPT</span><small>chatgpt.com</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="claude.ai" checked><span>Claude</span><small>claude.ai</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="gemini.google.com" checked><span>Gemini</span><small>gemini.google.com</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="copilot.microsoft.com" checked><span>Copilot</span><small>copilot.microsoft.com</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="perplexity.ai" checked><span>Perplexity</span><small>perplexity.ai</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="chatgpt.com"><span>ChatGPT</span><small>chatgpt.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="claude.ai"><span>Claude</span><small>claude.ai</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="gemini.google.com"><span>Gemini</span><small>gemini.google.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="copilot.microsoft.com"><span>Copilot</span><small>copilot.microsoft.com</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="perplexity.ai"><span>Perplexity</span><small>perplexity.ai</small></label>
               <label class="check-tile"><input type="checkbox" data-blocked-site="poe.com"><span>Poe</span><small>poe.com</small></label>
               <label class="check-tile"><input type="checkbox" data-blocked-site="you.com"><span>You.com</span><small>you.com</small></label>
               <label class="check-tile"><input type="checkbox" data-blocked-site="phind.com"><span>Phind</span><small>phind.com</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="interviewcoder" checked><span>Interview Coder</span><small>app / title</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="cluely" checked><span>Cluely</span><small>app / title</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="finalround" checked><span>Final Round</span><small>app / title</small></label>
-              <label class="check-tile"><input type="checkbox" data-blocked-site="lockedin" checked><span>LockedIn</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="interviewcoder"><span>Interview Coder</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="cluely"><span>Cluely</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="finalround"><span>Final Round</span><small>app / title</small></label>
+              <label class="check-tile"><input type="checkbox" data-blocked-site="lockedin"><span>LockedIn</span><small>app / title</small></label>
             </div>
             <div class="policy-list-builder compact">
               <div class="policy-chip-list" id="customBlockedSitesChips"></div>
@@ -276,7 +270,8 @@ teams.microsoft.com</textarea>
               </div>
             </div>
             <textarea id="customBlockedSitesInput" class="policy-source" rows="2" spellcheck="false" placeholder="Add extra blocked domains, one per line"></textarea>
-            <div class="field-hint">Known restricted AI sites close the active browser tab when possible, then Truveil refocuses and logs evidence.</div>
+            <div class="field-hint" id="restrictionScopeHint">Selected restrictions provide session context. Closing a shared tab always requires a manual action and the candidate's permission. Other apps and windows are not monitored in account-free sessions.</div>
+          </div>
           </div>
         </div>
 
@@ -291,11 +286,11 @@ teams.microsoft.com</textarea>
           <div class="field compliance-panel">
             <label class="compliance-check">
               <input type="checkbox" id="noticeConfirmedInput">
-              <span>Candidate notice covers microphone transcription, foreground app/window monitoring, restricted-target controls, and 30-day report retention.</span>
+              <span id="noticeConfirmedText">Candidate notice covers microphone transcription, optional browser sharing and tab controls, and local report retention.</span>
             </label>
             <label class="compliance-check">
               <input type="checkbox" id="policyConfirmedInput">
-              <span>The allowed and restricted destinations match this interview policy.</span>
+              <span>The restrictions, if any, match the agreed interview policy.</span>
             </label>
             <label class="compliance-check">
               <input type="checkbox" id="humanReviewConfirmedInput">
@@ -327,7 +322,7 @@ teams.microsoft.com</textarea>
 
       <div class="glass-bar">
         <div class="gb-left">
-          <span class="gb-brand-mark">T</span>
+          <img class="gb-brand-mark" src="../../assets/brand/mark.png" alt="">
           <span class="glass-title" id="glassTitle">Truveil Command Center</span>
           <span class="session-arm-badge">Transcript-first verification</span>
         </div>
@@ -337,6 +332,7 @@ teams.microsoft.com</textarea>
         </div>
       </div>
 
+      <div class="live-guide-slot" data-guide-slot="dashboard"></div>
       <div class="mock-metrics">
         <div class="mm">
           <div class="mm-label">REVIEW BAND</div>
@@ -404,9 +400,37 @@ teams.microsoft.com</textarea>
               </div>
             </div>
           </div>
+          <section class="chunk-review" aria-labelledby="chunkReviewTitle">
+            <div class="panel-header"><h3 id="chunkReviewTitle">AI pattern review</h3><span class="panel-count" id="chunkReviewCount">0 chunks</span></div>
+            <p id="chunkReviewSummary" class="chunk-review-summary" role="status">Waiting for confirmed speech.</p>
+            <p id="chunkReviewBoundary" class="field-hint">25-35-word chunks, reviewed in longer context; shorter tails are retained. Scores are experimental signals, not AI-authorship probabilities.</p>
+            <div id="chunkReviewList" class="chunk-review-list" role="list"></div>
+          </section>
         </div>
 
         <div class="dash-right">
+          <section class="shared-tabs" id="sharedTabsPanel" hidden aria-labelledby="sharedTabsTitle">
+            <div class="panel-header"><h3 id="sharedTabsTitle">Shared browser tabs</h3><span id="sharedTabState" role="status">Not shared</span></div>
+            <div id="sharedTabList" class="shared-tab-list"></div>
+            <p id="tabCloseStatus" role="status" aria-live="polite"></p>
+          </section>
+          <section class="panel provider-review-panel" aria-labelledby="providerReviewTitle">
+            <div class="panel-header"><h3 class="panel-label" id="providerReviewTitle">PANGRAM + SOL REVIEW</h3><span class="panel-count">Advisory</span></div>
+            <div class="provider-review-body">
+              <p id="providerConnectionStatus" role="status">Checking local provider configuration...</p>
+              <div class="provider-review-actions"><button class="btn sm" id="checkProviderConnectionsBtn" type="button">Check connections</button><button class="btn btn-ghost sm" id="connectProviderFileBtn" type="button">Connect key file</button></div>
+              <p id="providerAnswerStatus" role="status">Candidate permission is required before external review.</p>
+              <div class="provider-review-actions"><button class="btn sm" id="startProviderAnswerBtn" type="button" disabled>Start answer</button><button class="btn sm" id="finishProviderAnswerBtn" type="button" disabled>Finish answer</button><button class="btn btn-ghost sm" id="discardProviderAnswerBtn" type="button" disabled>Discard</button></div>
+              <div id="providerReviewConfirmation" hidden>
+                <details><summary>Review selected transcript</summary><p class="provider-answer-preview" id="providerAnswerPreview"></p></details>
+                <label class="compliance-check"><input type="checkbox" id="providerSingleAnswerInput"><span>This selection is one complete answer by this candidate.</span></label>
+                <label class="compliance-check"><input type="checkbox" id="providerPrivacyInput"><span>I reviewed the providers' retention policies and accept experimental speech-text review.</span></label>
+                <button class="btn btn-primary sm" id="runProviderReviewBtn" type="button" disabled>Review with Pangram + Sol</button>
+              </div>
+              <div id="providerReviewResult" class="provider-review-result" role="status" aria-live="polite"></div>
+              <p class="field-hint">150+ reliable words required. Text labels are not proof of AI use or a probability of cheating. No automatic hiring decision.</p>
+            </div>
+          </section>
           <div class="panel panel-audio">
             <div class="panel-header">
               <div class="panel-label">
@@ -444,7 +468,7 @@ teams.microsoft.com</textarea>
           <div class="review-tools">
             <div class="panel-label">INTERVIEWER NOTES</div>
             <div class="note-composer">
-              <input id="noteInput" placeholder="Add a private review note">
+              <input id="noteInput" aria-label="Private interviewer note" placeholder="Add a private review note">
               <button class="btn sm" id="addNoteBtn">Add note</button>
               <button class="btn sm" id="bookmarkBtn">Bookmark now</button>
             </div>
@@ -480,23 +504,20 @@ teams.microsoft.com</textarea>
       <div>
         <span class="eyebrow">Review history</span>
         <h1>Reports</h1>
-        <p>Searchable 30-day interview evidence. Reports remain advisory and reviewer-owned.</p>
+        <p>Reports stay on this computer until you delete them. Human review is always required.</p>
       </div>
+      <div data-guide-slot="reports"></div>
+      <div class="report-toolbar"><button class="btn" id="refreshReportsBtn">Refresh reports</button><button class="btn btn-ghost" id="browseReportsBtn">Open local report folder</button></div>
       <div class="report-list" id="reportList"><div class="empty-state">Loading reports...</div></div>
     </main>
   </div>
 
   <div class="screen" id="ended-screen">
     <div class="idle-card glass-card">
-      <div class="ended-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
       <div class="trust-badge ok"><span class="dot"></span>SESSION COMPLETE</div>
       <h2>Report ready</h2>
-      <p class="idle-sub" id="endedSub">Your interview report has been saved and opened in your browser.</p>
+      <p class="idle-sub" id="endedSub">Your interview has ended.</p>
+      <div data-guide-slot="ended"></div>
       <div class="ended-stats" id="endedStats"></div>
       <div class="ended-actions">
         <button class="btn btn-ghost" id="openReportsFolderBtn">Show in Folder</button>
@@ -507,27 +528,21 @@ teams.microsoft.com</textarea>
 
   <!-- Settings Modal -->
   <div class="modal-overlay" id="settingsModal">
-    <div class="modal-content glass-card">
+    <div class="modal-content glass-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <div class="modal-header">
-        <h3>Settings</h3>
-        <button class="modal-close" id="closeSettingsBtn">&times;</button>
+        <h3 id="settingsTitle">Workspace settings</h3>
+        <button class="modal-close" id="closeSettingsBtn" aria-label="Close settings">&times;</button>
       </div>
       <div class="modal-body">
         <div class="field">
-          <label>OpenRouter API key <span class="field-opt">optional</span></label>
-          <input type="password" id="openrouterKeyInput" placeholder="sk-or-v1-…" autocomplete="off">
-          <div class="field-hint">Optional experimental transcript-pattern review. Required transcription provider credentials stay server-side.</div>
+          <label for="transcriptSizeSelect">Transcript text size</label>
+          <select id="transcriptSizeSelect"><option value="standard">Standard</option><option value="large">Large</option></select>
         </div>
         <div class="field">
-          <label>Analysis model</label>
-          <select id="modelSelect">
-            <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash (fast, cheap)</option>
-            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (balanced)</option>
-            <option value="openai/gpt-4o-mini">GPT-4o mini</option>
-          </select>
-          <div class="field-hint">Optional transcript-pattern context never overrides observed behavioral evidence.</div>
+          <label class="preference-check"><input type="checkbox" id="reduceMotionInput"><span>Reduce interface motion</span></label>
         </div>
-        <div class="settings-status" id="settingsStatus"></div>
+        <div class="settings-note"><strong>Evidence stays in context</strong><p>Built-in transcript-pattern review runs on this device. Optional Pangram + Sol checks send selected text externally only with candidate permission and interviewer confirmation. Results remain advisory.</p></div>
+        <div class="settings-status" id="settingsStatus" role="status"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" id="cancelSettingsBtn">Cancel</button>
@@ -537,8 +552,10 @@ teams.microsoft.com</textarea>
   </div>
 
   <!-- Toast -->
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="../session/presentation.js"></script>
   <script src="dashboard.js"></script>
+  <script src="provider-review.js"></script>
 </body>
 </html>

@@ -3,135 +3,58 @@ import { corsHeadersFor } from "../_shared/cors.ts";
 import { issueSessionToken, resolveSessionSecret } from "../_shared/session-token.ts";
 
 Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeadersFor(request) });
+  const headers = corsHeadersFor(request);
+  if (request.method === "OPTIONS") return new Response("ok", { headers });
+  if (request.method !== "POST") {
+    return Response.json({ error: "Method not allowed." }, { status: 405, headers });
   }
   try {
     const authorization = request.headers.get("authorization") || "";
-    const { joinCode, candidateName } = await request.json();
-    const code = String(joinCode || "").trim().toUpperCase();
-    if (!/^TRV-[A-Z0-9]{6}$/.test(code)) {
-      throw new Error("Invalid session code.");
+    const bearer = /^Bearer\s+(\S+)$/i.exec(authorization)?.[1];
+    if (!bearer || bearer === Deno.env.get("SUPABASE_ANON_KEY")) {
+      return Response.json({ error: "Candidate sign-in is required before joining." }, { status: 401, headers });
     }
-
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authorization } }, auth: { persistSession: false } },
+    );
+    // Anonymous Auth users are valid candidates; an API key alone is not a user.
+    const { data: authData, error: authError } = await userClient.auth.getUser(bearer);
+    const candidateUser = authData?.user;
+    if (authError || !candidateUser?.id) {
+      return Response.json({ error: "Candidate sign-in is required before joining." }, { status: 401, headers });
+    }
+    const body = await request.json().catch(() => null);
+    const code = String(body?.joinCode || "").trim().toUpperCase();
+    if (!/^TRV-[A-Z0-9]{6}$/.test(code)) {
+      return Response.json({ error: "Invalid session code." }, { status: 400, headers });
+    }
+    const candidateName = String(body?.candidateName || "").slice(0, 120);
+    const secret = resolveSessionSecret();
     const client = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } },
     );
-
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      {
-        global: { headers: { Authorization: authorization } },
-        auth: { persistSession: false },
-      },
-    );
-    const { data: authData } = await userClient.auth.getUser();
-    const candidateUser = authData.user;
-    if (!candidateUser) {
-      return Response.json({ error: "Candidate sign-in is required before joining." }, {
-        status: 401,
-        headers: corsHeadersFor(request),
-      });
-    }
-
-    const { data: session, error } = await client
-      .from("sessions")
-      .select(
-        "id,internal_id,join_code,status,allowed_apps,allowed_sites,blocked_sites,blocking_mode,expires_at",
-      )
-      .eq("join_code", code)
-      .maybeSingle();
-    if (error) throw error;
-    if (!session) {
-      return Response.json({ error: "Session not found." }, {
-        status: 404,
-        headers: corsHeadersFor(request),
-      });
-    }
-    if (!["waiting", "candidate_ready"].includes(session.status)) {
-      return Response.json({ error: "This session has ended." }, {
-        status: 409,
-        headers: corsHeadersFor(request),
-      });
-    }
-    if (session.expires_at && Date.parse(session.expires_at) < Date.now()) {
-      return Response.json({ error: "This session code has expired." }, {
-        status: 410,
-        headers: corsHeadersFor(request),
-      });
-    }
-
-    const { data: sessionDetails } = await client.from("sessions").select(
-      "technical_vocabulary,candidate_name,role_title,policy_preset",
-    ).eq("internal_id", session.internal_id).maybeSingle();
-
-    const { data: existingCandidates, error: existingCandidateError } = await client
-      .from("session_participants")
-      .select("user_id")
-      .eq("session_id", session.internal_id)
-      .eq("participant_role", "candidate");
-    if (existingCandidateError) throw existingCandidateError;
-    const otherCandidate = (existingCandidates || []).find((participant) =>
-      participant.user_id && participant.user_id !== candidateUser.id
-    );
-    if (otherCandidate) {
-      return Response.json({ error: "This session is already linked to another candidate." }, {
-        status: 409,
-        headers: corsHeadersFor(request),
-      });
-    }
-
-    const exp = Math.floor(Date.now() / 1000) + 4 * 60 * 60;
-    const { error: participantError } = await client.from("session_participants")
-      .upsert({
-        session_id: session.internal_id,
-        user_id: candidateUser.id,
-        participant_role: "candidate",
-        candidate_name: String(candidateName || "").slice(0, 120),
-        expires_at: new Date(exp * 1000).toISOString(),
-      }, { onConflict: "session_id,user_id" });
-    if (participantError) throw participantError;
-
-    const { error: readyError } = await client.from("sessions").update({ status: "candidate_ready" }).eq(
-      "internal_id",
-      session.internal_id,
-    );
-    if (readyError) throw readyError;
-
-    const sessionToken = await issueSessionToken({
-      sessionId: session.internal_id,
-      channelId: session.id,
-      joinCode: code,
-      candidateName: String(candidateName || "").slice(0, 120),
-      userId: candidateUser.id,
-      exp,
-    }, resolveSessionSecret());
-
-    return Response.json({
-      session: {
-        id: session.id,
-        internal_id: session.internal_id,
-        join_code: session.join_code,
-        status: session.status,
-        allowed_apps: session.allowed_apps,
-        allowed_sites: session.allowed_sites,
-        blocked_sites: session.blocked_sites,
-        blocking_mode: session.blocking_mode,
-        technical_vocabulary: sessionDetails?.technical_vocabulary || [],
-        role_title: sessionDetails?.role_title || "",
-        policy_preset: sessionDetails?.policy_preset || "standard_technical",
-      },
-      sessionToken,
-      expiresAt: new Date(exp * 1000).toISOString(),
-    }, { headers: { ...corsHeadersFor(request), "content-type": "application/json" } });
-  } catch (error) {
-    console.error("candidate-join failed", error);
-    return Response.json({ error: "Could not join session." }, {
-      status: 400,
-      headers: corsHeadersFor(request),
+    const { data: claim, error } = await client.rpc("claim_candidate_session", {
+      target_code: code, candidate_user: candidateUser.id, display_name: candidateName,
     });
+    if (error || !claim) throw new Error("Candidate claim failed.");
+    if (claim.error) {
+      return Response.json({ error: claim.error }, { status: claim.status_code, headers });
+    }
+    const exp = Math.floor(Date.parse(claim.expires_at) / 1000);
+    if (!claim.session?.internal_id || !Number.isFinite(exp) || exp <= Date.now() / 1000) {
+      throw new Error("Invalid candidate claim.");
+    }
+    const sessionToken = await issueSessionToken({
+      sessionId: claim.session.internal_id, channelId: claim.session.id,
+      joinCode: code, candidateName, userId: candidateUser.id, exp,
+    }, secret);
+    return Response.json({
+      session: claim.session, sessionToken, expiresAt: new Date(exp * 1000).toISOString(),
+    }, { headers: { ...headers, "cache-control": "no-store" } });
+  } catch {
+    console.error("candidate-join failed");
+    return Response.json({ error: "Could not join session." }, { status: 500, headers });
   }
 });

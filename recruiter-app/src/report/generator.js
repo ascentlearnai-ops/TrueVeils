@@ -3,9 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const { evaluateReview } = require('../review/evidence');
 const { computeSessionVerdict } = require('../review/verdict');
+const { displayCode } = require('../session/presentation');
+const { MIN_RESPONSE_WORDS } = require('../ai/response-window');
 
 function esc(s) {
-  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString();
@@ -61,6 +63,7 @@ function weightedAverage(items) {
 function aiSiteFlagCount(flags = []) {
   const pattern = /\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i;
   return flags.filter(flag => {
+    if (flag.policyDecision === 'allowed' || flag.reviewStatus === 'allowed') return false;
     const severity = String(flag.severity || '').toLowerCase();
     return (severity === 'high' || severity === 'critical') && pattern.test(String(flag.text || ''));
   }).length;
@@ -80,6 +83,7 @@ function behavioralEvidence(flags = []) {
   const assistantPattern = /\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/;
 
   for (const flag of flags) {
+    if (flag.policyDecision === 'allowed' || flag.reviewStatus === 'allowed') continue;
     const text = [
       flag.text,
       flag.detectedHost,
@@ -96,7 +100,7 @@ function behavioralEvidence(flags = []) {
       evidence.aiToolHits++;
       destinations.add(assistantMatch[1]);
     }
-    if (/\b(hidden overlay|overlay detected|exclude.?from.?capture|interview coder|interviewcoder|cluely|lockedin|finalround|parakeet)\b/.test(text)) evidence.overlayHits++;
+    if (flag.eventType === 'overlay_detected' || /\b(hidden overlay|overlay detected|exclude.?from.?capture)\b/.test(text)) evidence.overlayHits++;
     if (/\bswitched away\b/.test(text)) evidence.focusSwitches++;
     if (/\bunlisted app\/site\b/.test(text)) evidence.unlistedAppHits++;
   }
@@ -175,17 +179,103 @@ async function generate(data) {
 
   const html = buildHtml({
     session, startMs, endMs, duration, avg, max, highFlags, risk, review, verdict, notes,
-    transcripts, flags, audioChunks, totalResponses: transcripts.length
+    transcripts, flags, audioChunks, totalResponses: transcripts.length, providerReviews: data.providerReviews || [],
+    chunkReview: data.chunkReview || null
   });
 
-  const filename = `${session.sessionId}-${new Date(startMs).toISOString().replace(/[:.]/g, '-').slice(0, 19)}.html`;
+  const filename = `${displayCode(session.sessionId)}-${new Date(startMs).toISOString().replace(/[:.]/g, '-').slice(0, 19)}.html`;
   const fullPath = path.join(dir, filename);
   fs.writeFileSync(fullPath, html, 'utf8');
   return fullPath;
 }
 
+function conciseSummary(ctx) {
+  const validScore = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
+  const candidates = new Map();
+  for (const item of ctx.transcripts) {
+    const score = item.aiScore ?? item.score;
+    if (item.scorable !== true || item.analysisPending || !validScore(score) || !item.text?.trim()) continue;
+    const words = item.responseWindowWordCount ?? (item.responseWindowText || item.text).trim().split(/\s+/).length;
+    if (!Number.isFinite(words) || words < MIN_RESPONSE_WORDS) continue;
+    const key = item.analysisWindowId || JSON.stringify([item.startedAt, item.endedAt, item.text]);
+    if (!candidates.has(key)) candidates.set(key, { item, score, words });
+  }
+  const ranked = [...candidates.values()].sort((a, b) => b.score - a.score);
+  const moments = ranked.slice(0, 3);
+  const lower = ranked.at(-1);
+  if (lower && lower.score < 40 && !moments.includes(lower)) moments.push(lower);
+  moments.sort((a, b) => (a.item.startedAt ?? Infinity) - (b.item.startedAt ?? Infinity));
+
+  const contextual = ctx.chunkReview?.summary;
+  const scoredWindows = (ctx.chunkReview?.windows || []).filter(window => window.scorable === true
+    && Number.isFinite(window.wordCount) && window.wordCount >= MIN_RESPONSE_WORDS && validScore(window.score));
+  const scoredContext = scoredWindows.length > 0;
+  const contextualScore = contextual?.reviewedWords > 0 && scoredContext && validScore(contextual.score);
+  const score = contextualScore ? contextual.score
+    : ctx.risk.scorableCount > 0 && validScore(ctx.risk.transcriptAvg) ? ctx.risk.transcriptAvg : null;
+  const explanation = contextualScore
+    ? `${contextual.reviewedWords} of ${contextual.totalWords} captured words reviewed in continuous context.`
+    : score != null ? `Based on ${ctx.risk.scorableCount} scored response windows.`
+      : 'Not enough reliable speech was available to score. This is not a zero or a finding of human authorship.';
+  const reason = contextualScore
+    ? [...scoredWindows].sort((a, b) => b.score - a.score)[0]?.reasoning
+    : ranked[0]?.item.reasoning;
+  const momentRows = moments.map(({ item, score: momentScore, words }) => {
+    const validBounds = Number.isFinite(item.startedAt) && Number.isFinite(item.endedAt)
+      && item.startedAt >= ctx.startMs && item.endedAt >= item.startedAt && item.endedAt <= ctx.endMs;
+    const timing = validBounds ? `${durationStr(item.startedAt - ctx.startMs)} - ${durationStr(item.endedAt - ctx.startMs)}`
+      : 'Speech timing unavailable';
+    return `<article class="summary-moment">
+      <p class="moment-meta"><time>${esc(timing)}</time><span>${esc(Math.round(momentScore))}/100 pattern score</span></p>
+      <blockquote>${esc(item.text)}</blockquote>
+      <p class="moment-reason">${esc(item.reasoning || 'No explanation was recorded. Review the full captured context.')} (${esc(words)}-word context.)</p>
+      ${item.responseWindowText && item.responseWindowText !== item.text ? `<details class="moment-context"><summary>Scored context</summary><p>${esc(item.responseWindowText)}</p></details>` : ''}
+    </article>`;
+  }).join('');
+  return `<section id="conciseSummary" class="report-summary" aria-label="Session summary">
+    <section><h2>Score</h2><p class="summary-score" data-summary-score>${score == null ? 'Insufficient evidence' : `${esc(Math.round(score))}/100 pattern score`}</p>
+      <p class="summary-boundary">Experimental pattern score, not an AI-authorship probability. Human review required.</p></section>
+    <section><h2>Why</h2><p>${esc(explanation)}</p>
+      ${reason ? `<p class="summary-reason">Highest-scoring context: ${esc(reason)}</p>` : ''}
+      <p class="summary-coverage">${esc(ctx.review.summary || ctx.review.displayBand || 'Review capture coverage in the full report.')}</p></section>
+    <section><h2>Key moments</h2>${momentRows || '<p>No reliably scored statement is available. Unscored speech remains in the full report.</p>'}
+      <p class="summary-boundary">Times identify captured segments, not exact word alignment. Scores can use longer surrounding context; key moments are not additional independent evidence.</p></section>
+  </section>`;
+}
+
 function buildHtml(ctx) {
   const { session, startMs, endMs, duration, risk, review, verdict = null, notes = [], transcripts, flags, audioChunks, totalResponses } = ctx;
+  const chunkReview = ctx.chunkReview;
+  const chunkScore = assessment => assessment?.scorable === true && Number.isFinite(assessment.score)
+    ? `${Math.round(assessment.score)}/100 pattern score` : 'Insufficient reliable context';
+  const chunkRows = chunkReview ? chunkReview.chunks.map((chunk, index) => `
+    <div class="entry"><div class="entry-head"><span class="time">Chunk ${index + 1} | ${esc(String(chunk.wordCount))} words</span>
+      <span class="score ${chunk.assessment?.scorable ? 'low' : 'unk'}">${esc(chunkScore(chunk.assessment))}</span></div>
+      <div class="entry-text">${esc(chunk.text)}</div>
+      <div class="reasoning">Context words: ${esc(String(chunk.assessment?.contextWords || 0))}. ${esc(chunk.assessment?.reasoning || '')}</div></div>`).join('') : '';
+  const contextRows = chunkReview ? chunkReview.windows.map(window => `
+    <div class="entry"><div class="entry-head"><span class="time">${esc(window.wordCount)}-word context</span>
+      <span class="score ${window.scorable ? 'low' : 'unk'}">${esc(chunkScore(window))}</span></div>
+      <div class="entry-text">${esc(window.text)}</div><div class="reasoning">${esc(window.reasoning || '')}</div>
+      <div class="reasoning">Signals: ${esc((window.aiSignals || []).join('; ') || 'No strong pattern signal')}.
+      Counter-signals: ${esc((window.humanSignals || []).join('; ') || 'None recorded')}.</div></div>`).join('') : '';
+  const chunkSection = chunkReview ? `
+    <h3>Concise Transcript Review</h3><div class="panel">
+      <div class="entry"><div class="entry-head"><span class="score low">${Number.isFinite(chunkReview.summary?.score) ? esc(Math.round(chunkReview.summary.score) + '/100 contextual pattern score') : 'INSUFFICIENT EVIDENCE'}</span></div>
+      <div class="entry-text">${esc(chunkReview.summary?.summaryText || 'Not enough reliable speech for review.')}</div>
+      <div class="reasoning">Reviewed ${esc(String(chunkReview.summary?.reviewedWords || 0))} of ${esc(String(chunkReview.summary?.totalWords || 0))} captured words.
+      Scores are experimental signals, not AI-authorship probabilities or proof of cheating. Shared context can give several chunks the same score; those badges are not independent evidence and are not added to the session verdict.</div></div>
+      <details><summary>25-35-word chunks and scores (including shorter tails)</summary>${chunkRows || '<div class="empty">No chunks available.</div>'}</details>
+      <details><summary>Larger context reviews</summary>${contextRows || '<div class="empty">No reliable review windows.</div>'}</details>
+      <details><summary>Complete captured transcript</summary><div class="entry entry-text">${esc(transcripts.map(item => item.text || '').join(' '))}</div></details>
+    </div>` : '';
+  const providerRows = (ctx.providerReviews || []).map(item => {
+    const fractions = item.textClassification?.assignedTextFractions;
+    return `<div class="entry"><div class="entry-text">${esc(item.status)}</div>
+      <div class="reasoning">${fractions ? esc(`Pangram-assigned text: AI-written ${Math.round(fractions.ai * 100)}%, AI-assisted ${Math.round(fractions.assisted * 100)}%, human-written ${Math.round(fractions.human * 100)}%. Not a cheating probability.`) : esc((item.reasons || []).join(', '))}</div>
+      ${(item.reviewAssistant?.followUps || []).map(f => `<div class="reasoning">${esc(f.text)}</div>`).join('')}
+      <div class="reasoning">Experimental speech-text review; human review required. This result does not affect the behavioral review band.</div></div>`;
+  }).join('') || '<div class="empty">No external provider review was performed.</div>';
   const riskCls = review.reviewBand === 'high_priority_review' ? 'high' : review.reviewBand === 'review' ? 'med' : 'low';
   const scorableTranscripts = transcripts.filter(item => item.scorable !== false);
   const abstainedTranscripts = transcripts.length - scorableTranscripts.length;
@@ -251,17 +341,16 @@ function buildHtml(ctx) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Truveil Report — ${esc(session.candidateName)} — ${esc(session.sessionId)}</title>
+<title>Truveil Report — ${esc(session.candidateName)} — ${esc(displayCode(session.sessionId))}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #080808; color: #f7f7f5; font-family: 'Inter', sans-serif; line-height: 1.55; padding: 56px 32px; -webkit-font-smoothing: antialiased; }
+  body { background: #f7fbff; color: #172a35; font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.55; padding: 32px; -webkit-font-smoothing: antialiased; }
   .container { max-width: 1040px; margin: 0 auto; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 28px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 40px; }
   .logo { font-size: 20px; font-weight: 800; color: #fff; }
   .tag { display: inline-block; margin-top: 6px; font-size: 10px; color: rgba(255,255,255,.3); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
   .sid { text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(255,255,255,.5); }
-  h1 { font-size: 52px; font-weight: 760; letter-spacing: -2px; line-height: 1.02; margin-bottom: 12px; }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: 0; line-height: 1.15; margin-bottom: 8px; }
   .sub-title { font-size: 15px; color: rgba(255,255,255,.5); margin-bottom: 40px; }
   .risk-banner { display: flex; align-items: center; gap: 24px; padding: 30px 32px; border-radius: 10px; margin-bottom: 40px; border: 1px solid rgba(255,255,255,.1); background: #101010; }
   .risk-banner.high { border-color: rgba(255,81,71,.45); }
@@ -315,6 +404,28 @@ function buildHtml(ctx) {
   .verdict-basis { font-size: 12px; color: rgba(255,255,255,.55); line-height: 1.9; text-align: right; }
   .verdict-basis b { color: rgba(255,255,255,.85); font-weight: 600; }
   footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.06); font-size: 11px; color: rgba(255,255,255,.25); text-align: center; }
+  .header { border-color: #d7e5ef; margin-bottom: 24px; padding-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+  .logo { color: #172a35; }
+  .tag, .sid, .sub-title, .report-date { color: #536b7a; letter-spacing: 0; }
+  .report-date { font-size: 12px; }
+  .sub-title { margin-bottom: 24px; }
+  .report-summary > section { padding: 20px 0; border-top: 1px solid #d7e5ef; }
+  .report-summary h2 { font-size: 14px; font-weight: 600; color: #32627e; margin-bottom: 10px; }
+  .summary-score { font-size: 30px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+  .summary-boundary, .summary-coverage { color: #536b7a; font-size: 12px; margin-top: 10px; }
+  .summary-reason { margin-top: 8px; }
+  .summary-moment { padding: 14px 0; border-bottom: 1px solid #e1ebf2; }
+  .summary-moment:last-of-type { border-bottom: 0; }
+  .moment-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #32627e; font-size: 12px; }
+  .summary-moment blockquote { margin: 8px 0; padding-left: 14px; border-left: 3px solid #b5d8ef; font-size: 15px; overflow-wrap: anywhere; }
+  .moment-reason, .moment-context { font-size: 13px; color: #536b7a; overflow-wrap: anywhere; }
+  .moment-context p { margin-top: 8px; }
+  summary { cursor: pointer; }
+  .full-report { margin-top: 24px; border-top: 1px solid #d7e5ef; padding-top: 16px; }
+  .full-report > summary { color: #32627e; font-weight: 600; }
+  .full-report-content { margin-top: 16px; padding: 24px; background: #080808; color: #f7f7f5; border-radius: 8px; overflow-x: auto; }
+  footer { color: #536b7a; border-color: #d7e5ef; margin-top: 32px; }
+  @media (max-width: 600px) { body { padding: 20px; } .sid { text-align: left; } .full-report-content { padding: 16px; } .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media print {
     body { background: #fff; color: #111; padding: 24px; }
     .logo { color: #111; }
@@ -330,14 +441,17 @@ function buildHtml(ctx) {
         <div class="tag">INTERVIEW INTEGRITY REPORT</div>
       </div>
       <div class="sid">
-        ${esc(session.sessionId)}<br>
-        <span style="color:rgba(255,255,255,.3);font-size:11px">${fmtDate(startMs)}</span>
+        ${esc(displayCode(session.sessionId))}<br>
+        <span class="report-date">${fmtDate(startMs)}</span>
       </div>
     </div>
 
     <h1>${esc(session.candidateName)}</h1>
     <div class="sub-title">${esc(session.role)} · Session duration ${duration}</div>
 
+    ${conciseSummary(ctx)}
+
+    <details id="fullReportDetails" class="full-report"><summary>Full report</summary><div class="full-report-content">
     <div class="risk-banner ${riskCls}">
       <div class="risk-info">
         <h2>${esc(review.displayBand)}</h2>
@@ -345,6 +459,8 @@ function buildHtml(ctx) {
         <p>${esc(review.evidence.join(' | ') || 'No meaningful behavioral evidence was recorded.')}</p>
       </div>
     </div>
+
+    ${chunkSection}
 
     ${verdict ? `
     <h3>Session Verdict</h3>
@@ -378,6 +494,9 @@ function buildHtml(ctx) {
     <h3>Response Analysis</h3>
     <div class="panel">${transcriptRows}</div>
 
+    <h3>Optional Pangram + Sol Review</h3>
+    <div class="panel">${providerRows}</div>
+
     <h3>Behavioral Evidence</h3>
     <div class="panel" style="padding:0">
       <table>
@@ -402,6 +521,7 @@ function buildHtml(ctx) {
         <tbody>${audioRows}</tbody>
       </table>
     </div>
+    </div></details>
 
     <footer>
       Generated by Truveil Command Center · ${fmtDate(Date.now())}<br>

@@ -6,9 +6,10 @@ const production = process.argv.includes('--production');
 const outputPath = path.join(__dirname, '..', 'src', 'config', 'runtime-config.json');
 
 const config = {
+  demoRelayUrl: process.env.TRUVEIL_DEMO_RELAY_URL || '',
   supabaseUrl: process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL || '',
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY || '',
-  candidateAppUrl: process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app'
+  candidateAppUrl: (process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-secure.vercel.app').replace('https://truveil-client.vercel.app', 'https://truveil-secure.vercel.app')
 };
 
 const missing = production && (!config.supabaseUrl || !config.supabaseAnonKey);

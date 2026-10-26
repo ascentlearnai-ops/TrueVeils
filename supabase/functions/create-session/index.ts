@@ -13,26 +13,67 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeadersFor(request) });
   }
+  if (request.method !== "POST") {
+    return Response.json({ error: "Method not allowed." }, {
+      status: 405,
+      headers: { ...corsHeadersFor(request), allow: "POST, OPTIONS" },
+    });
+  }
   const authorization = request.headers.get("authorization") || "";
-  let authUser: { id: string; email?: string | null } | null = null;
-  const userClient = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    {
-      global: { headers: { Authorization: authorization } },
-      auth: { persistSession: false },
-    },
-  );
-  if (
-    authorization &&
-    !authorization.endsWith(Deno.env.get("SUPABASE_ANON_KEY") || "")
-  ) {
-    const { data: authData } = await userClient.auth.getUser();
-    authUser = authData.user || null;
+  const bearer = /^Bearer\s+(\S+)$/i.exec(authorization)?.[1];
+  if (!bearer || bearer === Deno.env.get("SUPABASE_ANON_KEY")) {
+    return Response.json({ error: "Recruiter sign-in is required." }, {
+      status: 401,
+      headers: corsHeadersFor(request),
+    });
   }
 
   try {
-    const body = await request.json();
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      {
+        global: { headers: { Authorization: authorization } },
+        auth: { persistSession: false },
+      },
+    );
+    const { data: authData, error: authError } = await userClient.auth.getUser(bearer);
+    const authUser = authData?.user;
+    if (authError || !authUser?.id || authUser.is_anonymous || !authUser.email) {
+      return Response.json({ error: "Recruiter sign-in is required." }, {
+        status: 401,
+        headers: corsHeadersFor(request),
+      });
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return Response.json({ error: "Invalid session details." }, {
+        status: 400, headers: corsHeadersFor(request),
+      });
+    }
+    let candidateUrl: URL;
+    try {
+      const base = new URL(body.candidateAppUrl || "https://truveil-secure.vercel.app");
+      if (base.protocol !== "https:" || base.username || base.password) throw new Error();
+      // Older desktop builds still send the retired candidate hostname.
+      if (base.hostname === "truveil-client.vercel.app") base.hostname = "truveil-secure.vercel.app";
+      candidateUrl = new URL("/", base);
+    } catch {
+      return Response.json({ error: "Invalid candidate app URL." }, {
+        status: 400, headers: corsHeadersFor(request),
+      });
+    }
+    const policy = body.policy || {};
+    if (typeof policy !== "object" || Array.isArray(policy) ||
+      [policy.allowed_apps, policy.allowed_sites, policy.blocked_sites].some((items) =>
+        items !== undefined && (!Array.isArray(items) || items.length > 100 ||
+          items.some((item: unknown) => typeof item !== "string" || item.length > 2048))
+      )) {
+      return Response.json({ error: "Invalid session policy." }, {
+        status: 400, headers: corsHeadersFor(request),
+      });
+    }
     const service = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -40,51 +81,12 @@ Deno.serve(async (request) => {
         auth: { persistSession: false },
       },
     );
-    let member: { organization_id: string } | null = null;
-
-    if (authUser) {
-      const { data } = await service
-        .from("organization_members")
-        .select("organization_id")
-        .eq("user_id", authUser.id)
-        .limit(1)
-        .maybeSingle();
-      member = data;
-    }
-
-    if (authUser && !member) {
-      const name = `${
-        authUser.email?.split("@")[0] || "Truveil"
-      } workspace`;
-      const { data: organization, error: organizationError } = await service
-        .from("organizations").insert({ name }).select("id").single();
-      if (organizationError) throw organizationError;
-      const { error: memberError } = await service.from("organization_members")
-        .insert({
-          organization_id: organization.id,
-          user_id: authUser.id,
-          role: "owner",
-        });
-      if (memberError) throw memberError;
-      member = { organization_id: organization.id };
-    }
-
     const code = joinCode();
-    const policy = body.policy || {};
-    const candidateBaseUrl = String(
-      body.candidateAppUrl || "https://truveil-client.vercel.app",
-    ).replace(/\/+$/, "");
-    const { data: session, error } = await service.from("sessions").insert({
+    candidateUrl.searchParams.set("code", code);
+    candidateUrl.searchParams.set("open", "1");
+    const sessionData = {
       id: code,
-      join_code: code,
-      candidate_link: `${candidateBaseUrl}/?code=${
-        encodeURIComponent(code)
-      }&open=1`,
-      status: "waiting",
-      flags: [],
-      transcript: [],
-      recruiter_id: authUser?.id || null,
-      organization_id: member?.organization_id || null,
+      candidate_link: candidateUrl.href,
       candidate_name: String(body.candidateName || "").slice(0, 120),
       role_title: String(body.role || "").slice(0, 160),
       technical_vocabulary: Array.isArray(body.technicalVocabulary)
@@ -94,32 +96,28 @@ Deno.serve(async (request) => {
       allowed_apps: policy.allowed_apps || [],
       allowed_sites: policy.allowed_sites || [],
       blocked_sites: policy.blocked_sites || [],
-      blocking_mode: "warn_refocus",
-      expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-      retention_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString(),
-    }).select("*").single();
-    if (error) throw error;
-    if (authUser) {
-      const { error: participantError } = await service.from(
-        "session_participants",
-      ).insert({
-        session_id: session.internal_id,
-        user_id: authUser.id,
-        participant_role: "recruiter",
-        expires_at: session.expires_at,
+    };
+    const { data: result, error } = await service.rpc("create_recruiter_session", {
+      recruiter_user: authUser.id,
+      workspace_name: `${authUser.email.split("@")[0]} workspace`,
+      session_data: sessionData,
+    });
+    if (error || !result) throw new Error("Session creation failed.");
+    if (result.error) {
+      return Response.json({ error: result.error }, {
+        status: result.status_code, headers: corsHeadersFor(request),
       });
-      if (participantError) throw participantError;
     }
-    return Response.json({ session }, {
+    if (!result.session?.internal_id || result.session.recruiter_id !== authUser.id) {
+      throw new Error("Invalid created session.");
+    }
+    return Response.json({ session: result.session }, {
       headers: { ...corsHeadersFor(request), "content-type": "application/json" },
     });
-  } catch (error) {
-    const message = error instanceof Error
-      ? error.message
-      : "Could not create session.";
-    return Response.json({ error: message }, {
-      status: 400,
+  } catch {
+    console.error("create-session failed");
+    return Response.json({ error: "Could not create session." }, {
+      status: 500,
       headers: corsHeadersFor(request),
     });
   }

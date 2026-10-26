@@ -1,5 +1,5 @@
 {
-  "version": "truveil-risk-v2.5.0",
+  "version": "truveil-risk-v2.6.0",
   "intercept": -1.62,
   "thresholds": {
     "elevated": 0.6,

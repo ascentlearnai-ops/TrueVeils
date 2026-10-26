@@ -1,5 +1,5 @@
 const AI_TARGET = /\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/i;
-const OVERLAY_TARGET = /\b(hidden overlay|overlay detected|exclude.?from.?capture|interviewcoder|interview coder|cluely|lockedin|finalround|parakeet)\b/i;
+const OVERLAY_TARGET = /\b(hidden overlay|overlay detected|exclude.?from.?capture)\b/i;
 const DIRECT_TRANSCRIPT_SIGNAL = /\b(copied assistant or prompt artifact|markdown or code-block artifact|prompt or answer-label residue|direct ai-tool use context)\b/i;
 const CORRELATED_TRANSCRIPT_SIGNAL = /\bresponse followed a restricted ai-tool event\b/i;
 
@@ -115,7 +115,8 @@ function evaluateReview({
     event.detectionSource === 'url' || event.closedRestrictedTarget || event.eventType === 'overlay_detected'
   ));
   const possibleAiEvents = restrictedAiEvents.filter(event => !exactAiEvents.includes(event));
-  const overlayEvents = events.filter(event => OVERLAY_TARGET.test(eventText(event)));
+  const overlayEvents = events.filter(event => event.policyDecision !== 'allowed' && event.reviewStatus !== 'allowed'
+    && (event.eventType === 'overlay_detected' || OVERLAY_TARGET.test(eventText(event))));
   const unusualSwitches = events.filter(event => (
     event.eventType === 'focus_lost'
     || (event.eventType === 'foreground_changed' && event.policyDecision === 'unlisted')

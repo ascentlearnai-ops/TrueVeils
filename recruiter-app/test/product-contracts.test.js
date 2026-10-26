@@ -14,7 +14,8 @@ test('admin website uses a site-local installer and honest advisory language', (
   assert.doesNotMatch(html, /img\/candidate\.png/i);
   assert.match(html, /role="tablist"/i);
   assert.match(html, /Interactive product preview/i);
-  assert.match(html, /waitlist\.html/i);
+  assert.match(html, /download\.html/i);
+  assert.doesNotMatch(html, /href="waitlist\.html"/i);
   assert.match(html, /assets\/brand\/tavi/i);
   assert.doesNotMatch(html, /admin-app-real\.png|candidate-app-real\.png/i);
   assert.doesNotMatch(html, /truveil-horizontal-transparent\.png/i);
@@ -34,21 +35,22 @@ test('candidate-facing copy does not expose an AI score', { skip: !clientRepo },
   assert.doesNotMatch(html, /AI-assistance risk|integrity percent|cheating score/i);
 });
 
-test('admin app separates email sign-in codes from candidate TRV codes', () => {
+test('admin app separates authenticated interviews from the no-sign-in browser demo', () => {
   const html = read('recruiter-app/src/renderer/index.html');
   const renderer = read('recruiter-app/src/renderer/dashboard.js');
   const main = read('recruiter-app/main.js');
-  assert.match(html, /Create interview code without email/);
+  assert.match(html, /Open the interactive product preview/);
+  assert.match(html, /authPasswordInput/);
   assert.match(html, /candidate receives the TRV session code/i);
-  assert.match(html, /This is the candidate code/i);
+  assert.match(html, /Share this code with your candidate to join in Truveil Secure/i);
+  assert.match(html, /Keep this separate from the candidate's interview code/i);
   assert.match(html, /sessionServiceNotice/);
-  assert.match(renderer, /manualSessionMode/);
   assert.match(renderer, /Candidate code created/);
-  assert.match(renderer, /Manual code generated/);
-  assert.match(renderer, /Open local dashboard/);
-  assert.match(renderer, /Manual code mode is active/);
+  assert.doesNotMatch(renderer, /Manual code generated|Manual code mode is active|manualSessionMode/);
+  assert.match(renderer, /truveil-recruiter\.vercel\.app\/demo\.html/);
   assert.match(main, /functions\.invoke\('create-session'/);
-  assert.doesNotMatch(main, /if \(authData\.session\?\.user\) \{\s*const result = await client\.functions\.invoke\('create-session'/);
+  assert.match(main, /auth\.getUser\(\)/);
+  assert.doesNotMatch(main, /upsert\(buildSessionPayload/);
 });
 
 test('admin app creates a shareable candidate invite link and message', () => {
@@ -117,12 +119,13 @@ test('admin joins private realtime when secure session id exists', () => {
 
 test('candidate join blocks duplicate candidate participants before setting session ready', () => {
   const source = read('supabase/functions/candidate-join/index.ts');
-  assert.match(source, /session_participants/);
-  assert.match(source, /participant_role"\), "candidate"|participant_role", "candidate"/);
-  assert.match(source, /This session is already linked to another candidate/);
-  assert.match(source, /otherCandidate/);
+  const migration = read('supabase/migrations/20261024000100_session_readiness.sql');
+  assert.match(source, /rpc\("claim_candidate_session"/);
+  assert.match(migration, /session_one_candidate_idx/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /This session is already linked to another candidate/);
   assert.ok(
-    source.indexOf('session_participants') < source.indexOf('status: "candidate_ready"'),
+    migration.indexOf('existing_candidate <> candidate_user') < migration.indexOf("set status = 'candidate_ready'"),
     'participant membership should be checked before candidate_ready update',
   );
   assert.doesNotMatch(source, /crypto\.randomUUID\(\)/);

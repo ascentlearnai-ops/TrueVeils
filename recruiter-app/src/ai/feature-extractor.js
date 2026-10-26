@@ -1,3 +1,6 @@
+const { aiUseContext } = require('./ai-use-context');
+const { confidenceValue } = require('./transcript-quality');
+
 const PATTERNS = {
   fillers: [/\bum+\b/g, /\buh+\b/g, /\ber+\b/g, /\bah+\b/g, /\bhmm+\b/g, /\byou know\b/g, /\bi mean\b/g, /\bsort of\b/g, /\bkind of\b/g],
   corrections: [/\bactually\b/g, /\blet me rephrase\b/g, /\bwhat i mean\b/g, /\bor rather\b/g, /\bi guess\b/g, /\bwait\b/g, /\bno,?\s+i\b/g],
@@ -125,10 +128,15 @@ function extractFeatures(text, context = {}, history = []) {
   const sentenceAverage = mean(sentenceLengths) || wordCount;
   const sentenceCv = sentenceAverage ? stddev(sentenceLengths) / sentenceAverage : 0;
   const uniqueRatio = wordCount ? new Set(tokens).size / wordCount : 0;
-  const transcriptConfidence = clamp(context.transcriptConfidence ?? context.confidence ?? 1);
+  const hasSpeechMetadata = Boolean(context.source || context.responseWindow)
+    || Object.hasOwn(context, 'transcriptConfidence') || Object.hasOwn(context, 'confidence');
+  const transcriptConfidence = hasSpeechMetadata
+    ? confidenceValue(context.transcriptConfidence ?? context.confidence) : 1;
   const alphaTokens = tokens.filter(token => /[a-z]/.test(token)).length;
   const quality = wordCount ? clamp((alphaTokens / wordCount) * transcriptConfidence) : 0;
   const density = key => countMatches(text, PATTERNS[key]) / Math.max(1, wordCount);
+  const aiContext = aiUseContext(text);
+  const artifactDensity = key => countMatches(aiContext.artifactText, PATTERNS[key]) / Math.max(1, wordCount);
   const vocabularyTerms = Array.isArray(context.technicalVocabulary)
     ? context.technicalVocabulary
     : String(context.technicalVocabulary || '').split(/[\n,]/);
@@ -172,9 +180,10 @@ function extractFeatures(text, context = {}, history = []) {
     namedTechnologyDensity: density('namedTechnology'),
     hypotheticalDensity: density('hypotheticals'),
     assistantStyleDensity: density('assistantStyle'),
-    copiedArtifactDensity: density('copiedArtifact'),
+    copiedArtifactDensity: artifactDensity('copiedArtifact'),
     markdownArtifactDensity: countMarkdownArtifacts(text) / Math.max(1, wordCount),
-    promptResidueDensity: density('promptResidue'),
+    promptResidueDensity: artifactDensity('promptResidue'),
+    strongArtifact: aiContext.strongArtifact,
     templateClosureDensity: density('templateClosure'),
     polishedConnectorDensity: density('polishedConnectors'),
     certaintyDensity: density('certainty'),
@@ -182,7 +191,7 @@ function extractFeatures(text, context = {}, history = []) {
     mechanicsDensity: density('mechanics'),
     directAiDensity: density('directAi'),
     directAiMentionDensity: density('directAi'),
-    directAiUseDensity: density('directAiUse'),
+    directAiUseDensity: aiContext.directUseCount / Math.max(1, wordCount),
     negatedAiMentionDensity: density('negatedAi'),
     discourseDensity: density('discourse'),
     uniqueRatio,
@@ -198,7 +207,7 @@ function extractFeatures(text, context = {}, history = []) {
     disfluencyBaselineCount: disfluencyHistory.length,
     secondsSinceAiEvent: Number.isFinite(secondsSinceAiEvent) ? secondsSinceAiEvent : Infinity,
     behavioralAiEventCount: Number.isFinite(behavioralAiEventCount) ? behavioralAiEventCount : 0,
-    postAiEventProximity: Number.isFinite(secondsSinceAiEvent) ? clamp((120 - secondsSinceAiEvent) / 120) : 0,
+    postAiEventProximity: Number.isFinite(secondsSinceAiEvent) && secondsSinceAiEvent >= 0 ? clamp((120 - secondsSinceAiEvent) / 120) : 0,
     wordsPerMinute: context.durationMs
       ? wordCount / Math.max(Number(context.durationMs) / 60000, 0.1)
       : 0

@@ -1,0 +1,9 @@
+# Transcription cancellation guarantees
+
+- All three transcription endpoints require a signed session token, current matching candidate membership, a candidate_ready/active session, and unexpired token, membership, and session deadlines. Lookup errors fail closed.
+- The server-owned transcribe-live relay rechecks access every 5 seconds after each successful check. Both directions stop forwarding during a check; audio is dropped, not buffered. A denied or failed check closes both sockets. A stalled check closes them after 3 seconds. Cancellation/revocation is therefore polled, not instantaneous: allow up to 5 seconds to start the next check and 3 more seconds for timeout, subject to runtime scheduling.
+- The relay also schedules the earliest known expiry independently, checks deadlines on incoming frames, and clears poll/expiry/lookup timers on close. A late lookup result cannot reopen the stream. Synthetic WebSocket tests cover established connections, not just connection admission.
+- transcription-token grants a short-lived credential directly to the client. The backend can withhold new grants after cancellation, but it does not own or instantly terminate an already-established direct Deepgram connection. Token expiry limits opening new connections, not the duration of an existing connection. Client-side shutdown is still needed; use the server relay when server-enforced bounded revocation is required. See [Deepgram token-based authentication](https://developers.deepgram.com/guides/fundamentals/token-based-authentication).
+- Chunk uploads already sent to a provider cannot be recalled; each new upload and fallback is checked before dispatch.
+
+Run `npm run test:readiness` from supabase. Tests use synthetic tokens, virtual timers, mocked providers, and an in-memory PGlite database. They do not exercise production or real provider sockets.

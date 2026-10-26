@@ -4,6 +4,8 @@
 // CORS (Node fetch ignores these headers). This allowlist simply stops arbitrary
 // browser pages from reading responses.
 const ALLOWED_ORIGINS = new Set([
+  "https://truveil-secure.vercel.app",
+  "https://truveil-recruiter.vercel.app",
   "https://truveil-client.vercel.app",
   "https://trueveil.vercel.app",
   "https://truveil.com",

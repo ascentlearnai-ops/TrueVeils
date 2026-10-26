@@ -26,8 +26,15 @@ files:
   - "!node_modules/**/tests/**/*"
 asarUnpack:
   - node_modules/ffmpeg-static/ffmpeg.exe
+  - node_modules/ffmpeg-static/ffmpeg
 mac:
+  icon: assets/mac/icon.icns
   category: public.app-category.business
+  minimumSystemVersion: '12.0'
+  hardenedRuntime: true
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
+  artifactName: TruveilRecruiter-${version}-mac-${arch}.${ext}
   target:
     - dmg
 win:

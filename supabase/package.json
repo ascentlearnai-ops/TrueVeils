@@ -2,6 +2,8 @@
   "name": "truveil-database-tests",
   "private": true,
   "scripts": {
+    "test:auth-profile": "node --test tests/auth-profile-trigger.test.cjs",
+    "test:readiness": "node --experimental-vm-modules --test tests/session-readiness.test.cjs tests/session-readiness-db.test.cjs",
     "test:website": "node --test tests/website-api.test.cjs"
   },
   "devDependencies": {

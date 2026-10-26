@@ -26,7 +26,7 @@
   var require_risk_model = __commonJS({
     "src/ai/risk-model.json"(exports, module) {
       module.exports = {
-        version: "truveil-risk-v2.5.0",
+        version: "truveil-risk-v2.6.0",
         intercept: -1.62,
         thresholds: {
           elevated: 0.6,
@@ -84,10 +84,49 @@
     }
   });
 
+  // src/ai/ai-use-context.js
+  var require_ai_use_context = __commonJS({
+    "src/ai/ai-use-context.js"(exports, module) {
+      var TOOL = "(?:chatgpt|claude|gemini|copilot|perplexity|an? ai|an? llm)", SELF_USE = new RegExp(`\\b(?:i|we)\\s+(?:(?:am|are|have|just|have just)\\s+)?(?:use[ds]?|using|asked|prompted|copied|pasted|opened|checked|got help from)\\s+${TOOL}\\b`, "i"), TOOL_RESPONSE = new RegExp(`\\b${TOOL}\\s+(?:said|suggested|gave|generated|wrote|answered)\\b`, "i"), FED_TOOL = new RegExp(`\\b(?:i|we)\\s+(?:put|fed|typed)\\s+(?:it|the question|the prompt|my answer)\\s+(?:into|in)\\s+${TOOL}\\b`, "i"), CURRENT = /\b(?:this|my|the|system design|architecture) (?:answer|response|question)|\b(?:right now|just now|during (?:this|the) interview|currently|i am using|we are using)\b/i, PAST = /\b(?:last (?:year|month|week|quarter|role|job|project)|yesterday|previous(?:ly)?|used to|back then|years? ago|in 20\d\d)\b/i, HYPOTHETICAL = /\b(?:if|suppose|imagine|hypothetically|would|could|might)\b/i, REPORTED = /\b(?:the (?:bot|model|assistant|tool|tutorial|documentation|example|message) (?:said|says|read|reads|returned)|(?:quote|phrase|example))\b/i, REPORTED_QUESTION = /\b(?:whether|you (?:asked|ask|said|say)|(?:the )?interviewer (?:asked|asks))\b/i, SELF_QUESTION = /(?<![\w'])(?:did|do|have|are|am) (?:i|we)\b/i;
+      function aiUseContext(text) {
+        let clauses = (String(text || "").replace(/[\u2018\u2019]/g, "'").replace(/["\u201c][^"\u201d\n]*["\u201d]/g, " ").replace(/\bi'm\b/gi, "I am").replace(/\bwe're\b/gi, "we are").match(/[^.!?;\n]+[.!?;\n]*/g) || []).flatMap((sentence) => sentence.includes("?") ? sentence.split(/,\s*(?=(?:is|are|should|can|could|may|does|do|would|will)\s+(?:i|we|you|it|that|this|there|they)\b)/i) : [sentence]).flatMap((clause) => clause.split(/\b(?:but|however)\b/i)), directUseCount = 0, artifactClauses = [];
+        for (let clause of clauses)
+          if (!(PAST.test(clause) || HYPOTHETICAL.test(clause) || REPORTED.test(clause) || REPORTED_QUESTION.test(clause))) {
+            if (SELF_QUESTION.test(clause)) {
+              let reply = /\byes[,\s]+((?:i|we)\b.*)$/i.exec(clause);
+              if (!reply) continue;
+              clause = reply[1];
+            }
+            clause.includes("?") || (artifactClauses.push(clause), CURRENT.test(clause) && (SELF_USE.test(clause) || FED_TOOL.test(clause) || TOOL_RESPONSE.test(clause)) && directUseCount++);
+          }
+        let artifactText = artifactClauses.join(". "), strongArtifact = /\bas an ai (?:language model|assistant|model)\b/i.test(artifactText) || /\b(?:suggested answer|polished (?:answer|response)|final answer)\b/i.test(artifactText) && /\b(?:the candidate should|copy|use this|i can help|interviewer)\b/i.test(artifactText);
+        return { directUseCount, artifactText, strongArtifact };
+      }
+      module.exports = { aiUseContext };
+    }
+  });
+
+  // src/ai/transcript-quality.js
+  var require_transcript_quality = __commonJS({
+    "src/ai/transcript-quality.js"(exports, module) {
+      function confidenceValue(value) {
+        return typeof value == "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? value : null;
+      }
+      function qualityReason(value) {
+        return !value || value === "ok" ? null : value === "missing-confidence" || value === "confidence-unavailable" ? "Speech recognition confidence is unavailable; transcript retained for review." : value === "low-confidence" || value === "weak-single-word" ? "Transcript confidence is too low for a reliable estimate." : value === "low-confidence-words" ? "Too many words have uncertain recognition; transcript retained for review." : `Speech recognition needs review (${String(value).slice(0, 80)}).`;
+      }
+      function transcriptQuality(segment = {}) {
+        let confidence = confidenceValue(segment.transcriptConfidence ?? segment.confidence), lowConfidenceWordRatio = confidenceValue(segment.lowConfidenceWordRatio), reason = qualityReason(segment.qualityReason) || (confidence == null ? "Speech recognition confidence is unavailable; transcript retained for review." : null) || (confidence < 0.58 ? "Transcript confidence is too low for a reliable estimate." : null) || (lowConfidenceWordRatio != null && lowConfidenceWordRatio > 0.25 ? "Too many words have uncertain recognition; transcript retained for review." : null);
+        return { confidence, lowConfidenceWordRatio, reason, reliable: !reason };
+      }
+      module.exports = { confidenceValue, qualityReason, transcriptQuality };
+    }
+  });
+
   // src/ai/feature-extractor.js
   var require_feature_extractor = __commonJS({
     "src/ai/feature-extractor.js"(exports, module) {
-      var PATTERNS = {
+      var { aiUseContext } = require_ai_use_context(), { confidenceValue } = require_transcript_quality(), PATTERNS = {
         fillers: [/\bum+\b/g, /\buh+\b/g, /\ber+\b/g, /\bah+\b/g, /\bhmm+\b/g, /\byou know\b/g, /\bi mean\b/g, /\bsort of\b/g, /\bkind of\b/g],
         corrections: [/\bactually\b/g, /\blet me rephrase\b/g, /\bwhat i mean\b/g, /\bor rather\b/g, /\bi guess\b/g, /\bwait\b/g, /\bno,?\s+i\b/g],
         structured: [/\bfirst(?:ly)?\b/g, /\bsecond(?:ly)?\b/g, /\bthird(?:ly)?\b/g, /\bfinally\b/g, /\bin conclusion\b/g, /\bto summarize\b/g, /\bthere are (?:three|several|a few) (?:key|main|important)\b/g],
@@ -177,7 +216,7 @@
         return countMatches(text, PATTERNS.markdownArtifact);
       }
       function extractFeatures(text, context = {}, history = []) {
-        let tokens = tokenize(text), sentences = splitSentences(text), wordCount = tokens.length, sentenceLengths = sentences.map((sentence) => tokenize(sentence).length).filter(Boolean), sentenceAverage = mean(sentenceLengths) || wordCount, sentenceCv = sentenceAverage ? stddev(sentenceLengths) / sentenceAverage : 0, uniqueRatio = wordCount ? new Set(tokens).size / wordCount : 0, transcriptConfidence = clamp(context.transcriptConfidence ?? context.confidence ?? 1), alphaTokens = tokens.filter((token) => /[a-z]/.test(token)).length, quality = wordCount ? clamp(alphaTokens / wordCount * transcriptConfidence) : 0, density = (key) => countMatches(text, PATTERNS[key]) / Math.max(1, wordCount), technicalVocabularyMatches = (Array.isArray(context.technicalVocabulary) ? context.technicalVocabulary : String(context.technicalVocabulary || "").split(/[\n,]/)).map((term) => String(term || "").trim().toLowerCase()).filter((term) => term.length >= 2).reduce((count, term) => count + (String(text || "").toLowerCase().includes(term) ? 1 : 0), 0), responseLatencyMs = Number(context.responseLatencyMs ?? context.latencyMs ?? 0), priorSilenceGapMs = Number(context.priorSilenceGapMs ?? NaN), secondsSinceAiEvent = Number(context.secondsSinceAiEvent ?? context.secondsSinceRestrictedAiEvent ?? 1 / 0), behavioralAiEventCount = Number(context.behavioralAiEventCount ?? 0), recent = history.slice(-6), historySimilarity = recent.length ? Math.max(...recent.map((item) => jaccard(tokens, item.tokens || []))) : 0, baselineTokens = recent.flatMap((item) => item.tokens || []), styleDrift = recent.length >= 3 && baselineTokens.length >= 60 ? cosineDistance(tokens, baselineTokens) : 0, disfluencyHistory = recent.map((item) => Number(item.fillerDensity) + Number(item.correctionDensity)).filter(Number.isFinite), baselineDisfluency = disfluencyHistory.length >= 3 ? mean(disfluencyHistory) : 0, historyLengths = recent.map((item) => item.wordCount).filter(Boolean), lengthAverage = mean(historyLengths), lengthUniformity = historyLengths.length >= 3 && lengthAverage ? 1 - clamp(Math.abs(wordCount - lengthAverage) / lengthAverage) : 0;
+        let tokens = tokenize(text), sentences = splitSentences(text), wordCount = tokens.length, sentenceLengths = sentences.map((sentence) => tokenize(sentence).length).filter(Boolean), sentenceAverage = mean(sentenceLengths) || wordCount, sentenceCv = sentenceAverage ? stddev(sentenceLengths) / sentenceAverage : 0, uniqueRatio = wordCount ? new Set(tokens).size / wordCount : 0, transcriptConfidence = !!(context.source || context.responseWindow) || Object.hasOwn(context, "transcriptConfidence") || Object.hasOwn(context, "confidence") ? confidenceValue(context.transcriptConfidence ?? context.confidence) : 1, alphaTokens = tokens.filter((token) => /[a-z]/.test(token)).length, quality = wordCount ? clamp(alphaTokens / wordCount * transcriptConfidence) : 0, density = (key) => countMatches(text, PATTERNS[key]) / Math.max(1, wordCount), aiContext = aiUseContext(text), artifactDensity = (key) => countMatches(aiContext.artifactText, PATTERNS[key]) / Math.max(1, wordCount), technicalVocabularyMatches = (Array.isArray(context.technicalVocabulary) ? context.technicalVocabulary : String(context.technicalVocabulary || "").split(/[\n,]/)).map((term) => String(term || "").trim().toLowerCase()).filter((term) => term.length >= 2).reduce((count, term) => count + (String(text || "").toLowerCase().includes(term) ? 1 : 0), 0), responseLatencyMs = Number(context.responseLatencyMs ?? context.latencyMs ?? 0), priorSilenceGapMs = Number(context.priorSilenceGapMs ?? NaN), secondsSinceAiEvent = Number(context.secondsSinceAiEvent ?? context.secondsSinceRestrictedAiEvent ?? 1 / 0), behavioralAiEventCount = Number(context.behavioralAiEventCount ?? 0), recent = history.slice(-6), historySimilarity = recent.length ? Math.max(...recent.map((item) => jaccard(tokens, item.tokens || []))) : 0, baselineTokens = recent.flatMap((item) => item.tokens || []), styleDrift = recent.length >= 3 && baselineTokens.length >= 60 ? cosineDistance(tokens, baselineTokens) : 0, disfluencyHistory = recent.map((item) => Number(item.fillerDensity) + Number(item.correctionDensity)).filter(Number.isFinite), baselineDisfluency = disfluencyHistory.length >= 3 ? mean(disfluencyHistory) : 0, historyLengths = recent.map((item) => item.wordCount).filter(Boolean), lengthAverage = mean(historyLengths), lengthUniformity = historyLengths.length >= 3 && lengthAverage ? 1 - clamp(Math.abs(wordCount - lengthAverage) / lengthAverage) : 0;
         return {
           wordCount,
           sentenceCount: sentenceLengths.length,
@@ -196,9 +235,10 @@
           namedTechnologyDensity: density("namedTechnology"),
           hypotheticalDensity: density("hypotheticals"),
           assistantStyleDensity: density("assistantStyle"),
-          copiedArtifactDensity: density("copiedArtifact"),
+          copiedArtifactDensity: artifactDensity("copiedArtifact"),
           markdownArtifactDensity: countMarkdownArtifacts(text) / Math.max(1, wordCount),
-          promptResidueDensity: density("promptResidue"),
+          promptResidueDensity: artifactDensity("promptResidue"),
+          strongArtifact: aiContext.strongArtifact,
           templateClosureDensity: density("templateClosure"),
           polishedConnectorDensity: density("polishedConnectors"),
           certaintyDensity: density("certainty"),
@@ -206,7 +246,7 @@
           mechanicsDensity: density("mechanics"),
           directAiDensity: density("directAi"),
           directAiMentionDensity: density("directAi"),
-          directAiUseDensity: density("directAiUse"),
+          directAiUseDensity: aiContext.directUseCount / Math.max(1, wordCount),
           negatedAiMentionDensity: density("negatedAi"),
           discourseDensity: density("discourse"),
           uniqueRatio,
@@ -222,7 +262,7 @@
           disfluencyBaselineCount: disfluencyHistory.length,
           secondsSinceAiEvent: Number.isFinite(secondsSinceAiEvent) ? secondsSinceAiEvent : 1 / 0,
           behavioralAiEventCount: Number.isFinite(behavioralAiEventCount) ? behavioralAiEventCount : 0,
-          postAiEventProximity: Number.isFinite(secondsSinceAiEvent) ? clamp((120 - secondsSinceAiEvent) / 120) : 0,
+          postAiEventProximity: Number.isFinite(secondsSinceAiEvent) && secondsSinceAiEvent >= 0 ? clamp((120 - secondsSinceAiEvent) / 120) : 0,
           wordsPerMinute: context.durationMs ? wordCount / Math.max(Number(context.durationMs) / 6e4, 0.1) : 0
         };
       }
@@ -233,7 +273,7 @@
   // src/ai/local-risk.js
   var require_local_risk = __commonJS({
     "src/ai/local-risk.js"(exports, module) {
-      var model = require_risk_model(), { extractFeatures, clamp } = require_feature_extractor(), transcriptHistory = [], MODEL_VERSION = model.version, SIGNALS = {
+      var model = require_risk_model(), { extractFeatures, clamp } = require_feature_extractor(), { qualityReason: recognitionQualityReason } = require_transcript_quality(), transcriptHistory = [], MODEL_VERSION = model.version, SIGNALS = {
         assistantStyleDensity: ["Assistant-style spoken framing", "AI"],
         copiedArtifactDensity: ["Copied assistant or prompt artifact", "AI"],
         markdownArtifactDensity: ["Markdown or code-block artifact", "AI"],
@@ -305,7 +345,8 @@
           nearZeroLatency: longEnoughForTempo && features.responseLatencyMs > 0 ? clamp((18e3 - features.responseLatencyMs) / 18e3) : 0,
           postAiEventProximity: clamp(features.postAiEventProximity) * clamp(features.behavioralAiEventCount),
           disfluencyCollapse: features.disfluencyBaselineCount >= 3 && enoughSpeechForDisfluency ? clamp((features.baselineDisfluency - (features.fillerDensity + features.correctionDensity) - 0.01) / 0.02) : 0,
-          suspiciouslyInstantAnswer: longEnoughForTempo && Number.isFinite(features.priorSilenceGapMs) && features.priorSilenceGapMs >= 0 ? clamp((900 - features.priorSilenceGapMs) / 900) : 0,
+          // A gap between STT chunks is not the time taken to answer an interviewer.
+          suspiciouslyInstantAnswer: 0,
           naturalDisfluency: clamp((features.fillerDensity - 0.012) / 0.05),
           selfCorrection: clamp(features.correctionDensity / 0.045),
           concreteDetail: clamp(features.specificityDensity / 0.12),
@@ -363,22 +404,26 @@
           unscorableReason: reason
         };
       }
-      function rememberTranscript(features, score = null) {
-        !features || features.wordCount < 8 || features.transcriptConfidence < model.minimums.transcriptConfidence || features.quality < model.minimums.quality || (transcriptHistory.push({
+      function rememberTranscript(features, score = null, history = transcriptHistory) {
+        !features || features.wordCount < 8 || features.transcriptConfidence < model.minimums.transcriptConfidence || features.quality < model.minimums.quality || (history.push({
           tokens: features.tokens,
           wordCount: features.wordCount,
           fillerDensity: features.fillerDensity,
           correctionDensity: features.correctionDensity,
           score,
           modelVersion: MODEL_VERSION
-        }), transcriptHistory.length > 20 && transcriptHistory.shift());
+        }), history.length > 20 && history.shift());
       }
-      function analyzeTranscript(text, context = {}) {
-        let features = extractFeatures(text, context, transcriptHistory);
+      function analyzeTranscript(text, context = {}, history = transcriptHistory) {
+        let features = extractFeatures(text, context, history), qualityReason = recognitionQualityReason(context.qualityReason);
+        if (features.transcriptConfidence == null || qualityReason)
+          return unscorable(qualityReason || "Speech recognition confidence is unavailable; transcript retained for review.", features);
+        if (typeof context.lowConfidenceWordRatio == "number" && context.lowConfidenceWordRatio > 0.25)
+          return unscorable("Too many words have uncertain recognition; transcript retained for review.", features);
         if (features.wordCount < model.minimums.words)
-          return rememberTranscript(features), unscorable(`Needs at least ${model.minimums.words} words before estimating AI-assistance risk.`, features);
+          return rememberTranscript(features, null, history), unscorable(`Needs at least ${model.minimums.words} words before estimating AI-assistance risk.`, features);
         if (features.sentenceCount < 2 && features.wordCount < 24)
-          return rememberTranscript(features), unscorable("Needs at least two sentences or 24 reliable words before estimating AI-assistance risk.", features);
+          return rememberTranscript(features, null, history), unscorable("Needs at least two sentences or 24 reliable words before estimating AI-assistance risk.", features);
         if (features.transcriptConfidence < model.minimums.transcriptConfidence)
           return unscorable("Transcript confidence is too low for a reliable estimate.", features);
         if (features.quality < model.minimums.quality)
@@ -389,29 +434,24 @@
           contribution: (normalized[key] || 0) * weight,
           message: SIGNALS[key]?.[0] || key,
           kind: SIGNALS[key]?.[1] || (weight >= 0 ? "AI" : "HUMAN")
-        })), logit = contributions.reduce((sum, item) => sum + item.contribution, model.intercept), probability = clamp(sigmoid(logit)), rawScore = Math.round(probability * 100), hasHighPrecisionTranscriptEvidence = Math.max(
-          normalized.copiedArtifactDensity,
-          normalized.markdownArtifactDensity,
-          normalized.promptResidueDensity,
-          normalized.directAiUse
-        ) > 0.12, hasBehavioralCorrelation = normalized.postAiEventProximity > 0.3 || normalized.behavioralTranscriptFusion > 0.18, hasStrongGrounding = normalized.concreteDetail > 0.45 || normalized.firstPersonOwnership > 0.42 || normalized.experienceAnchor > 0.42 || normalized.technicalVocabulary > 0.35 || normalized.situatedTechnicalDepth > 0.35 || normalized.namedTechnology > 0.35 && normalized.timelineDetail > 0.2, score = rawScore;
+        })), logit = contributions.reduce((sum, item) => sum + item.contribution, model.intercept), probability = clamp(sigmoid(logit)), rawScore = Math.round(probability * 100), hasHighPrecisionTranscriptEvidence = features.strongArtifact || normalized.directAiUse > 0.12, hasBehavioralCorrelation = normalized.postAiEventProximity > 0.3 || normalized.behavioralTranscriptFusion > 0.18, hasStrongGrounding = normalized.concreteDetail > 0.45 || normalized.firstPersonOwnership > 0.42 || normalized.experienceAnchor > 0.42 || normalized.technicalVocabulary > 0.35 || normalized.situatedTechnicalDepth > 0.35 || normalized.namedTechnology > 0.35 && normalized.timelineDetail > 0.2, score = rawScore;
         !hasHighPrecisionTranscriptEvidence && !hasBehavioralCorrelation && (score = Math.min(score, 68)), hasBehavioralCorrelation && rawScore >= 72 && !hasHighPrecisionTranscriptEvidence && (score = Math.min(Math.max(score, 72), 84)), hasStrongGrounding && !hasHighPrecisionTranscriptEvidence && !hasBehavioralCorrelation && (score = Math.min(score, 58));
-        let cappedProbability = score / 100, label = labelFor(cappedProbability), evidence = contributions.filter((item) => item.kind === "AI" && item.contribution > 0.18).sort((a, b) => b.contribution - a.contribution).slice(0, 3), counters = contributions.filter((item) => item.kind === "HUMAN" && item.contribution < -0.12).sort((a, b) => a.contribution - b.contribution), confidence = clamp(
+        let cappedProbability = score / 100, label = labelFor(cappedProbability), evidencePriority = (item) => item.key === "directAiUse" || item.key === "postAiEventProximity" || features.strongArtifact && ["copiedArtifactDensity", "promptResidueDensity"].includes(item.key) ? 1 : 0, evidence = contributions.filter((item) => item.kind === "AI" && item.contribution > 0.18).sort((a, b) => evidencePriority(b) - evidencePriority(a) || b.contribution - a.contribution).slice(0, 3), counters = contributions.filter((item) => item.kind === "HUMAN" && item.contribution < -0.12).sort((a, b) => a.contribution - b.contribution), confidence = clamp(
           0.25 + Math.min(features.wordCount, 100) / 180 + features.transcriptConfidence * 0.24 + (features.sentenceCount >= 2 ? 0.08 : 0)
-        ), confidenceLabel = confidence >= 0.78 ? "high" : confidence >= 0.58 ? "medium" : "low", counterSignal = counters[0]?.message || null, topContributors = [...contributions].filter((item) => Math.abs(item.contribution) > 0.05).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 3).map((item) => ({
+        ), evidenceConfidence = !hasHighPrecisionTranscriptEvidence && !hasBehavioralCorrelation ? Math.min(confidence, 0.57) : confidence, confidenceLabel = evidenceConfidence >= 0.78 ? "high" : evidenceConfidence >= 0.58 ? "medium" : "low", counterSignal = counters[0]?.message || null, topContributors = [...contributions].filter((item) => Math.abs(item.contribution) > 0.05).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 3).map((item) => ({
           signal: item.key,
           label: item.message,
           kind: item.kind,
           contribution: Number(item.contribution.toFixed(3))
         })), aiSignals = evidence.map((item) => item.message), humanSignals = counters.slice(0, 6).map((item) => item.message), reasoning = evidence.length ? `${displayLabel(label)}. Main signals: ${aiSignals.join("; ")}.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join("; ").toLowerCase()}.` : ""}` : `${displayLabel(label)}. No strong AI-style speech pattern was found.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join("; ").toLowerCase()}.` : ""}`;
-        return rememberTranscript(features, score), {
+        return rememberTranscript(features, score, history), {
           score,
           probability: cappedProbability,
           rawProbability: probability,
           rawScore,
           label,
           displayLabel: displayLabel(label),
-          confidence,
+          confidence: evidenceConfidence,
           confidenceLabel,
           flags: aiSignals,
           reasoning,
@@ -422,10 +462,13 @@
           counterSignal,
           features,
           scorable: !0,
-          scoreWeight: confidence,
+          scoreWeight: evidenceConfidence,
           modelVersion: MODEL_VERSION,
           unscorableReason: null
         };
+      }
+      function analyzeTranscriptIsolated(text, context = {}) {
+        return analyzeTranscript(text, context, []);
       }
       function analyzeAudio(metadata = {}) {
         let rms = Number(metadata.rms || 0), peak = Number(metadata.peak || 0), healthy = rms >= 6e-3 && peak >= 0.025;
@@ -446,7 +489,7 @@
       function resetHistory() {
         transcriptHistory.length = 0;
       }
-      module.exports = { analyzeTranscript, analyzeAudio, resetHistory, MODEL_VERSION };
+      module.exports = { analyzeTranscript, analyzeTranscriptIsolated, analyzeAudio, resetHistory, MODEL_VERSION };
     }
   });
 

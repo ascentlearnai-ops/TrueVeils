@@ -1,8 +1,10 @@
 // ─── Truveil Command Center — Renderer ──────────────────────────────────
 
 const $ = id => document.getElementById(id);
+const sessionPresentation = window.TruveilSession;
 
 const screens = {
+  access: $('access-screen'),
   auth: $('auth-screen'),
   idle: $('idle-screen'),
   setup: $('setup-screen'),
@@ -12,12 +14,22 @@ const screens = {
 };
 
 function showScreen(name) {
+  document.body.dataset.screen = name;
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
-  document.querySelectorAll('.workspace-nav-btn').forEach(button => button.classList.remove('active'));
-  if (name === 'dashboard') $('navLiveSession')?.classList.add('active');
-  else if (name === 'reports') $('navReports')?.classList.add('active');
-  else $('navNewSession')?.classList.add('active');
+  document.querySelector('.skip-link')?.setAttribute('href', '#' + screens[name].id);
+  screens[name].setAttribute('tabindex', '-1');
+  document.querySelectorAll('.workspace-nav-btn').forEach(button => {
+    button.classList.remove('active');
+    button.removeAttribute('aria-current');
+  });
+  const active = $(name === 'reports' ? 'navReports' : name === 'dashboard' || name === 'setup' ? 'navLiveSession' : 'navNewSession');
+  active?.classList.add('active');
+  active?.setAttribute('aria-current', 'page');
+  $('navLiveSession').disabled = !signedIn || !currentSession;
+  $('navNewSession').disabled = !signedIn;
+  $('navReports').disabled = !signedIn;
+  updateRecruiterGuide();
 }
 
 // ─── State ─────────────────────────────────────────────────────────────
@@ -35,7 +47,21 @@ let currentSession = null;
 let flagEvidence = [];
 let candidateReady = false;
 let telemetryState = { connected: true, transcription: 'waiting', monitoring: 'waiting' };
-let manualSessionMode = false;
+let creatingSession = false;
+let startingSession = false;
+let endingSession = false;
+let signedIn = false;
+let demoMode = false;
+let pendingDemoJoin = null;
+let invitationCopied = false;
+let reportNeedsRetry = false;
+let reportSaved = false;
+let guideConnectionLost = false;
+let sharedTabGeneration = 0;
+let sharedBrowserView = { connected: false, closeConsent: false };
+const sharedTabRows = new Map();
+const sharedTabRequests = new Map();
+let sharedTabEmpty = null;
 
 // ─── Elements ──────────────────────────────────────────────────────────
 const statusDot = $('statusDot');
@@ -71,14 +97,8 @@ const candidateEmailInput = $('candidateEmailInput');
 const candidateInviteMessage = $('candidateInviteMessage');
 const inviteLinkPreview = $('inviteLinkPreview');
 const inviteLinkState = $('inviteLinkState');
-const allowedAppsInput = $('allowedAppsInput');
-const allowedSitesInput = $('allowedSitesInput');
 const customBlockedSitesInput = $('customBlockedSitesInput');
-const allowedAppsChips = $('allowedAppsChips');
-const allowedSitesChips = $('allowedSitesChips');
 const customBlockedSitesChips = $('customBlockedSitesChips');
-const allowedAppDraft = $('allowedAppDraft');
-const allowedSiteDraft = $('allowedSiteDraft');
 const customBlockedSiteDraft = $('customBlockedSiteDraft');
 const toastEl = $('toast');
 const authEmailInput = $('authEmailInput');
@@ -97,8 +117,44 @@ const recruiterConfirmationInputs = [
 ].filter(Boolean);
 
 // ─── Utility ───────────────────────────────────────────────────────────
+function updateRecruiterGuide() {
+  const screen = document.body.dataset.screen;
+  const guide = $('recruiterGuide');
+  const slot = document.querySelector(`[data-guide-slot="${screen}"]`);
+  if (!guide || !slot) return;
+  if (guide.parentElement !== slot) slot.appendChild(guide);
+  let text = '';
+  if (screen === 'access') text = $('demoAccessMessage').textContent
+    ? 'Check your access code and connection address below, then try again. Keep your private code to yourself.'
+    : "Enter your private access code here. Keep it separate from the candidate's code.";
+  if (screen === 'idle') text = 'Choose New interview. You will get an invitation to send to your candidate.';
+  if (screen === 'setup') {
+    if (startingSession) text = 'Starting the interview. Keep your usual calling app open.';
+    else if (pendingDemoJoin) text = 'Check the candidate\'s name below, then choose Approve candidate if it is the person you invited.';
+    else if (guideConnectionLost) text = 'The candidate disconnected. Check the connection and contact them before continuing.';
+    else if (candidateReady) text = 'Your candidate is ready. Review the three checks below, then choose Start interview.';
+    else text = invitationCopied
+      ? 'Send the invitation you copied. Their name will appear here for approval; copying does not send it.'
+      : 'Choose Copy invitation and send it to your candidate. The link carries their code and connection address.';
+  }
+  if (screen === 'dashboard') text = reportNeedsRetry
+    ? 'The report was not saved. Keep this window open and retry saving the report.'
+    : endingSession ? 'Finishing the interview and saving its report. Keep this window open.'
+      : guideConnectionLost ? 'The session connection needs attention. Check its status before continuing.'
+        : 'Use your usual calling app. Captions appear here; browser sharing is optional and needs the candidate\'s permission.';
+  if (screen === 'reports') text = 'Open a saved report to review the transcript and events. The decision stays yours.';
+  if (screen === 'ended') text = reportSaved
+    ? 'Your report is saved. Open Reports in the sidebar to review the conversation.'
+    : 'The interview has ended. No report was generated for this session.';
+  const body = $('recruiterGuideBody');
+  if (body.textContent !== text) body.textContent = text;
+  const image = $('recruiterGuideImage');
+  const src = `../../assets/app-ui/tavi-${screen === 'dashboard' ? 'listen' : screen === 'ended' && reportSaved ? 'celebrate' : 'checklist'}.webp`;
+  if (image.getAttribute('src') !== src) image.setAttribute('src', src);
+}
+
 function toast(msg, variant = 'info') {
-  toastEl.textContent = msg;
+  toastEl.textContent = sessionPresentation.message(msg);
   toastEl.className = `toast visible ${variant}`;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => toastEl.classList.remove('visible'), 3000);
@@ -116,13 +172,12 @@ function listFromTextarea(value) {
     .filter(Boolean);
 }
 function buildCandidateInviteMessage() {
-  const code = currentSession?.sessionId || sessionCodeEl.textContent || '';
+  const code = sessionPresentation.displayCode(currentSession?.sessionId || '');
   const link = candidateInviteLink();
   const candidateName = candidateNameInput.value.trim();
   const role = roleInput.value.trim();
   const greeting = candidateName ? `Hi ${candidateName},` : 'Hi,';
-  const roleLine = role ? `This is for your ${role} interview.` : 'This is for your upcoming interview.';
-  if (!/^TRV-[A-Z0-9]{6}$/i.test(String(code)) || !link) {
+  if (!link) {
     return {
       code: '',
       link: '',
@@ -130,6 +185,11 @@ function buildCandidateInviteMessage() {
       body: 'Create a session to generate the candidate invite message.'
     };
   }
+  if (currentSession.demo) return {
+    code, link, subject: 'Your Truveil interview invitation',
+    body: `${greeting}\n\nJoin your interview in Truveil Secure:\n${link}\n\n1. Open the link and enter your name.\n2. Review permissions, then choose Join interview.\n3. Wait for your interviewer to approve and start.\n\nIf the link will not open, enter these in Truveil Secure:\nRoom code: ${code}\nSession server: ${sessionPresentation.serverAddress(currentSession.relayUrl)}\n\nUse your usual calling app and keep Truveil Secure open. No account is needed. Browser sharing is optional. Interview reports stay on the interviewer's computer.`
+  };
+  const roleLine = role ? `This is for your ${role} interview.` : 'This is for your upcoming interview.';
   return {
     code,
     link,
@@ -188,13 +248,16 @@ function renderPolicyList(textarea, container, type = 'text') {
     : '<span class="policy-empty">None added</span>';
 }
 function renderPolicyControls() {
-  renderPolicyList(allowedAppsInput, allowedAppsChips, 'text');
-  renderPolicyList(allowedSitesInput, allowedSitesChips, 'site');
   renderPolicyList(customBlockedSitesInput, customBlockedSitesChips, 'site');
 }
 function addPolicyItem(textarea, draft, container, type = 'text') {
   const value = normalizePolicyInput(draft.value, type);
   if (!value) return;
+  if (demoMode && type === 'site' && !isBrowserDestination(value)) {
+    toast('Enter a website domain, such as example.com. Other apps are not monitored in this session.', 'error');
+    draft.focus();
+    return;
+  }
   setTextareaList(textarea, [...listFromTextarea(textarea.value), value]);
   draft.value = '';
   renderPolicyList(textarea, container, type);
@@ -205,27 +268,55 @@ function removePolicyItem(textarea, value, container, type = 'text') {
   renderPolicyList(textarea, container, type);
 }
 function getBlockedSites() {
-  const checked = Array.from(document.querySelectorAll('[data-blocked-site]:checked'))
+  const checked = Array.from(document.querySelectorAll('[data-blocked-site]'))
+    .filter(input => input.checked === true)
     .map(input => input.getAttribute('data-blocked-site'))
     .filter(Boolean);
-  return Array.from(new Set([...checked, ...listFromTextarea(customBlockedSitesInput.value)]));
+  return Array.from(new Set([...checked, ...listFromTextarea(customBlockedSitesInput.value)]))
+    .filter(rule => !demoMode || isBrowserDestination(rule));
+}
+function isBrowserDestination(value) {
+  return typeof value === 'string' && value.length <= 253 && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(value);
 }
 function getAllowedPolicy() {
+  const enabled = $('restrictionsEnabledInput').checked === true;
   return {
-    allowed_apps: listFromTextarea(allowedAppsInput.value),
-    allowed_sites: listFromTextarea(allowedSitesInput.value),
-    blocked_sites: getBlockedSites(),
-    blocking_mode: 'warn_refocus'
+    allowed_apps: [],
+    allowed_sites: [],
+    blocked_sites: enabled ? getBlockedSites() : [],
+    blocking_mode: enabled ? (demoMode ? 'observe' : 'warn_refocus') : 'none'
   };
 }
 
 async function renderAuthState(state = {}) {
-  const signedIn = Boolean(state.signedIn);
+  if (demoMode) return;
+  signedIn = Boolean(state.signedIn);
   authUser.hidden = !signedIn;
   authUser.textContent = state.user?.email || '';
   signOutBtn.hidden = !signedIn;
-  showScreen(signedIn || manualSessionMode || state.configured === false ? 'idle' : 'auth');
+  showScreen(signedIn ? 'idle' : 'auth');
+  if (state.configured === false) authMessage.textContent = 'This build is missing its server configuration. Use the product preview while setup is completed.';
+  $('noticeConfirmedText').textContent = 'Candidate notice covers microphone transcription, foreground app/window monitoring, restricted-target controls, and report retention.';
+  $('transcriptRelayNote').textContent = 'Candidate speech appears in the live dashboard. Backup recordings, when needed, are temporary and deleted after transcription.';
 }
+
+async function signInWithPassword() {
+  const button = $('signInPasswordBtn');
+  if (button.disabled) return;
+  button.disabled = true;
+  authMessage.textContent = 'Signing in...';
+  try {
+    await renderAuthState(await window.truveil.signInWithPassword({ email: authEmailInput.value, password: $('authPasswordInput').value }));
+    authMessage.textContent = 'Signed in.';
+  } catch (error) {
+    authMessage.textContent = error.message || 'Could not sign in.';
+  } finally {
+    $('authPasswordInput').value = '';
+    button.disabled = false;
+  }
+}
+$('signInPasswordBtn').addEventListener('click', signInWithPassword);
+$('authPasswordInput').addEventListener('keydown', event => { if (event.key === 'Enter') signInWithPassword(); });
 
 $('sendSignInLinkBtn').addEventListener('click', async () => {
   const button = $('sendSignInLinkBtn');
@@ -233,11 +324,11 @@ $('sendSignInLinkBtn').addEventListener('click', async () => {
   authMessage.textContent = 'Sending secure sign-in link...';
   try {
     await window.truveil.sendSignInLink(authEmailInput.value);
-    authMessage.textContent = 'Check your email. You can click the link or paste the 6 digit email code here. To create a candidate TRV code now, use the button below.';
+    authMessage.textContent = 'For a supported beta account, check your email and enter the sign-in code. Public email delivery is not yet enabled.';
   } catch (err) {
     const message = String(err.message || '');
     authMessage.textContent = message.includes('rate limit')
-      ? 'Email sign-in is rate-limited. Click "Create interview code without email" and share the TRV code from the next screen.'
+      ? 'Email sign-in is rate-limited. Use your provisioned account password or try again later.'
       : message;
   } finally {
     button.disabled = false;
@@ -265,15 +356,14 @@ $('verifySignInCodeBtn')?.addEventListener('click', async () => {
   }
 });
 
-$('continueOfflineBtn')?.addEventListener('click', () => {
-  manualSessionMode = true;
-  authMessage.textContent = '';
-  showScreen('idle');
-  toast('Email skipped. Create a session and share the TRV code with the candidate.', 'success');
+$('continueOfflineBtn')?.addEventListener('click', async () => {
+  try { await window.truveil.openExternal('https://truveil-recruiter.vercel.app/demo.html'); }
+  catch (error) { authMessage.textContent = error.message; }
 });
 
 signOutBtn.addEventListener('click', async () => {
-  await renderAuthState(await window.truveil.signOut());
+  try { await renderAuthState(await window.truveil.signOut()); }
+  catch (error) { toast(error.message, 'error'); }
 });
 
 window.truveil.onAuthChanged(renderAuthState);
@@ -289,11 +379,12 @@ function behaviorBoostFromFlags(flags = []) {
   let unlistedAppHits = 0;
   let criticalHits = 0;
   for (const flag of flags) {
+    if (flag.policyDecision === 'allowed' || flag.reviewStatus === 'allowed') continue;
     const text = flagEvidenceText(flag);
     const severity = String(flag.severity || '').toLowerCase();
     if (severity === 'critical') criticalHits++;
     if (/\b(chatgpt(?:\.com)?|claude(?:\.ai)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|poe(?:\.com)?|you\.com|phind(?:\.com)?|interviewcoder|interview coder|cluely|finalround|lockedin|parakeet|leetcode wizard|ultracode|interview copilot)\b/.test(text)) aiToolHits++;
-    if (/\b(hidden overlay|overlay detected|exclude.?from.?capture|interview coder|interviewcoder|cluely|lockedin|finalround|parakeet)\b/.test(text)) overlayHits++;
+    if (flag.eventType === 'overlay_detected' || /\b(hidden overlay|overlay detected|exclude.?from.?capture)\b/.test(text)) overlayHits++;
     if (/\bswitched away\b/.test(text)) focusSwitches++;
     if (/\bunlisted app\/site\b/.test(text)) unlistedAppHits++;
   }
@@ -385,88 +476,123 @@ function refreshOverallRiskMetric() {
 }
 
 // ─── Idle: New Session ────────────────────────────────────────────────
+function showDemoAccess(message = '') {
+  signedIn = false;
+  authUser.hidden = true;
+  $('demoAccessMessage').textContent = sessionPresentation.message(message);
+  showScreen('access');
+  $('demoHostCodeInput').focus();
+}
+
+$('demoAccessForm').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!demoMode || currentSession || creatingSession) return;
+  if (!$('demoHostCodeInput').value.trim()) return showDemoAccess('Enter your host access code.');
+  if (!$('demoRelayInput').value.trim()) {
+    $('demoConnectionSettings').open = true;
+    showDemoAccess('Enter the session server address in Connection settings.');
+    $('demoRelayInput').focus();
+    return;
+  }
+  // This only prepares the workspace. The relay authorizes room creation below.
+  signedIn = true;
+  authUser.hidden = false;
+  authUser.textContent = 'Interview workspace';
+  $('demoAccessMessage').textContent = '';
+  showScreen('idle');
+  $('newSessionBtn').focus();
+});
+
 $('newSessionBtn').addEventListener('click', onNewSession);
 $('newSessionBtn2').addEventListener('click', onNewSession);
 
 async function onNewSession() {
+  if (creatingSession) return;
+  if (currentSession) return showScreen(sessionStartTime ? 'dashboard' : 'setup');
+  if (demoMode && (!signedIn || !$('demoHostCodeInput').value.trim())) return showDemoAccess();
+  creatingSession = true;
   resetState();
   try {
     statusDot.className = 'status-dot active';
     statusText.textContent = 'Configuring';
-    // We create the session object now (generates TRV-XXXXXX), but don't start timer
-    currentSession = await window.truveil.createSession({
+    // Only a server-backed invitation can be shared with a candidate.
+    const create = demoMode ? window.truveil.createDemo : window.truveil.createSession;
+    const hostAccessCode = $('demoHostCodeInput').value.trim();
+    $('demoHostCodeInput').value = '';
+    currentSession = await create({
+      hostAccessCode,
+      relayUrl: $('demoRelayInput')?.value.trim(),
       candidateName: '',
       role: '',
       technicalVocabulary: [],
-      policyPreset: 'standard_technical'
+      policyPreset: 'custom',
+      policy: { allowed_apps: [], allowed_sites: [], blocked_sites: [], blocking_mode: 'none' }
     });
-    sessionCodeEl.textContent = currentSession.sessionId;
-    if (currentSession.localOnly) {
-      toast(`Code generated: ${currentSession.sessionId}. Supabase rejected session sync, so use this as a manual code for now.`, 'warn');
-      $('candidateReadyState').innerHTML = '<i></i> Manual code generated';
-      sessionServiceNotice.hidden = false;
-      sessionServiceNotice.textContent = `Manual code mode: ${currentSession.remoteError || 'Supabase session sync is unavailable.'}`;
-      candidateReady = true;
-      startMonitoringBtn.disabled = false;
-      startMonitoringBtn.textContent = 'Open local dashboard';
-    } else {
-      toast(`Candidate code created: ${currentSession.sessionId}`, 'success');
+    sessionCodeEl.textContent = sessionPresentation.displayCode(currentSession.sessionId);
+      toast(`Candidate code created: ${sessionPresentation.displayCode(currentSession.sessionId)}`, 'success');
       $('candidateReadyState').innerHTML = '<i></i> Candidate preflight pending';
       sessionServiceNotice.hidden = true;
       sessionServiceNotice.textContent = '';
+    if (currentSession.demo) {
+      $('openCandidateLinkBtn').disabled = true;
+      $('openCandidateLinkBtn').hidden = true;
+      $('demoApproval').hidden = true;
+    } else {
+      $('openCandidateLinkBtn').disabled = false;
+      $('openCandidateLinkBtn').hidden = false;
     }
     candidateNameInput.value = '';
     roleInput.value = '';
-    allowedAppsInput.value = ['TruveilSecure', 'Zoom', 'Microsoft Teams', 'Google Chrome', 'Microsoft Edge'].join('\n');
-    allowedSitesInput.value = ['meet.google.com', 'zoom.us', 'teams.microsoft.com'].join('\n');
     customBlockedSitesInput.value = '';
     candidateEmailInput.value = '';
     technicalVocabularyInput.value = '';
-    policyPresetSelect.value = 'standard_technical';
+    policyPresetSelect.value = 'custom';
+    $('restrictionsEnabledInput').checked = false;
+    renderRestrictionState();
     resetRecruiterConfirmations();
     renderPolicyControls();
     refreshCandidateInvite();
-    if (!currentSession.localOnly) {
       candidateReady = false;
       startMonitoringBtn.disabled = true;
       startMonitoringBtn.innerHTML = '<span class="dots-pulse"><span></span><span></span><span></span></span> Waiting for candidate preflight';
-    }
     document.querySelectorAll('[data-blocked-site]').forEach(input => {
-      input.checked = [
-        'chatgpt.com',
-        'claude.ai',
-        'gemini.google.com',
-        'copilot.microsoft.com',
-        'perplexity.ai',
-        'poe.com',
-        'you.com',
-        'phind.com',
-        'interviewcoder',
-        'cluely',
-        'finalround',
-        'lockedin'
-      ]
-        .includes(input.getAttribute('data-blocked-site'));
+      input.checked = false;
     });
     showScreen('setup');
     setTimeout(() => candidateNameInput.focus(), 300);
   } catch (err) {
     console.error(err);
     toast('Failed to create session: ' + err.message, 'error');
+    statusDot.className = 'status-dot';
+    statusText.textContent = 'Not connected';
+    if (demoMode) showDemoAccess('Could not create the interview: ' + err.message);
+  } finally {
+    creatingSession = false;
   }
 }
 
 // ─── Setup Screen ──────────────────────────────────────────────────────
-$('cancelSetupBtn').addEventListener('click', () => {
-  currentSession = null;
-  statusDot.className = 'status-dot';
-  statusText.textContent = 'Idle';
-  showScreen('idle');
+$('cancelSetupBtn').addEventListener('click', async () => {
+  const button = $('cancelSetupBtn');
+  button.disabled = true;
+  try {
+    await window.truveil.cancelSession();
+    currentSession = null;
+    candidateReady = false;
+    statusDot.className = 'status-dot';
+    statusText.textContent = 'Idle';
+    showScreen('idle');
+  } catch (error) {
+    toast('Could not cancel the invitation: ' + error.message, 'error');
+  } finally {
+    button.disabled = false;
+  }
 });
 
 $('startMonitoringBtn').addEventListener('click', startMonitoring);
 
 async function startMonitoring() {
+  if (startingSession) return;
   if (!candidateReady) {
     toast('Wait for the candidate to complete consent and microphone preflight.', 'error');
     return;
@@ -479,6 +605,10 @@ async function startMonitoring() {
   const name = candidateNameInput.value.trim() || 'Candidate';
   const role = roleInput.value.trim() || 'Interview';
 
+  startingSession = true;
+  updateRecruiterGuide();
+  startMonitoringBtn.disabled = true;
+  $('cancelSetupBtn').disabled = true;
   try {
     currentSession = await window.truveil.updateSession({
       candidateName: name,
@@ -487,42 +617,48 @@ async function startMonitoring() {
       technicalVocabulary: listFromTextarea(technicalVocabularyInput.value),
       policyPreset: policyPresetSelect.value
     });
-  } catch (err) {
-    toast('Failed to update session: ' + err.message, 'error');
-    return;
-  }
-
   // Kick off session timer. Candidate audio/transcript arrives over Supabase Realtime.
   const started = await window.truveil.startSession();
-  sessionStartTime = Date.now();
+  sessionStartTime = started.startedAt;
   startTimer();
 
-  sessionIdEl.textContent = `SESSION: ${currentSession.sessionId}`;
+  sessionIdEl.textContent = `SESSION: ${sessionPresentation.displayCode(currentSession.sessionId)}`;
   glassTitleEl.textContent = `${name} / ${role}`;
 
   statusDot.className = 'status-dot active';
-  statusText.textContent = started?.localOnly ? 'Local dashboard' : 'Waiting for candidate';
-  if (started?.localOnly) {
-    addFlag('Manual code mode is active. Supabase session sync must be fixed before candidate telemetry can connect.', Date.now(), 'medium', false, {
-      eventType: 'manual_session_mode',
-      severity: 'medium'
-    });
-  }
+  statusText.textContent = started.deliveryPending ? 'Interview active; awaiting candidate sync' : 'Interview active';
   showScreen('dashboard');
+  } catch (err) {
+    toast('Could not start the interview: ' + err.message, 'error');
+  } finally {
+    startingSession = false;
+    updateRecruiterGuide();
+    startMonitoringBtn.disabled = !candidateReady;
+    $('cancelSetupBtn').disabled = false;
+  }
 }
 
 function candidateInviteLink() {
-  if (!currentSession || !/^TRV-[A-Z0-9]{6}$/i.test(String(currentSession.sessionId || ''))) return '';
-  const code = currentSession?.sessionId || sessionCodeEl.textContent;
-  return currentSession?.candidateLink || `https://truveil-client.vercel.app/?code=${encodeURIComponent(code)}&open=1`;
+  if (!currentSession) return '';
+  const code = String(currentSession.sessionId || '');
+  if (currentSession.demo) {
+    if (!/^DEMO-[A-Z2-7]{16}$/.test(code) || typeof currentSession.relayUrl !== 'string' || !currentSession.relayUrl) return '';
+    // Main issues this exact link; do not share a different room, relay or extra parameters.
+    try {
+      const link = sessionPresentation.invitation(code, currentSession.relayUrl);
+      return currentSession.candidateLink === link ? link : '';
+    } catch { return ''; }
+  }
+  if (!/^TRV-[A-Z0-9]{6}$/i.test(code)) return '';
+  return currentSession.candidateLink || `https://truveil-secure.vercel.app/?code=${encodeURIComponent(code)}&open=1`;
 }
 
 $('copySessionCodeBtn')?.addEventListener('click', async () => {
-  if (!currentSession || !/^TRV-[A-Z0-9]{6}$/i.test(String(currentSession.sessionId || ''))) {
+  if (!candidateInviteLink()) {
     toast('Create a session first, then copy the candidate code.', 'error');
     return;
   }
-  const code = currentSession?.sessionId || sessionCodeEl.textContent;
+  const code = sessionPresentation.displayCode(currentSession.sessionId);
   await window.truveil.copyLink(code);
   toast(`Copied ${code}. Candidate can paste it in Truveil Secure.`, 'success');
 });
@@ -550,11 +686,18 @@ function ensureInviteReady(actionLabel = 'use the invite') {
 $('copyInviteMessageBtn')?.addEventListener('click', async () => {
   const invite = ensureInviteReady('copy the invite message');
   if (!invite) return;
-  await window.truveil.copyLink(invite.body);
-  toast('Copied full candidate invite message.', 'success');
+  try {
+    await window.truveil.copyLink(invite.body);
+    invitationCopied = true;
+    updateRecruiterGuide();
+    toast('Invitation copied. Send it to your candidate.', 'success');
+  } catch {
+    toast('Could not copy the invitation. Use Preview full candidate message to select it.', 'error');
+  }
 });
 
 $('openCandidateLinkBtn')?.addEventListener('click', async () => {
+  if (currentSession?.demo) return;
   const invite = ensureInviteReady('open the invite link');
   if (!invite) return;
   await window.truveil.openExternal(invite.link);
@@ -585,13 +728,9 @@ $('emailCandidateLinkBtn')?.addEventListener('click', async () => {
   input?.addEventListener('input', refreshCandidateInvite);
 });
 
-$('addAllowedAppBtn')?.addEventListener('click', () => addPolicyItem(allowedAppsInput, allowedAppDraft, allowedAppsChips, 'text'));
-$('addAllowedSiteBtn')?.addEventListener('click', () => addPolicyItem(allowedSitesInput, allowedSiteDraft, allowedSitesChips, 'site'));
 $('addCustomBlockedSiteBtn')?.addEventListener('click', () => addPolicyItem(customBlockedSitesInput, customBlockedSiteDraft, customBlockedSitesChips, 'site'));
 
 [
-  [allowedAppDraft, allowedAppsInput, allowedAppsChips, 'text'],
-  [allowedSiteDraft, allowedSitesInput, allowedSitesChips, 'site'],
   [customBlockedSiteDraft, customBlockedSitesInput, customBlockedSitesChips, 'site']
 ].forEach(([draft, textarea, container, type]) => {
   draft?.addEventListener('keydown', (event) => {
@@ -602,8 +741,6 @@ $('addCustomBlockedSiteBtn')?.addEventListener('click', () => addPolicyItem(cust
 });
 
 [
-  [allowedAppsChips, allowedAppsInput, 'text'],
-  [allowedSitesChips, allowedSitesInput, 'site'],
   [customBlockedSitesChips, customBlockedSitesInput, 'site']
 ].forEach(([container, textarea, type]) => {
   container?.addEventListener('click', (event) => {
@@ -627,7 +764,87 @@ policyPresetSelect?.addEventListener('change', () => {
 });
 
 // ─── Interim / final transcript ───────────────────────────────────────
+function renderRestrictionState() {
+  const enabled = $('restrictionsEnabledInput').checked === true;
+  $('restrictionControls').hidden = !enabled;
+  $('restrictionState').textContent = enabled ? 'Only selected destinations are restricted. All others remain allowed.' : 'All apps and websites allowed.';
+}
+$('restrictionsEnabledInput').addEventListener('change', renderRestrictionState);
+
 let interimBubble = null;
+const captionEntries = new Map();
+let captionStream = { id: null, order: 0, epoch: 0, revision: 0, legacyTime: -1 };
+
+function compareCaptionEntries(a, b) {
+  if ((a.captionStreamId || null) === (b.captionStreamId || null)) {
+    return (a.streamEpoch || 0) - (b.streamEpoch || 0)
+      || (a.sequence != null && b.sequence != null ? a.sequence - b.sequence : 0)
+      || (a.startedAt ?? a.timestamp ?? 0) - (b.startedAt ?? b.timestamp ?? 0)
+      || (a.captionOrder || 0) - (b.captionOrder || 0);
+  }
+  return (a.captionStreamOrder || 0) - (b.captionStreamOrder || 0) || (a.captionOrder || 0) - (b.captionOrder || 0);
+}
+
+function renderRealtimeCaption(entry = {}) {
+  if (!currentSession || (!sessionStartTime && !startingSession) || (entry.sessionId && entry.sessionId !== currentSession.sessionId)) return;
+  const modern = Boolean(entry.captionStreamId);
+  if (modern) {
+    const order = entry.captionStreamOrder || 1;
+    if (order > captionStream.order) {
+      updateInterim('');
+      captionStream = { id: entry.captionStreamId, order, epoch: 0, revision: 0, legacyTime: captionStream.legacyTime };
+    }
+    const current = captionStream.id === entry.captionStreamId;
+    if (entry.interim && (!current || entry.streamEpoch < captionStream.epoch || entry.revision <= captionStream.revision)) return;
+    if (current) {
+      if (entry.captionCanClear !== false && entry.streamEpoch >= captionStream.epoch && entry.revision >= captionStream.revision) updateInterim('');
+      captionStream.epoch = Math.max(captionStream.epoch, entry.streamEpoch || 0);
+      captionStream.revision = Math.max(captionStream.revision, entry.revision || 0);
+    }
+  } else {
+    const time = entry.timestamp || 0;
+    if (entry.interim && (captionStream.id || time <= captionStream.legacyTime)) return;
+    if (!captionStream.id && entry.captionCanClear !== false && time >= captionStream.legacyTime) updateInterim('');
+    captionStream.legacyTime = Math.max(captionStream.legacyTime, time);
+  }
+  if (entry.interim) {
+    updateInterim(entry.captionClear ? '' : entry.text || '');
+    return;
+  }
+  if (!entry.text) return;
+  const key = entry.captionKey || JSON.stringify([entry.source, entry.segmentId, entry.timestamp, entry.text]);
+  if (captionEntries.has(key)) return captionEntries.get(key);
+  if (!hasFirstTranscript) {
+    transcriptList.innerHTML = '';
+    hasFirstTranscript = true;
+  }
+  const element = document.createElement('div');
+  element.className = 'transcript-entry';
+  element.innerHTML = `
+    <div class="entry-header">
+      <span class="entry-time">${fmtTime(entry.timestamp || Date.now())}</span>
+      <span class="entry-score pending">Pattern review pending</span>
+    </div>
+    <div class="entry-text"></div>
+    <div class="entry-reasoning hidden"></div>`;
+  element.querySelector('.entry-text').textContent = entry.text;
+  // Both timestamps are local to this recruiter PC, not a cross-device latency claim.
+  if (Number.isFinite(entry.captionReceivedAt)) element.dataset.captionRenderDelayMs = String(Math.max(0, Date.now() - entry.captionReceivedAt));
+  element.captionSortEntry = entry;
+  const before = Array.from(transcriptList.querySelectorAll('.transcript-entry:not(.interim)'))
+    .find(existing => compareCaptionEntries(entry, existing.captionSortEntry || {}) > 0);
+  transcriptList.insertBefore(element, before || null);
+  const record = { element, entry, analyzed: false };
+  captionEntries.set(key, record);
+  totalResponses++;
+  totalTranscriptSignals++;
+  transcriptCount.textContent = totalResponses;
+  statsResponses.textContent = totalResponses;
+  if (audioCount) audioCount.textContent = totalTranscriptSignals;
+  if (statsAudio) statsAudio.textContent = totalTranscriptSignals;
+  return record;
+}
+
 function updateInterim(text) {
   if (!text) { if (interimBubble) { interimBubble.remove(); interimBubble = null; } return; }
   if (!hasFirstTranscript) {
@@ -853,10 +1070,9 @@ function addFlag(text, timestamp, severity = 'medium', persist = true, evidence 
     matchedRule: evidence.matchedRule || ''
   };
   const hasTarget = Object.values(target).some(Boolean);
-  const controls = hasTarget ? `
+  const controls = hasTarget && !demoMode ? `
     <div class="flag-actions">
       <button data-candidate-action="allow_target">Allow this site</button>
-      <button data-candidate-action="close_target">Close tab</button>
       ${(target.detectedUrl || target.detectedHost) ? '<button data-candidate-action="reopen_target">Reopen</button>' : ''}
     </div>` : '';
   const el = document.createElement('div');
@@ -889,7 +1105,6 @@ flagsList.addEventListener('click', async (event) => {
     await window.truveil.sendCandidateAction({ action, target });
     const labels = {
       allow_target: 'Destination allowed for this session',
-      close_target: 'Close-tab/refocus request sent',
       reopen_target: 'Reopen request sent'
     };
     toast(labels[action] || 'Action sent', 'success');
@@ -903,33 +1118,65 @@ flagsList.addEventListener('click', async (event) => {
 // ─── Timer ────────────────────────────────────────────────────────────
 function renderRealtimeTranscript(result) {
   if (!result || !result.text) return;
-  if (interimBubble) { interimBubble.remove(); interimBubble = null; }
-  if (!hasFirstTranscript) {
-    transcriptList.innerHTML = '';
-    hasFirstTranscript = true;
-  }
-
-  totalResponses++;
-  totalTranscriptSignals++;
-  transcriptCount.textContent = totalResponses;
-  statsResponses.textContent = totalResponses;
-  if (audioCount) audioCount.textContent = totalTranscriptSignals;
-  if (statsAudio) statsAudio.textContent = totalTranscriptSignals;
-
-  const timestamp = result.timestamp || Date.now();
-  const entryEl = document.createElement('div');
-  entryEl.className = 'transcript-entry';
-  entryEl.innerHTML = `
-    <div class="entry-header">
-      <span class="entry-time">${fmtTime(timestamp)}</span>
-      <span class="entry-score pending">Analyzing...</span>
-    </div>
-    <div class="entry-text">${esc(result.text)}</div>
-    <div class="entry-reasoning hidden"></div>`;
-  transcriptList.prepend(entryEl);
-
-  renderAnalysis(entryEl, { ...result, timestamp });
+  if (!currentSession || (!sessionStartTime && !startingSession) || (result.sessionId && result.sessionId !== currentSession.sessionId)) return;
+  const key = result.captionKey || JSON.stringify([result.source, result.segmentId, result.timestamp, result.text]);
+  // An analysis update never touches the live draft or increments counters again.
+  const record = captionEntries.get(key) || renderRealtimeCaption(result);
+  if (!record || record.analyzed || result.analysisPending) return;
+  record.analyzed = true;
+  renderAnalysis(record.element, result);
 }
+
+function renderChunkReview(snapshot = {}) {
+  if (!currentSession || snapshot.sessionId !== currentSession.sessionId) return;
+  const list = $('chunkReviewList');
+  const summary = snapshot.summary || {};
+  const chunks = Array.isArray(snapshot.chunks) ? snapshot.chunks : [];
+  $('chunkReviewCount').textContent = `${chunks.length} chunks`;
+  $('chunkReviewSummary').textContent = summary.summaryText || 'Waiting for enough reliable speech.';
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+  const rows = chunks.slice(-200).map((chunk, index) => {
+    const row = document.createElement('div');
+    row.className = 'chunk-review-entry';
+    row.setAttribute('role', 'listitem');
+    const header = document.createElement('div');
+    header.className = 'chunk-review-header';
+    const label = document.createElement('span');
+    label.textContent = `Chunk ${Math.max(0, chunks.length - 200) + index + 1} · ${chunk.wordCount} words`;
+    const badge = document.createElement('span');
+    badge.className = 'chunk-review-score';
+    const assessment = chunk.assessment || {};
+    const scorable = assessment.scorable === true && Number.isFinite(assessment.score);
+    badge.textContent = scorable ? `${Math.round(assessment.score)}/100 pattern score`
+      : assessment.contextWords > 0 ? 'Collecting reliable context' : 'Not scored';
+    badge.title = 'Nearby chunks can share the same longer-context score. This is not an AI-authorship probability.';
+    if (scorable) badge.dataset.band = assessment.score >= 70 ? 'high' : assessment.score >= 40 ? 'medium' : 'low';
+    header.append(label, badge);
+    const text = document.createElement('p');
+    text.className = 'chunk-review-text'; text.textContent = chunk.text;
+    const detail = document.createElement('p');
+    detail.className = 'chunk-review-detail';
+    const signal = assessment.aiSignals?.[0] || 'No strong AI-style pattern';
+    const counter = assessment.humanSignals?.[0];
+    detail.textContent = scorable
+      ? `${assessment.contextWords}-word context · ${signal}${counter ? ` · Counter-signal: ${counter}` : ''}`
+      : assessment.reasoning || 'At least 35 reliable words are required. This is not a zero score.';
+    detail.title = assessment.reasoning || '';
+    row.append(header, text, detail);
+    return row;
+  });
+  list.replaceChildren(...rows);
+  if (atBottom) list.scrollTop = list.scrollHeight;
+}
+
+window.truveil.onChunkReview?.(renderChunkReview);
+
+window.truveil.onRealtimeCaption?.((entry) => {
+  statusDot.className = 'status-dot recording';
+  statusText.textContent = entry?.interim ? 'Listening live' : 'Transcript live';
+  telemetryState.transcription = 'healthy';
+  renderRealtimeCaption(entry);
+});
 
 window.truveil.onRealtimeTranscript((entry) => {
   statusDot.className = 'status-dot recording';
@@ -942,23 +1189,35 @@ if (window.truveil.onRealtimeInterimTranscript) {
   window.truveil.onRealtimeInterimTranscript((entry) => {
     statusDot.className = 'status-dot recording';
     statusText.textContent = 'Listening live';
-    updateInterim(entry?.text || '');
+    renderRealtimeCaption({ ...entry, interim: true });
   });
 }
 
 window.truveil.onRealtimeFlag((flag) => {
   addFlag(flag.text, flag.timestamp, flag.severity || 'medium', false, flag);
+  if (demoMode && ['browser_tab_created', 'browser_tab_navigated'].includes(flag.eventType)) toast(flag.text, 'info');
 });
 
 window.truveil.onRealtimeStatus((status) => {
-  if (status?.text) statusText.textContent = status.text;
+  if (status?.text) statusText.textContent = sessionPresentation.message(status.text);
   if (status?.candidateReady) {
     candidateReady = true;
+    // Current guidance can recover without erasing the session's evidence gap.
+    guideConnectionLost = false;
     $('candidateReadyState').innerHTML = '<i></i> Candidate ready';
     startMonitoringBtn.disabled = false;
     startMonitoringBtn.textContent = 'Start interview';
     toast('Candidate completed consent and microphone preflight.', 'success');
+  } else if (status?.candidateReady === false) {
+    if (demoMode) { pendingDemoJoin = null; $('demoApproval').hidden = true; }
+    candidateReady = false;
+    guideConnectionLost = true;
+    telemetryState.connected = false;
+    startMonitoringBtn.disabled = true;
+    startMonitoringBtn.textContent = 'Waiting for candidate preflight';
+    $('candidateReadyState').textContent = status.text || 'Candidate disconnected';
   }
+  updateRecruiterGuide();
 });
 
 window.truveil.onRealtimeAudioChunk((chunk) => {
@@ -990,6 +1249,10 @@ function startTimer() {
 $('endSessionBtn').addEventListener('click', endSession);
 
 async function endSession() {
+  if (endingSession) return;
+  endingSession = true;
+  updateRecruiterGuide();
+  $('endSessionBtn').disabled = true;
   clearInterval(timerInterval);
   statusDot.className = 'status-dot';
   statusText.textContent = 'Complete';
@@ -1005,21 +1268,43 @@ async function endSession() {
 
   try {
     const result = await window.truveil.endSession();
+    if (result?.reportPending) {
+      reportNeedsRetry = true;
+      statusText.textContent = 'Report not saved';
+      $('endSessionBtn').textContent = 'Retry saving report';
+      toast('The interview stopped, but its report needs a retry: ' + result.error, 'error');
+      return;
+    }
     if (result && result.reportPath) {
-      $('endedSub').textContent = 'Your interview report has been saved and opened in your browser.';
+      reportSaved = true;
+      reportNeedsRetry = false;
+      $('endedSub').textContent = 'Your interview report has been saved. Find it in Reports.';
     } else {
       $('endedSub').textContent = 'Session ended. No report generated.';
     }
   } catch (err) {
+    reportNeedsRetry = true;
     console.error(err);
     toast('Failed to generate report: ' + err.message, 'error');
+    return;
+  } finally {
+    endingSession = false;
+    updateRecruiterGuide();
+    $('endSessionBtn').disabled = false;
   }
+  currentSession = null;
+  sessionStartTime = null;
+  updateInterim('');
+  candidateReady = false;
   showScreen('ended');
 }
 
-$('openReportsFolderBtn').addEventListener('click', () => {
-  window.truveil.openReportsFolder();
-});
+async function openReportsFolder() {
+  try { await window.truveil.openReportsFolder(); }
+  catch (error) { toast(error.message || 'Could not open the report folder', 'error'); }
+}
+$('openReportsFolderBtn').addEventListener('click', openReportsFolder);
+$('browseReportsBtn').addEventListener('click', openReportsFolder);
 
 async function addNote(bookmark = false, overrideText = '') {
   const input = $('noteInput');
@@ -1043,16 +1328,26 @@ async function addNote(bookmark = false, overrideText = '') {
 
 $('addNoteBtn')?.addEventListener('click', () => addNote(false));
 $('bookmarkBtn')?.addEventListener('click', () => addNote(true, $('noteInput').value || 'Bookmarked interview moment'));
-document.querySelectorAll('[data-followup]').forEach(button => button.addEventListener('click', () => {
+document.querySelectorAll('[data-followup]').forEach(button => button.addEventListener('click', async () => {
   const question = button.dataset.followup;
-  window.truveil.copyLink(question);
-  addNote(false, `Suggested follow-up copied: ${question}`);
+  try {
+    await window.truveil.copyLink(question);
+    await addNote(false, `Suggested follow-up copied: ${question}`);
+  } catch (error) { toast(error.message || 'Could not copy the follow-up', 'error'); }
 }));
 
+let reportsLoading = false;
+const deletingReports = new Set();
 async function loadReports() {
+  if (reportsLoading || deletingReports.size) return;
+  reportsLoading = true;
   const list = $('reportList');
+  const refresh = $('refreshReportsBtn');
+  refresh.disabled = true;
   list.innerHTML = '<div class="empty-state">Loading reports...</div>';
+  try {
   const reports = await window.truveil.listReports();
+  if (!Array.isArray(reports)) throw new Error('Reports could not be loaded. Please try again.');
   if (!reports.length) {
     list.innerHTML = '<div class="empty-state">No reports yet</div>';
     return;
@@ -1061,27 +1356,72 @@ async function loadReports() {
     <div class="report-row" data-report-id="${esc(report.id)}">
       <div><strong>${esc(report.summary?.candidateName || 'Interview report')}</strong><span>${esc(report.summary?.role || '')} / ${new Date(report.created_at).toLocaleString()}</span></div>
       <div class="review-band">${esc(String(report.review_band || 'incomplete_evidence').replaceAll('_', ' '))}</div>
-      <button class="btn sm" data-delete-report>Delete</button>
+      <div class="report-actions"><button class="btn sm" data-delete-report>Delete</button><button class="btn sm" data-cancel-delete hidden>Cancel</button></div>
     </div>`).join('');
+  } catch (error) {
+    list.innerHTML = `<div class="empty-state" role="status">${esc(error.message || 'Reports could not be loaded.')} Use Refresh reports to try again.</div>`;
+  } finally {
+    reportsLoading = false;
+    refresh.disabled = false;
+  }
 }
 
 $('reportList')?.addEventListener('click', async event => {
+  const cancel = event.target.closest('[data-cancel-delete]');
+  if (cancel) {
+    const remove = cancel.parentElement.querySelector('[data-delete-report]');
+    remove.removeAttribute('data-confirmed');
+    remove.textContent = 'Delete';
+    cancel.hidden = true;
+    return;
+  }
   const button = event.target.closest('[data-delete-report]');
-  if (!button) return;
+  if (!button || button.disabled) return;
   const row = button.closest('.report-row');
-  await window.truveil.deleteReport(row.dataset.reportId);
-  row.remove();
+  if (!button.hasAttribute('data-confirmed')) {
+    button.setAttribute('data-confirmed', 'true');
+    button.textContent = 'Confirm delete';
+    row.querySelector('[data-cancel-delete]').hidden = false;
+    return;
+  }
+  button.disabled = true;
+  row.querySelector('[data-cancel-delete]').disabled = true;
+  const reportId = row.dataset.reportId;
+  deletingReports.add(reportId);
+  $('refreshReportsBtn').disabled = true;
+  try {
+    await window.truveil.deleteReport(reportId);
+    $('reportList').querySelectorAll('.report-row').forEach(item => {
+      if (item.dataset.reportId === reportId) item.remove();
+    });
+    if (!$('reportList').querySelector('.report-row')) $('reportList').innerHTML = '<div class="empty-state">No reports yet</div>';
+    toast('Report deleted', 'success');
+  } catch (error) {
+    toast(error.message || 'Could not delete the report', 'error');
+    button.disabled = false;
+    row.querySelector('[data-cancel-delete]').disabled = false;
+  } finally {
+    deletingReports.delete(reportId);
+    $('refreshReportsBtn').disabled = reportsLoading || deletingReports.size > 0;
+  }
 });
 
-$('navNewSession')?.addEventListener('click', () => showScreen(currentSession ? 'setup' : 'idle'));
-$('navLiveSession')?.addEventListener('click', () => currentSession && showScreen('dashboard'));
-$('navReports')?.addEventListener('click', () => {
+$('navNewSession')?.addEventListener('click', () => signedIn && showScreen(currentSession ? sessionStartTime ? 'dashboard' : 'setup' : 'idle'));
+$('navLiveSession')?.addEventListener('click', () => signedIn && currentSession && showScreen(sessionStartTime ? 'dashboard' : 'setup'));
+function showReports() {
+  if (!signedIn) return;
   showScreen('reports');
-  loadReports().catch(error => toast(error.message, 'error'));
-});
+  loadReports();
+}
+$('navReports')?.addEventListener('click', showReports);
+$('refreshReportsBtn')?.addEventListener('click', loadReports);
 
 // ─── Reset ────────────────────────────────────────────────────────────
 function resetState() {
+  invitationCopied = false;
+  reportNeedsRetry = false;
+  reportSaved = false;
+  guideConnectionLost = false;
   totalFlags = 0;
   totalResponses = 0;
   totalTranscriptSignals = 0;
@@ -1091,6 +1431,9 @@ function resetState() {
   latestScore = null;
   flagEvidence = [];
   candidateReady = false;
+  notesList.replaceChildren();
+  $('noteInput').value = '';
+  $('endSessionBtn').textContent = 'End interview';
   if (sessionServiceNotice) {
     sessionServiceNotice.hidden = true;
     sessionServiceNotice.textContent = '';
@@ -1098,6 +1441,12 @@ function resetState() {
   telemetryState = { connected: true, transcription: 'waiting', monitoring: 'waiting' };
   hasFirstTranscript = false;
   interimBubble = null;
+  captionEntries.clear();
+  resetSharedTabView();
+  $('chunkReviewList').replaceChildren();
+  $('chunkReviewCount').textContent = '0 chunks';
+  $('chunkReviewSummary').textContent = 'Waiting for confirmed speech.';
+  captionStream = { id: null, order: 0, epoch: 0, revision: 0, legacyTime: -1 };
   transcriptList.innerHTML = '<div class="empty-state"><span class="empty-cursor"></span>Waiting for the first reliable transcript segment</div>';
   flagsList.innerHTML = '<div class="empty-state">No session events yet</div>';
   transcriptCount.textContent = '0';
@@ -1129,34 +1478,68 @@ function resetState() {
 
 // ─── Settings Modal ───────────────────────────────────────────────────
 const settingsModal = $('settingsModal');
+let settingsReturnFocus = null;
+let settingsOpening = false;
+function applyPreferences(settings = {}) {
+  document.body.dataset.transcriptSize = settings.transcriptSize === 'large' ? 'large' : 'standard';
+  document.body.dataset.reducedMotion = String(settings.reduceMotion === true);
+}
+function closeSettings() {
+  settingsModal.classList.remove('active');
+  settingsReturnFocus?.focus();
+}
 $('openSettingsBtn').addEventListener('click', openSettings);
-$('closeSettingsBtn').addEventListener('click', () => settingsModal.classList.remove('active'));
-$('cancelSettingsBtn').addEventListener('click', () => settingsModal.classList.remove('active'));
+$('closeSettingsBtn').addEventListener('click', closeSettings);
+$('cancelSettingsBtn').addEventListener('click', closeSettings);
 $('saveSettingsBtn').addEventListener('click', saveSettings);
+settingsModal.addEventListener('click', event => { if (event.target === settingsModal) closeSettings(); });
 
 async function openSettings() {
+  if (settingsOpening || settingsModal.classList.contains('active')) return;
+  settingsOpening = true;
+  settingsReturnFocus = document.activeElement;
+  try {
   const s = await window.truveil.getSettings();
-  $('openrouterKeyInput').value = s.openrouterKey || '';
-  $('modelSelect').value = s.model || 'google/gemini-2.0-flash-001';
+  $('transcriptSizeSelect').value = s.transcriptSize === 'large' ? 'large' : 'standard';
+  $('reduceMotionInput').checked = s.reduceMotion === true;
   $('settingsStatus').textContent = '';
   settingsModal.classList.add('active');
+  $('transcriptSizeSelect').focus();
+  } catch (error) { toast(error.message || 'Could not load settings', 'error'); }
+  finally { settingsOpening = false; }
 }
 
 async function saveSettings() {
+  const button = $('saveSettingsBtn');
+  if (button.disabled) return;
+  $('cancelSettingsBtn').focus();
+  button.disabled = true;
   const patch = {
-    openrouterKey: $('openrouterKeyInput').value.trim(),
-    model: $('modelSelect').value
+    transcriptSize: $('transcriptSizeSelect').value === 'large' ? 'large' : 'standard',
+    reduceMotion: $('reduceMotionInput').checked === true
   };
+  try {
   await window.truveil.saveSettings(patch);
-  $('settingsStatus').textContent = 'Settings saved.';
-  $('settingsStatus').className = 'settings-status success';
-  setTimeout(() => settingsModal.classList.remove('active'), 700);
+  applyPreferences(patch);
+  closeSettings();
+  toast('Workspace preferences saved', 'success');
+  } catch (error) {
+    $('settingsStatus').textContent = error.message || 'Could not save preferences. Please try again.';
+    $('settingsStatus').className = 'settings-status error';
+  } finally { button.disabled = false; }
 }
 
 // ─── Keyboard shortcuts ───────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (settingsModal.classList.contains('active')) settingsModal.classList.remove('active');
+    if (settingsModal.classList.contains('active')) closeSettings();
+  }
+  if (e.key === 'Tab' && settingsModal.classList.contains('active')) {
+    const controls = [...settingsModal.querySelectorAll('button, select, input')].filter(control => !control.disabled);
+    const first = controls[0], last = controls[controls.length - 1];
+    if (!controls.includes(document.activeElement)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
   if ((e.metaKey || e.ctrlKey) && e.key === ',') {
     e.preventDefault();
@@ -1167,10 +1550,178 @@ document.addEventListener('keydown', (e) => {
 // ─── Boot ─────────────────────────────────────────────────────────────
 (async () => {
   try {
-    await renderAuthState(await window.truveil.getAuth());
+    const demo = await window.truveil.getDemoConfig?.();
+    demoMode = demo?.enabled === true;
+    if (demoMode) {
+      $('demoRelayInput').value = demo.relayUrl ? sessionPresentation.serverAddress(demo.relayUrl) : '';
+      $('demoConnectionSettings').open = !demo.relayUrl;
+      $('sharedTabsPanel').hidden = false;
+      document.querySelectorAll('[data-blocked-site]').forEach(input => {
+        input.closest('.check-tile').hidden = !isBrowserDestination(input.dataset.blockedSite);
+      });
+      customBlockedSiteDraft.placeholder = 'Add website domain, e.g. example.com';
+      signOutBtn.hidden = true;
+      showDemoAccess();
+    } else await renderAuthState(await window.truveil.getAuth());
     const s = await window.truveil.getSettings();
-    console.log('[Truveil] settings loaded', !!s);
+    applyPreferences(s);
   } catch (e) {
     console.warn('Settings load failed', e);
   }
 })();
+
+window.truveil.onDemoJoinRequest?.(request => {
+  pendingDemoJoin = request;
+  $('demoJoinName').textContent = String(request.name || 'Candidate');
+  $('demoApproval').hidden = false;
+  updateRecruiterGuide();
+  toast('A candidate is waiting for your approval.');
+});
+for (const [id, allow] of [['approveDemoBtn', true], ['declineDemoBtn', false]]) {
+  $(id)?.addEventListener('click', async () => {
+    if (!pendingDemoJoin) return;
+    const request = pendingDemoJoin;
+    $('approveDemoBtn').disabled = $('declineDemoBtn').disabled = true;
+    try {
+      await window.truveil.approveDemo({ requestId: request.requestId, allow });
+      if (pendingDemoJoin === request) { pendingDemoJoin = null; $('demoApproval').hidden = true; }
+    } catch (error) { toast(error.message, 'error'); }
+    finally { $('approveDemoBtn').disabled = $('declineDemoBtn').disabled = false; updateRecruiterGuide(); }
+  });
+}
+function sharedTabStatus(message) {
+  const count = sharedTabRequests.size;
+  $('tabCloseStatus').textContent = count
+    ? `Closing ${count === 1 ? 'the selected tab' : `${count} selected tabs`}...` : message;
+}
+
+function revokeSharedTabCommands() {
+  sharedTabGeneration++;
+  sharedTabRequests.clear();
+  for (const row of sharedTabRows.values()) row.pending = null;
+}
+
+function resetSharedTabView() {
+  revokeSharedTabCommands();
+  sharedBrowserView = { connected: false, closeConsent: false };
+  renderSharedTabs(sharedBrowserView);
+}
+
+function updateSharedTabRow(row) {
+  const tab = row.tab;
+  row.pending = sharedTabRequests.get(tab.id) || null;
+  const text = tab.hostname || 'New tab';
+  if (row.label.textContent !== text) row.label.textContent = text;
+  const detail = tab.protected ? 'Protected tab' : tab.active ? 'Active tab' : 'Shared tab';
+  if (row.detail.textContent !== detail) row.detail.textContent = detail;
+  row.element.classList.toggle('is-active', tab.active === true);
+  row.element.classList.toggle('is-pending', Boolean(row.pending));
+  const closed = row.closedRevision === tab.revision;
+  const caption = tab.protected ? 'Protected' : row.pending ? 'Closing...' : closed ? 'Closed' : 'Close tab';
+  if (row.button.textContent !== caption) row.button.textContent = caption;
+  row.button.disabled = !sharedBrowserView.connected || !sharedBrowserView.closeConsent || tab.protected || Boolean(row.pending) || closed;
+  row.button.setAttribute('aria-busy', row.pending ? 'true' : 'false');
+  row.button.setAttribute('aria-label', tab.protected ? `${text}, protected tab` : `Close shared tab for ${text}`);
+  row.button.title = tab.protected ? 'Meeting and protected tabs cannot be closed' : `Close ${text}`;
+}
+
+async function closeSharedTab(row) {
+  if (!currentSession || !sharedBrowserView.connected || !sharedBrowserView.closeConsent
+    || row.tab.protected || sharedTabRequests.has(row.tab.id) || row.closedRevision === row.tab.revision || sharedTabRows.get(row.tab.id) !== row) return;
+  const tab = { ...row.tab };
+  const ownerId = currentSession.sessionId;
+  if (!window.confirm(`Close the shared tab for ${tab.hostname || 'New tab'}? Unsaved work in that tab may be lost.`)) return;
+  const generation = sharedTabGeneration;
+  const request = { generation, ownerId, id: tab.id, revision: tab.revision };
+  row.pending = request;
+  sharedTabRequests.set(tab.id, request);
+  updateSharedTabRow(row);
+  sharedTabStatus('');
+  let message = 'The browser could not close that tab.';
+  try {
+    const result = await window.truveil.closeBrowserTab({ id: tab.id, revision: tab.revision });
+    if (generation !== sharedTabGeneration || currentSession?.sessionId !== ownerId) return;
+    const messages = { closed: 'The selected tab was closed.', stale: 'The tab changed. Review the latest list.', denied: 'Closing was not permitted.', unavailable: 'The browser or session is no longer connected.', failed: message };
+    message = messages[result?.status] || messages.failed;
+    if (result?.status === 'closed') {
+      row.closedRevision = tab.revision;
+      const visible = sharedTabRows.get(tab.id);
+      if (visible?.tab.revision === tab.revision) visible.closedRevision = tab.revision;
+    }
+  } catch {
+    message = 'The tab-close request could not be delivered. Check the connection.';
+  } finally {
+    if (sharedTabRequests.get(tab.id) === request) sharedTabRequests.delete(tab.id);
+    if (generation === sharedTabGeneration && currentSession?.sessionId === ownerId) {
+      const visible = sharedTabRows.get(tab.id);
+      if (visible) updateSharedTabRow(visible);
+      sharedTabStatus(message);
+    }
+  }
+}
+
+function renderSharedTabs(state = {}) {
+  state = state && typeof state === 'object' ? state : {};
+  if (state.sessionId && state.sessionId !== currentSession?.sessionId) return;
+  const list = $('sharedTabList');
+  const focused = document.activeElement;
+  const retainFocus = Boolean(focused && list.contains(focused));
+  const connected = state.connected === true;
+  const closeConsent = connected && state.closeConsent === true;
+  const newlyAvailable = connected && (!sharedBrowserView.connected || (closeConsent && !sharedBrowserView.closeConsent));
+  if ((!connected && sharedBrowserView.connected) || (!closeConsent && sharedBrowserView.closeConsent)) revokeSharedTabCommands();
+  sharedBrowserView = { connected, closeConsent };
+  const seen = new Set();
+  const tabs = connected && Array.isArray(state.tabs) ? state.tabs.slice(0, 128).filter(tab => {
+    if (!tab || typeof tab.id !== 'string' || !tab.id || tab.id.length > 256 || seen.has(tab.id)
+      || !Number.isSafeInteger(tab.revision) || tab.revision < 0 || typeof tab.hostname !== 'string' || tab.hostname.length > 253) return false;
+    seen.add(tab.id); return true;
+  }) : [];
+  const ids = new Set(tabs.map(tab => tab.id));
+  for (const [id, row] of sharedTabRows) {
+    if (!ids.has(id)) { row.element.remove(); sharedTabRows.delete(id); }
+  }
+  const badge = $('sharedTabState');
+  const stateText = connected ? `${tabs.length} ${tabs.length === 1 ? 'tab' : 'tabs'} · ${closeConsent ? 'Closing permitted' : 'View only'}` : 'Not shared';
+  if (badge.textContent !== stateText) badge.textContent = stateText;
+  badge.dataset.state = connected ? 'connected' : 'disconnected';
+  if (!connected) sharedTabStatus('Candidate browser sharing is off.');
+  else if (!closeConsent) sharedTabStatus('Tab closing is not permitted.');
+  else if (newlyAvailable) sharedTabStatus('');
+  if (!tabs.length) {
+    sharedTabEmpty ||= document.createElement('div');
+    sharedTabEmpty.className = 'shared-tab-empty';
+    sharedTabEmpty.textContent = connected ? 'No shared tabs open.' : 'Browser not shared';
+    if (!sharedTabEmpty.isConnected) list.append(sharedTabEmpty);
+    return;
+  }
+  sharedTabEmpty?.remove();
+  for (const [index, tab] of tabs.entries()) {
+    let row = sharedTabRows.get(tab.id);
+    if (!row) {
+      const element = document.createElement('div');
+      element.className = 'shared-tab-row'; element.dataset.tabId = tab.id;
+      const icon = document.createElement('span');
+      icon.className = 'shared-tab-icon'; icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg>';
+      const copy = document.createElement('div'); copy.className = 'shared-tab-copy';
+      const label = document.createElement('span'); label.className = 'shared-tab-host';
+      const detail = document.createElement('span'); detail.className = 'shared-tab-detail';
+      copy.append(label, detail);
+      const button = document.createElement('button'); button.className = 'btn sm shared-tab-close';
+      row = { element, label, detail, button, pending: null, closedRevision: null };
+      button.addEventListener('click', () => closeSharedTab(row));
+      element.append(icon, copy, button);
+      sharedTabRows.set(tab.id, row);
+    }
+    row.tab = { ...tab };
+    updateSharedTabRow(row);
+    const position = list.children[index];
+    if (position !== row.element) list.insertBefore(row.element, position || null);
+  }
+  if (retainFocus && focused.isConnected && !focused.disabled && list.contains(focused) && document.activeElement !== focused) {
+    focused.focus({ preventScroll: true });
+  }
+}
+
+window.truveil.onBrowserTabs?.(renderSharedTabs);

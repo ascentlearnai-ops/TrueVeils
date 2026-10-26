@@ -1,5 +1,6 @@
 const model = require('./risk-model.json');
 const { extractFeatures, clamp } = require('./feature-extractor');
+const { qualityReason: recognitionQualityReason } = require('./transcript-quality');
 
 const transcriptHistory = [];
 const MODEL_VERSION = model.version;
@@ -92,9 +93,8 @@ function normalizedFeatures(features) {
     disfluencyCollapse: features.disfluencyBaselineCount >= 3 && enoughSpeechForDisfluency
       ? clamp((features.baselineDisfluency - (features.fillerDensity + features.correctionDensity) - 0.01) / 0.02)
       : 0,
-    suspiciouslyInstantAnswer: longEnoughForTempo && Number.isFinite(features.priorSilenceGapMs) && features.priorSilenceGapMs >= 0
-      ? clamp((900 - features.priorSilenceGapMs) / 900)
-      : 0,
+    // A gap between STT chunks is not the time taken to answer an interviewer.
+    suspiciouslyInstantAnswer: 0,
     naturalDisfluency: clamp((features.fillerDensity - 0.012) / 0.05),
     selfCorrection: clamp(features.correctionDensity / 0.045),
     concreteDetail: clamp(features.specificityDensity / 0.12),
@@ -170,9 +170,9 @@ function unscorable(reason, features) {
   };
 }
 
-function rememberTranscript(features, score = null) {
+function rememberTranscript(features, score = null, history = transcriptHistory) {
   if (!features || features.wordCount < 8 || features.transcriptConfidence < model.minimums.transcriptConfidence || features.quality < model.minimums.quality) return;
-  transcriptHistory.push({
+  history.push({
     tokens: features.tokens,
     wordCount: features.wordCount,
     fillerDensity: features.fillerDensity,
@@ -180,17 +180,24 @@ function rememberTranscript(features, score = null) {
     score,
     modelVersion: MODEL_VERSION
   });
-  if (transcriptHistory.length > 20) transcriptHistory.shift();
+  if (history.length > 20) history.shift();
 }
 
-function analyzeTranscript(text, context = {}) {
-  const features = extractFeatures(text, context, transcriptHistory);
+function analyzeTranscript(text, context = {}, history = transcriptHistory) {
+  const features = extractFeatures(text, context, history);
+  const qualityReason = recognitionQualityReason(context.qualityReason);
+  if (features.transcriptConfidence == null || qualityReason) {
+    return unscorable(qualityReason || 'Speech recognition confidence is unavailable; transcript retained for review.', features);
+  }
+  if (typeof context.lowConfidenceWordRatio === 'number' && context.lowConfidenceWordRatio > 0.25) {
+    return unscorable('Too many words have uncertain recognition; transcript retained for review.', features);
+  }
   if (features.wordCount < model.minimums.words) {
-    rememberTranscript(features);
+    rememberTranscript(features, null, history);
     return unscorable(`Needs at least ${model.minimums.words} words before estimating AI-assistance risk.`, features);
   }
   if (features.sentenceCount < 2 && features.wordCount < 24) {
-    rememberTranscript(features);
+    rememberTranscript(features, null, history);
     return unscorable('Needs at least two sentences or 24 reliable words before estimating AI-assistance risk.', features);
   }
   if (features.transcriptConfidence < model.minimums.transcriptConfidence) {
@@ -211,13 +218,7 @@ function analyzeTranscript(text, context = {}) {
   const logit = contributions.reduce((sum, item) => sum + item.contribution, model.intercept);
   const probability = clamp(sigmoid(logit));
   const rawScore = Math.round(probability * 100);
-  const directArtifactStrength = Math.max(
-    normalized.copiedArtifactDensity,
-    normalized.markdownArtifactDensity,
-    normalized.promptResidueDensity,
-    normalized.directAiUse
-  );
-  const hasHighPrecisionTranscriptEvidence = directArtifactStrength > 0.12;
+  const hasHighPrecisionTranscriptEvidence = features.strongArtifact || normalized.directAiUse > 0.12;
   const hasBehavioralCorrelation = normalized.postAiEventProximity > 0.3 || normalized.behavioralTranscriptFusion > 0.18;
   const hasStrongGrounding = normalized.concreteDetail > 0.45
     || normalized.firstPersonOwnership > 0.42
@@ -237,8 +238,10 @@ function analyzeTranscript(text, context = {}) {
   }
   const cappedProbability = score / 100;
   const label = labelFor(cappedProbability);
+  const evidencePriority = item => item.key === 'directAiUse' || item.key === 'postAiEventProximity'
+    || (features.strongArtifact && ['copiedArtifactDensity', 'promptResidueDensity'].includes(item.key)) ? 1 : 0;
   const evidence = contributions.filter(item => item.kind === 'AI' && item.contribution > 0.18)
-    .sort((a, b) => b.contribution - a.contribution).slice(0, 3);
+    .sort((a, b) => evidencePriority(b) - evidencePriority(a) || b.contribution - a.contribution).slice(0, 3);
   const counters = contributions.filter(item => item.kind === 'HUMAN' && item.contribution < -0.12)
     .sort((a, b) => a.contribution - b.contribution);
   const confidence = clamp(
@@ -247,7 +250,8 @@ function analyzeTranscript(text, context = {}) {
     + features.transcriptConfidence * 0.24
     + (features.sentenceCount >= 2 ? 0.08 : 0)
   );
-  const confidenceLabel = confidence >= 0.78 ? 'high' : confidence >= 0.58 ? 'medium' : 'low';
+  const evidenceConfidence = !hasHighPrecisionTranscriptEvidence && !hasBehavioralCorrelation ? Math.min(confidence, 0.57) : confidence;
+  const confidenceLabel = evidenceConfidence >= 0.78 ? 'high' : evidenceConfidence >= 0.58 ? 'medium' : 'low';
   const counterSignal = counters[0]?.message || null;
   const topContributors = [...contributions]
     .filter(item => Math.abs(item.contribution) > 0.05)
@@ -265,7 +269,7 @@ function analyzeTranscript(text, context = {}) {
     ? `${displayLabel(label)}. Main signals: ${aiSignals.join('; ')}.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join('; ').toLowerCase()}.` : ''}`
     : `${displayLabel(label)}. No strong AI-style speech pattern was found.${humanSignals.length ? ` Human counter-signals: ${humanSignals.join('; ').toLowerCase()}.` : ''}`;
 
-  rememberTranscript(features, score);
+  rememberTranscript(features, score, history);
 
   return {
     score,
@@ -274,7 +278,7 @@ function analyzeTranscript(text, context = {}) {
     rawScore,
     label,
     displayLabel: displayLabel(label),
-    confidence,
+    confidence: evidenceConfidence,
     confidenceLabel,
     flags: aiSignals,
     reasoning,
@@ -285,10 +289,14 @@ function analyzeTranscript(text, context = {}) {
     counterSignal,
     features,
     scorable: true,
-    scoreWeight: confidence,
+    scoreWeight: evidenceConfidence,
     modelVersion: MODEL_VERSION,
     unscorableReason: null
   };
+}
+
+function analyzeTranscriptIsolated(text, context = {}) {
+  return analyzeTranscript(text, context, []);
 }
 
 function analyzeAudio(metadata = {}) {
@@ -314,4 +322,4 @@ function resetHistory() {
   transcriptHistory.length = 0;
 }
 
-module.exports = { analyzeTranscript, analyzeAudio, resetHistory, MODEL_VERSION };
+module.exports = { analyzeTranscript, analyzeTranscriptIsolated, analyzeAudio, resetHistory, MODEL_VERSION };

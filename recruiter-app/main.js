@@ -14,6 +14,9 @@ try {
 const SessionManager = require('./src/session/manager');
 const LocalRisk = require('./src/ai/local-risk');
 const { ResponseWindowAnalyzer } = require('./src/ai/response-window');
+const { ChunkReview } = require('./src/ai/chunk-review');
+const { confidenceValue } = require('./src/ai/transcript-quality');
+const { DesktopProviderReview, CONSENT_VERSION } = require('./src/ai/desktop-provider-review');
 const ReportGenerator = require('./src/report/generator');
 const SettingsStore = require('./src/settings/store');
 const { LocalTranscriber } = require('./src/audio/local-transcriber');
@@ -32,6 +35,11 @@ let localTranscriber = null;
 let deepgramTranscriber = null;
 let groqTranscriber = null;
 let pendingAuthUrl = null;
+let creatingSession = false;
+let endingSession = false;
+let startingSession = false;
+const providerReview = new DesktopProviderReview({ getOwner: () => sessionData, appPath: __dirname,
+  userDataPath: app.getPath('userData'), getEnvFile: () => SettingsStore.getAll().providerReviewEnvFile || '' });
 
 function getTechnicalVocabulary() {
   return activeSession?.technicalVocabulary || sessionData?.session?.technicalVocabulary || [];
@@ -51,12 +59,15 @@ function recentAiEventContext(timestamp = Date.now()) {
   const events = (sessionData?.flags || [])
     .map(flag => ({
       ...flag,
-      timestamp: Number(flag.timestamp || flag.occurredAt || flag.createdAt || 0)
+      timestamp: typeof (flag.timestamp || flag.occurredAt || flag.createdAt) === 'number'
+        ? (flag.timestamp || flag.occurredAt || flag.createdAt)
+        : Date.parse(flag.timestamp || flag.occurredAt || flag.createdAt || '')
     }))
     .filter(flag => {
       if (!flag.timestamp || flag.timestamp > occurredAt) return false;
       if (occurredAt - flag.timestamp > 120000) return false;
       if (flag.policyDecision === 'allowed' || flag.reviewStatus === 'allowed') return false;
+      if (flag.detectionSource !== 'url' && !flag.closedRestrictedTarget && flag.eventType !== 'overlay_detected') return false;
       return pattern.test([
         flag.text,
         flag.detectedHost,
@@ -78,16 +89,32 @@ function analyzeResponseWindow(segment = {}) {
   const analyzer = getResponseAnalyzer();
   if (!analyzer) return null;
   const technicalVocabulary = getTechnicalVocabulary();
-  const behavioralContext = recentAiEventContext(segment.timestamp);
   return analyzer.addSegment(
     segment,
     (text, context) => LocalRisk.analyzeTranscript(text, {
       ...context,
       technicalVocabulary,
-      ...behavioralContext
+      ...recentAiEventContext(context.startedAt || segment.startedAt || segment.timestamp)
     }),
-    { technicalVocabulary, ...behavioralContext }
+    { technicalVocabulary }
   );
+}
+
+function refreshChunkReview(owner, final = false) {
+  if (owner !== sessionData || !owner?.startedAt || (!final && owner.endedAt)) return;
+  try {
+    owner.chunkReviewer ||= new ChunkReview();
+    owner.chunkReview = owner.chunkReviewer.build(owner.transcripts, {
+      final, technicalVocabulary: getTechnicalVocabulary(),
+      contextForRange: startedAt => recentAiEventContext(startedAt)
+    });
+    sendToRenderer('realtime:chunk-review', { ...owner.chunkReview, sessionId: owner.session.sessionId });
+  } catch {
+    owner.chunkReview = { final, chunks: [], windows: [], summary: { score: null,
+      totalWords: 0, reviewedWords: 0, reviewedChunks: 0,
+      summaryText: 'Chunk review is unavailable. The original transcript is retained for human review.' } };
+    sendToRenderer('realtime:chunk-review', { ...owner.chunkReview, sessionId: owner.session.sessionId });
+  }
 }
 
 function authStoragePath() {
@@ -166,11 +193,12 @@ function normalizePolicy(policy = {}) {
     'interview copilot'
   ];
   const toList = (value, fallback = []) => {
+    if (value == null) return fallback;
     const items = Array.isArray(value)
       ? value
       : String(value || '').split(/[\n,]/);
     const cleaned = items.map(item => String(item).trim()).filter(Boolean);
-    return cleaned.length ? cleaned : fallback;
+    return cleaned;
   };
 
   return {
@@ -192,6 +220,7 @@ function normalizePolicy(policy = {}) {
 }
 
 function getSupabase() {
+  if (workspaceMode === 'demo' || activeSession?.demo) return null;
   if (supabase) return supabase;
   const url = runtimeConfig.supabaseUrl || process.env.SUPABASE_URL || process.env.TRUVEIL_SUPABASE_URL;
   const key = runtimeConfig.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || process.env.TRUVEIL_SUPABASE_ANON_KEY;
@@ -289,7 +318,7 @@ async function transcribeAudioEntry(entry) {
       });
       const result = await deepgram.transcribe(entry.localPath, entry);
       const text = String(result.text || '').trim();
-      if (text) return { text, source: 'deepgram-nova-3', result };
+      if (text) return { text, confidence: confidenceValue(result.confidence), lowConfidenceWordRatio: result.lowConfidenceWordRatio, source: 'deepgram-nova-3', result };
       errors.push(new Error('Deepgram did not detect clear speech in this audio chunk.'));
     } catch (err) {
       errors.push(err);
@@ -308,7 +337,7 @@ async function transcribeAudioEntry(entry) {
 
       const result = await groq.transcribe(entry.localPath, entry);
       const text = String(result.text || '').trim();
-      if (text) return { text, source: 'groq-whisper', result };
+      if (text) return { text, confidence: null, source: 'groq-whisper', result };
       errors.push(new Error('Groq did not detect clear speech in this audio chunk.'));
     } catch (err) {
       errors.push(err);
@@ -324,7 +353,7 @@ async function transcribeAudioEntry(entry) {
     });
     const result = await getLocalTranscriber().transcribeQueued(entry.localPath, entry);
     const text = String(result.text || '').trim();
-    if (text) return { text, source: 'local-whisper', result };
+    if (text) return { text, confidence: null, source: 'local-whisper', result };
     errors.push(new Error('Local speech engine did not detect clear speech in this audio chunk.'));
   } catch (err) {
     errors.push(err);
@@ -338,27 +367,12 @@ function sessionChannelName(sessionId) {
   return `truveil-session:${sessionId}`;
 }
 
-function buildSessionPayload(session, { includePolicy = true } = {}) {
-  const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
-  const candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
-  const payload = {
-    id: session.sessionId,
-    candidate_link: candidateLink,
-    status: 'waiting',
-    flags: [],
-    transcript: [],
-    created_at: new Date(session.createdAt).toISOString()
-  };
-
-  if (includePolicy) {
-    const policy = normalizePolicy(session.policy);
-    payload.allowed_apps = policy.allowed_apps;
-    payload.allowed_sites = policy.allowed_sites;
-    payload.blocked_sites = policy.blocked_sites;
-    payload.blocking_mode = policy.blocking_mode;
-  }
-
-  return payload;
+function candidateSiteUrl() {
+  const configured = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL;
+  const url = new URL(configured || 'https://truveil-secure.vercel.app');
+  if (url.hostname === 'truveil-client.vercel.app') url.hostname = 'truveil-secure.vercel.app';
+  if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Candidate website must use a valid HTTPS URL.');
+  return url.origin;
 }
 
 function isPolicySchemaError(error) {
@@ -372,13 +386,11 @@ function isPolicySchemaError(error) {
 }
 
 async function ensureRemoteSession(session) {
-  const candidateBaseUrl = runtimeConfig.candidateAppUrl || process.env.CANDIDATE_APP_URL || process.env.TRUVEIL_CANDIDATE_APP_URL || 'https://truveil-client.vercel.app';
-  session.candidateLink = `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
+  const candidateBaseUrl = candidateSiteUrl();
   const client = getSupabase();
-  if (!client) {
-    console.warn('[Supabase] Not configured; created a local-only session code.');
-    return false;
-  }
+  if (!client) throw new Error('Supabase is not configured. A connected session cannot be created.');
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError || !authData.user || authData.user.is_anonymous) throw new Error('Sign in to a recruiter account before creating an interview.');
 
   const result = await client.functions.invoke('create-session', {
     body: {
@@ -390,37 +402,35 @@ async function ensureRemoteSession(session) {
       policy: normalizePolicy(session.policy)
     }
   });
-  if (!result.error && result.data?.session) {
-    session.sessionId = result.data.session.join_code || result.data.session.id;
-    session.internalId = result.data.session.internal_id;
-    session.organizationId = result.data.session.organization_id;
-    session.recruiterId = result.data.session.recruiter_id;
-    session.candidateLink = result.data.session.candidate_link || `${candidateBaseUrl.replace(/\/+$/, '')}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
-    return true;
+  if (result.error) throw new Error(result.data?.error || result.error.message || 'Session service unavailable.');
+  const remote = result.data?.session;
+  if (!remote?.internal_id || !/^TRV-[A-Z0-9]{6}$/.test(remote.join_code || remote.id || '')) {
+    throw new Error('Session service returned an incomplete invitation. Please retry.');
   }
-  if (result.error) console.warn('[Supabase] secure session creation unavailable:', result.error.message);
-
-  const withPolicy = await client.from('sessions').upsert(buildSessionPayload(session));
-  session.candidateLink = buildSessionPayload(session).candidate_link;
-  if (!withPolicy.error) return true;
-  if (!isPolicySchemaError(withPolicy.error)) {
-    console.warn('[Supabase] session upsert unavailable:', withPolicy.error.message);
-    session.remoteError = withPolicy.error.message || 'Supabase session sync is unavailable.';
-    return false;
-  }
-
-  console.warn('[Supabase] Policy columns missing; creating session without persisted policy.');
-  const baseOnly = await client.from('sessions').upsert(buildSessionPayload(session, { includePolicy: false }));
-  session.candidateLink = buildSessionPayload(session, { includePolicy: false }).candidate_link;
-  if (baseOnly.error) {
-    console.warn('[Supabase] base session upsert unavailable:', baseOnly.error.message);
-    session.remoteError = baseOnly.error.message || 'Supabase session sync is unavailable.';
-    return false;
-  }
+  session.sessionId = remote.join_code || remote.id;
+  session.internalId = remote.internal_id;
+  session.organizationId = remote.organization_id;
+  session.recruiterId = remote.recruiter_id;
+  session.candidateLink = `${candidateBaseUrl}/?code=${encodeURIComponent(session.sessionId)}&open=1`;
   return true;
 }
 
+async function updateSessionStatus(status, patch = {}, session = activeSession) {
+  if (session?.demo) {
+    if (status === 'active') return realtimeChannel.start();
+    if (['cancelled', 'completed', 'interrupted'].includes(status)) return realtimeChannel?.end();
+    return;
+  }
+  const client = getSupabase();
+  if (!client || !session?.internalId) throw new Error('No connected interview session.');
+  const { data, error } = await client.from('sessions')
+    .update({ status, ...patch }).eq('internal_id', session.internalId).select('internal_id').single();
+  if (error) throw new Error(error.message || 'Could not update the interview.');
+  if (!data) throw new Error('The interview could not be updated. Check your connection and sign-in.');
+}
+
 async function updateRemotePolicy(sessionId, policy) {
+  if (activeSession?.demo) return;
   const client = getSupabase();
   if (!client || activeSession?.localOnly) return;
 
@@ -431,15 +441,11 @@ async function updateRemotePolicy(sessionId, policy) {
     blocking_mode: policy.blocking_mode
   }).eq('id', sessionId);
 
-  if (!error) return;
-  if (!isPolicySchemaError(error)) {
-    console.warn('[Supabase] policy update skipped:', error.message);
-    return;
-  }
-  console.warn('[Supabase] Policy columns missing; policy will be sent over realtime only.');
+  if (error) throw new Error(error.message || 'Could not save the interview policy.');
 }
 
 async function updateRemoteSessionDetails(session) {
+  if (session?.demo) return realtimeChannel?.update(demoDetails(session));
   const client = getSupabase();
   if (!client || !session || session.localOnly) return;
   const patch = {
@@ -452,10 +458,11 @@ async function updateRemoteSessionDetails(session) {
   const { error } = session.internalId
     ? await query.eq('internal_id', session.internalId)
     : await query.eq('id', session.sessionId);
-  if (error) console.warn('[Supabase] session detail update failed:', error.message);
+  if (error) throw new Error(error.message || 'Could not save the interview details.');
 }
 
 async function broadcastSessionPolicy() {
+  if (activeSession?.demo) return;
   if (!activeSession || activeSession.localOnly || !realtimeChannel) return;
   try {
     await realtimeChannel.send({
@@ -489,40 +496,47 @@ async function joinRealtimeSession(sessionId, { privateChannel = false } = {}) {
   if (!client) return false;
   if (realtimeChannel) await client.removeChannel(realtimeChannel);
 
-  realtimeChannel = client
+  const channel = client
     .channel(sessionChannelName(sessionId), {
-      config: { private: privateChannel, broadcast: { self: false }, presence: { key: 'recruiter' } }
+      config: { private: privateChannel, broadcast: { self: false, ack: true }, presence: { key: 'recruiter' } }
     })
     .on('broadcast', { event: 'candidate_transcript' }, ({ payload }) => {
-      if (payload?.interim) {
-        sendToRenderer('realtime:transcript-interim', {
-          text: payload.text,
-          timestamp: payload.timestamp || Date.now(),
-          source: payload.source || 'deepgram-live-interim'
-        });
-        return;
-      }
-      analyzeCandidateTranscript(payload);
+      if (realtimeChannel !== channel || sessionData?.endedAt) return;
+      receiveCandidateCaption(payload);
     })
     .on('broadcast', { event: 'candidate_audio_chunk' }, ({ payload }) => {
+      if (realtimeChannel !== channel || sessionData?.endedAt) return;
       handleCandidateAudioChunk(payload);
     })
     .on('broadcast', { event: 'candidate_audio_level' }, ({ payload }) => {
+      if (realtimeChannel !== channel || sessionData?.endedAt) return;
       handleCandidateAudioLevel(payload);
     })
     .on('broadcast', { event: 'candidate_event' }, ({ payload }) => {
+      if (realtimeChannel !== channel || sessionData?.endedAt) return;
       handleCandidateEvent(payload);
     });
 
+  realtimeChannel = channel;
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Timed out joining realtime session.')), 12000);
-    realtimeChannel.subscribe((status) => {
+    channel.subscribe((status) => {
+      if (realtimeChannel !== channel) return;
       if (status === 'SUBSCRIBED') {
         clearTimeout(timeout);
+        if (sessionData) sessionData.telemetry.connected = true;
         resolve();
       }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timeout);
+        providerReview.cancel();
+        if (sessionData) {
+          sessionData.externalReviewConsent = null;
+          sessionData.candidateReady = false;
+          sessionData.telemetry.connected = false;
+          sessionData.telemetry.monitoring = 'unavailable';
+        }
+        sendToRenderer('realtime:status', { text: 'Connection interrupted', candidateReady: false });
         reject(new Error(`Could not join realtime session (${status}).`));
       }
     });
@@ -532,85 +546,208 @@ async function joinRealtimeSession(sessionId, { privateChannel = false } = {}) {
   return true;
 }
 
-async function analyzeCandidateTranscript(payload = {}) {
-  if (!sessionData || !payload.text) return;
+function validatedCandidateCaption(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  if (['senderRole', 'role'].some(key => payload[key] != null && payload[key] !== 'candidate')) return null;
+  const modern = payload.captionStreamId != null;
+  if (payload.sessionId != null && payload.sessionId !== activeSession.sessionId && payload.sessionId !== activeSession.internalId) return null;
+  if (modern && !payload.sessionId) return null;
+  if (typeof payload.text !== 'string' || payload.text.length > 16000) return null;
+  for (const key of ['interim', 'isFinal', 'captionClear']) {
+    if (payload[key] != null && typeof payload[key] !== 'boolean') return null;
+  }
+  const id = value => typeof value === 'string' && /^[a-zA-Z0-9._:-]{1,200}$/.test(value);
+  if (modern && !id(payload.captionStreamId)) return null;
+  if (payload.segmentId != null && !id(payload.segmentId)) return null;
+  for (const key of ['revision', 'streamEpoch', 'sequence', 'utteranceId']) {
+    if (payload[key] != null && (!Number.isSafeInteger(payload[key]) || payload[key] < 0 || payload[key] > 2147483647)) return null;
+  }
+  if (modern && (!(payload.revision > 0) || payload.streamEpoch == null)) return null;
+  for (const key of ['timestamp', 'startedAt', 'endedAt', 'durationMs']) {
+    if (payload[key] != null && (typeof payload[key] !== 'number' || !Number.isFinite(payload[key]) || payload[key] < 0 || payload[key] > 8640000000000000)) return null;
+  }
+  if (payload.durationMs > 600000 || (payload.startedAt != null && payload.endedAt != null && payload.endedAt < payload.startedAt)) return null;
+  for (const [key, maximum] of [['source', 100], ['finalReason', 80], ['qualityReason', 500]]) {
+    if (payload[key] != null && (typeof payload[key] !== 'string' || payload[key].length > maximum)) return null;
+  }
+  const interim = payload.interim === true || payload.isFinal === false;
+  const text = payload.text.trim();
+  if (!text && !(interim && payload.captionClear === true)) return null;
+  if (payload.captionClear && (!interim || text)) return null;
+  if (modern && !interim && !payload.segmentId) return null;
+  return {
+    sessionId: activeSession.sessionId, text, interim, isFinal: !interim,
+    captionClear: Boolean(payload.captionClear), captionStreamId: payload.captionStreamId || null,
+    revision: payload.revision, streamEpoch: payload.streamEpoch ?? null,
+    segmentId: payload.segmentId || null, sequence: payload.sequence ?? null, utteranceId: payload.utteranceId ?? null,
+    timestamp: payload.timestamp ?? Date.now(), startedAt: payload.startedAt ?? null, endedAt: payload.endedAt ?? null,
+    durationMs: payload.durationMs ?? null, transcriptConfidence: confidenceValue(payload.transcriptConfidence),
+    lowConfidenceWordRatio: confidenceValue(payload.lowConfidenceWordRatio), qualityReason: payload.qualityReason || null,
+    source: payload.source || 'candidate-transcript', finalReason: payload.finalReason || 'speech_final',
+    captionReceivedAt: Date.now()
+  };
+}
 
-  const text = String(payload.text || '').trim();
-  if (text.length < 4) return;
-  const transcriptConfidence = Number(payload.transcriptConfidence);
-  if (Number.isFinite(transcriptConfidence) && transcriptConfidence > 0 && transcriptConfidence < 0.52) return;
-  const fingerprint = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
-  if (!Array.isArray(sessionData.transcriptFingerprints)) sessionData.transcriptFingerprints = [];
-  if (sessionData.transcriptFingerprints.some(item => item.fingerprint === fingerprint && Date.now() - item.timestamp < 45000)) return;
-  sessionData.transcriptFingerprints.push({ fingerprint, timestamp: Date.now() });
-  while (sessionData.transcriptFingerprints.length > 40) sessionData.transcriptFingerprints.shift();
+function captionOrder(a, b) {
+  if (a.captionStreamId === b.captionStreamId) {
+    return (a.streamEpoch || 0) - (b.streamEpoch || 0)
+      || (a.sequence != null && b.sequence != null ? a.sequence - b.sequence : 0)
+      || (a.startedAt ?? a.timestamp) - (b.startedAt ?? b.timestamp)
+      || a.captionOrder - b.captionOrder;
+  }
+  return a.captionStreamOrder - b.captionStreamOrder || a.captionOrder - b.captionOrder;
+}
 
-  const timestamp = payload.timestamp || Date.now();
-  if (sessionData.telemetry) sessionData.telemetry.transcription = 'healthy';
-  const analysis = analyzeResponseWindow({
-    text,
-    timestamp,
-    durationMs: payload.durationMs,
-    sequence: payload.sequence,
-    transcriptConfidence,
-    confidence: transcriptConfidence,
-    segmentId: payload.segmentId,
-    streamEpoch: payload.streamEpoch,
-    utteranceId: payload.utteranceId,
-    finalReason: payload.finalReason,
-    source: payload.source || 'candidate-transcript'
-  });
-  if (!analysis) return;
+function receiveCandidateCaption(payload) {
+  const owner = sessionData;
+  if (!owner?.startedAt || owner.endedAt || !activeSession) return;
+  const caption = validatedCandidateCaption(payload);
+  if (!caption) return;
+  const state = owner.captionState ||= {
+    streamId: null, streamOrder: 0, epoch: 0, revision: 0, retiredStreams: new Set(),
+    legacyRevision: 0, legacyTime: -1, order: 0
+  };
+  const modern = Boolean(caption.captionStreamId);
+  const identity = caption.segmentId || (caption.sequence != null ? `sequence-${caption.sequence}`
+    : crypto.createHash('sha256').update(`${caption.timestamp}:${caption.text}`).digest('hex'));
+  caption.captionKey = JSON.stringify([caption.captionStreamId, caption.streamEpoch, identity]);
+  // Finals can arrive behind a newer interim. Deduplication must not use the
+  // interim revision watermark or discard previously unseen finalized speech.
+  if (!caption.interim && owner.transcripts.some(entry => entry.captionKey === caption.captionKey)) return;
+  if (modern) {
+    if (state.retiredStreams.has(caption.captionStreamId)) return;
+    if (state.streamId !== caption.captionStreamId) {
+      if (state.streamId) state.retiredStreams.add(state.streamId);
+      while (state.retiredStreams.size > 32) state.retiredStreams.delete(state.retiredStreams.values().next().value);
+      state.streamId = caption.captionStreamId;
+      state.streamOrder++;
+      state.epoch = caption.streamEpoch;
+      state.revision = 0;
+    }
+    if (caption.interim && (caption.streamEpoch < state.epoch || caption.revision <= state.revision)) return;
+    caption.captionCanClear = caption.streamEpoch >= state.epoch && caption.revision >= state.revision;
+    state.epoch = Math.max(state.epoch, caption.streamEpoch);
+    state.revision = Math.max(state.revision, caption.revision);
+    caption.captionStreamOrder = state.streamOrder;
+  } else {
+    if (caption.interim && (state.streamId || caption.timestamp <= state.legacyTime)) return;
+    caption.captionCanClear = !state.streamId && caption.timestamp >= state.legacyTime;
+    state.legacyTime = Math.max(state.legacyTime, caption.timestamp);
+    caption.revision = ++state.legacyRevision;
+    caption.captionStreamOrder = 0;
+  }
+  caption.captionOrder = ++state.order;
+  if (caption.interim) {
+    sendToRenderer('realtime:caption', caption);
+    return;
+  }
   const entry = {
-    text,
-    timestamp,
+    ...caption, analysisPending: true, aiScore: null, scorable: false, scoreWeight: 0,
+    label: 'unscorable', displayLabel: 'Pattern review pending', flags: [],
+    reasoning: 'Waiting for finalized speech analysis.', aiSignals: [], humanSignals: [], evidence: []
+  };
+  owner.transcripts.push(entry);
+  owner.transcripts.sort(captionOrder);
+  owner.telemetry.transcription = 'healthy';
+  sendToRenderer('realtime:caption', { ...entry });
+  persistCandidateCaption(entry, owner);
+  owner.captionAnalysisQueue ||= [];
+  if (owner.captionAnalysisQueue.length >= 256) {
+    owner.responseAnalyzer?.reset();
+    finishCaptionAnalysis(entry, { reasoning: 'Pattern review unavailable: speech analysis queue is full.' }, owner);
+    return;
+  }
+  owner.captionAnalysisQueue.push(entry);
+  scheduleCaptionAnalysis(owner);
+}
+
+function finishCaptionAnalysis(entry, analysis = {}, owner) {
+  if (sessionData !== owner || owner.endedAt) return;
+  Object.assign(entry, {
+    analysisPending: false,
     aiScore: analysis.score,
     label: analysis.label,
     displayLabel: analysis.displayLabel,
     confidence: analysis.confidence,
-    scorable: analysis.scorable !== false,
+    scorable: analysis.scorable === true && typeof analysis.score === 'number',
     scoreWeight: analysis.scoreWeight || 0,
     flags: analysis.flags || [],
-    reasoning: analysis.reasoning,
+    reasoning: analysis.reasoning || 'Pattern review unavailable. The transcript is retained.',
     aiSignals: analysis.aiSignals || [],
     humanSignals: analysis.humanSignals || [],
     evidence: analysis.evidence || [],
     counterSignal: analysis.counterSignal || null,
     modelVersion: analysis.modelVersion,
     unscorableReason: analysis.unscorableReason || null,
-    source: payload.source || 'candidate-transcript',
-    transcriptConfidence: Number.isFinite(transcriptConfidence) ? transcriptConfidence : null,
-    segmentId: payload.segmentId || `${activeSession?.sessionId || 'local'}-${payload.sequence || sessionData.transcripts.length + 1}`,
-    streamEpoch: Number.isFinite(Number(payload.streamEpoch)) ? Number(payload.streamEpoch) : null,
-    utteranceId: Number.isFinite(Number(payload.utteranceId)) ? Number(payload.utteranceId) : null,
-    finalReason: payload.finalReason || 'speech_final',
     analysisWindowId: analysis.analysisWindowId || null,
     responseWindowWordCount: analysis.responseWindowWordCount || 0,
     responseWindowText: analysis.responseWindowText || ''
-  };
-
-  sessionData.transcripts.push(entry);
+  });
   if (typeof entry.aiScore === 'number' && entry.scorable) {
-    sessionData.scores.push({ score: entry.aiScore, weight: entry.scoreWeight || 1 });
+    owner.scores.push({ score: entry.aiScore, weight: entry.scoreWeight || 1 });
   }
-  sendToRenderer('realtime:transcript', entry);
+  sendToRenderer('realtime:transcript', { ...entry });
+  refreshChunkReview(owner);
+}
 
+function scheduleCaptionAnalysis(owner) {
+  if (owner.captionAnalysisTimer) return;
+  owner.captionAnalysisTimer = setTimeout(() => {
+    owner.captionAnalysisTimer = null;
+    if (sessionData !== owner || owner.endedAt || !owner.startedAt) {
+      owner.captionAnalysisQueue = [];
+      return;
+    }
+    owner.captionAnalysisQueue.sort(captionOrder);
+    const entry = owner.captionAnalysisQueue.shift();
+    if (!entry) return;
+    try {
+      const previous = owner.lastAnalyzedCaption;
+      if (previous && captionOrder(entry, previous) < 0) {
+        finishCaptionAnalysis(entry, { reasoning: 'Pattern review abstained: this speech segment arrived out of order.' }, owner);
+      } else {
+        owner.lastAnalyzedCaption = entry;
+        finishCaptionAnalysis(entry, analyzeResponseWindow({ ...entry, confidence: entry.transcriptConfidence }) || {}, owner);
+      }
+    } catch (error) {
+      owner.responseAnalyzer?.reset();
+      console.warn('[Caption analysis] Pattern review unavailable:', error.message);
+      finishCaptionAnalysis(entry, {}, owner);
+    }
+    if (owner.captionAnalysisQueue.length) scheduleCaptionAnalysis(owner);
+  }, 0);
+}
+
+function stopCaptionAnalysis(owner) {
+  clearTimeout(owner.captionAnalysisTimer);
+  owner.captionAnalysisTimer = null;
+  for (const entry of owner.captionAnalysisQueue || []) {
+    Object.assign(entry, {
+      analysisPending: false, aiScore: null, scorable: false, scoreWeight: 0,
+      reasoning: 'Interview ended before pattern review completed. The transcript is retained.',
+      unscorableReason: 'Interview ended before pattern review completed.'
+    });
+  }
+  owner.captionAnalysisQueue = [];
+}
+
+function persistCandidateCaption(entry, owner) {
   const client = getSupabase();
-  if (client && activeSession?.internalId) {
-    client.from('transcript_segments').upsert({
-      session_id: activeSession.internalId,
-      segment_id: payload.segmentId || `${activeSession.sessionId}-${payload.sequence || sessionData.transcripts.length}`,
-      sequence: Number(payload.sequence) || 0,
-      revision: Number(payload.revision) || 0,
-      text,
-      confidence: Number.isFinite(transcriptConfidence) ? transcriptConfidence : null,
-      source: payload.source || 'candidate-transcript',
-      started_at: payload.startedAt ? new Date(payload.startedAt).toISOString() : null,
-      ended_at: payload.endedAt ? new Date(payload.endedAt).toISOString() : null,
-      emitted_at: new Date(timestamp).toISOString()
+  if (client && owner.session.internalId) {
+    Promise.resolve().then(() => client.from('transcript_segments').upsert({
+      session_id: owner.session.internalId,
+      segment_id: entry.captionStreamId ? crypto.createHash('sha256').update(entry.captionKey).digest('hex') : entry.segmentId || `legacy-${entry.captionOrder}`,
+      sequence: entry.sequence || 0,
+      revision: entry.revision || 0,
+      text: entry.text,
+      confidence: entry.transcriptConfidence,
+      source: entry.source,
+      started_at: entry.startedAt != null ? new Date(entry.startedAt).toISOString() : null,
+      ended_at: entry.endedAt != null ? new Date(entry.endedAt).toISOString() : null,
+      emitted_at: new Date(entry.timestamp).toISOString()
     }, { onConflict: 'session_id,segment_id,revision' }).then(({ error }) => {
       if (error) console.warn('[Supabase] transcript persistence failed:', error.message);
-    });
+    })).catch(error => console.warn('[Supabase] transcript persistence failed:', error.message));
   }
 }
 
@@ -695,6 +832,8 @@ function handleCandidateAudioLevel(payload = {}) {
 }
 
 async function handleCandidateAudioChunk(payload = {}) {
+  const owner = sessionData;
+  if (!owner || owner.endedAt) return;
   if (!sessionData || !payload.chunkId || !payload.storagePath) {
     sendToRenderer('realtime:audio-status', {
       state: 'error',
@@ -722,7 +861,8 @@ async function handleCandidateAudioChunk(payload = {}) {
     return;
   }
 
-  const sessionId = payload.sessionId || activeSession?.sessionId || sessionData.session.sessionId;
+  const sessionId = owner.session.sessionId;
+  if (!String(payload.storagePath).startsWith(`${sessionId}/`) || String(payload.storagePath).includes('..')) return;
   const sessionDir = path.join(app.getPath('userData'), 'sessions', safeFilePart(sessionId), 'audio');
   fs.mkdirSync(sessionDir, { recursive: true });
 
@@ -734,6 +874,8 @@ async function handleCandidateAudioChunk(payload = {}) {
     storagePath: payload.storagePath,
     sequence: Number(payload.sequence) || 0,
     durationMs: Number(payload.durationMs) || 0,
+    startedAt: payload.startedAt,
+    endedAt: payload.endedAt,
     mimeType: payload.mimeType || 'audio/webm',
     sizeBytes: Number(payload.sizeBytes) || 0,
     peak: Number(payload.peak) || 0,
@@ -765,6 +907,8 @@ async function handleCandidateAudioChunk(payload = {}) {
     });
 
     const buffer = await blobToBuffer(download.data);
+    if (sessionData !== owner || owner.endedAt) return;
+    if (buffer.length > 12 * 1024 * 1024) throw new Error('Audio chunk exceeds the 12 MB limit.');
     fs.writeFileSync(localPath, buffer);
 
     const audioRisk = LocalRisk.analyzeAudio(entry);
@@ -781,7 +925,7 @@ async function handleCandidateAudioChunk(payload = {}) {
     });
     await broadcastAudioChunkStatus(entry);
 
-    processAudioTranscription(entry).catch((err) => {
+    processAudioTranscription(entry, owner).catch((err) => {
       console.error('[Local transcription]', err);
     });
   } catch (err) {
@@ -798,7 +942,7 @@ async function handleCandidateAudioChunk(payload = {}) {
   }
 }
 
-async function processAudioTranscription(entry) {
+async function processAudioTranscription(entry, owner = sessionData) {
   try {
     sendToRenderer('realtime:audio-status', {
       state: 'transcribing',
@@ -808,6 +952,7 @@ async function processAudioTranscription(entry) {
     });
 
     const transcription = await transcribeAudioEntry(entry);
+    if (!owner || sessionData !== owner || owner.endedAt) return;
     const text = transcription.text;
     entry.status = text ? 'transcribed' : 'received';
     entry.transcript = text;
@@ -820,8 +965,11 @@ async function processAudioTranscription(entry) {
         text,
         timestamp: entry.timestamp,
         durationMs: entry.durationMs,
+        startedAt: entry.startedAt,
+        endedAt: entry.endedAt,
         sequence: entry.sequence,
         transcriptConfidence: transcription.confidence,
+        lowConfidenceWordRatio: transcription.lowConfidenceWordRatio,
         confidence: transcription.confidence,
         segmentId,
         finalReason: 'fallback_chunk',
@@ -849,6 +997,8 @@ async function processAudioTranscription(entry) {
         modelVersion: analysis.modelVersion,
         unscorableReason: analysis.unscorableReason || null,
         source: transcription.source,
+        transcriptConfidence: transcription.confidence,
+        lowConfidenceWordRatio: transcription.lowConfidenceWordRatio ?? null,
         chunkId: entry.chunkId,
         segmentId,
         finalReason: 'fallback_chunk',
@@ -869,6 +1019,7 @@ async function processAudioTranscription(entry) {
         });
       });
       sendToRenderer('realtime:transcript', transcriptEntry);
+      refreshChunkReview(sessionData);
     } else {
       entry.reasoning = 'Local speech engine did not detect clear speech in this audio chunk.';
     }
@@ -885,6 +1036,7 @@ async function processAudioTranscription(entry) {
     await broadcastAudioChunkStatus(entry);
     await deleteRemoteAudioChunk(entry, text ? 'transcribed_deleted' : 'failed_deleted');
   } catch (err) {
+    if (sessionData !== owner || owner?.endedAt) return;
     entry.status = 'failed';
     entry.reasoning = `Transcription unavailable: ${err.message}`;
     entry.flags = [...(entry.flags || []), 'Transcription unavailable'].slice(0, 4);
@@ -913,7 +1065,79 @@ async function processAudioTranscription(entry) {
 }
 
 function handleCandidateEvent(payload = {}) {
-  if (!sessionData || !payload.type) return;
+  if (!sessionData || sessionData.endedAt || !payload.type) return;
+  if (activeSession?.demo && payload.sessionId !== activeSession.sessionId) return;
+  if (payload.type === 'browser_tabs') {
+    if (!activeSession?.demo || !sessionData.startedAt) return;
+    const state = payload.state || {};
+    browserTabs = {
+      connected: state.connected === true, closeConsent: state.closeConsent === true,
+      tabs: Array.isArray(state.tabs) ? state.tabs.filter(tab => typeof tab.id === 'string' && tab.id.length <= 256
+        && Number.isSafeInteger(tab.revision) && tab.revision >= 0).slice(0, 128).map(tab => ({
+          id: tab.id, revision: tab.revision, hostname: String(tab.hostname || '').slice(0, 253),
+          active: tab.active === true, protected: tab.protected === true
+        })) : []
+    };
+    if (!browserTabs.connected || !browserTabs.closeConsent) cancelTabRequests();
+    if (!browserTabs.connected) lastBrowserEventSequence = 0;
+    sendToRenderer('browser:tabs', browserTabs);
+    for (const event of (browserTabs.connected && Array.isArray(state.events) ? state.events : []).slice(-64)) {
+      if (!Number.isSafeInteger(event.sequence) || event.sequence <= lastBrowserEventSequence) continue;
+      lastBrowserEventSequence = event.sequence;
+      if (!['created', 'navigated', 'activated', 'removed', 'attached', 'detached'].includes(event.kind)) continue;
+      const flag = { eventType: `browser_tab_${event.kind}`, text: `Shared tab ${event.kind}: ${String(event.hostname || 'New tab').slice(0, 253)}`,
+        timestamp: Date.now(), severity: 'low', detectionSource: 'browser-extension' };
+      const host = String(event.hostname || '').toLowerCase();
+      const restricted = activeSession.policy?.blocking_mode !== 'none' && (activeSession.policy?.blocked_sites || []).some(rule => {
+        const domain = String(rule).toLowerCase().replace(/^www\./, '');
+        return host && domain && (host === domain || host.endsWith('.' + domain));
+      });
+      flag.policyDecision = restricted ? 'restricted' : 'allowed';
+      if (restricted) flag.detectedHost = host;
+      sessionData.flags.push(flag);
+      sendToRenderer('realtime:flag', flag);
+    }
+    return;
+  }
+  if (payload.type === 'browser_tab_close_result') {
+    const request = tabRequests.get(payload.commandId);
+    if (!request) return;
+    tabRequests.delete(payload.commandId);
+    clearTimeout(request.timer);
+    const status = ['closed', 'stale', 'denied', 'unavailable', 'failed'].includes(payload.result?.status) ? payload.result.status : 'failed';
+    request.resolve({ status });
+    return;
+  }
+
+  if (['candidate_ready', 'candidate_review_consent', 'provider_review_consent_withdrawn'].includes(payload.type)) {
+    const matchesSession = typeof payload.sessionId === 'string' && activeSession &&
+      (payload.sessionId === activeSession.sessionId || payload.sessionId === activeSession.internalId);
+    const consent = payload.type === 'provider_review_consent_withdrawn'
+      ? { version: CONSENT_VERSION, enabled: false } : payload.externalReviewConsent;
+    if (matchesSession && consent?.version === CONSENT_VERSION && typeof consent.enabled === 'boolean') {
+      sessionData.externalReviewConsent = { version: CONSENT_VERSION, enabled: consent.enabled, receivedAt: Date.now() };
+      if (!consent.enabled) providerReview.cancel();
+      sendToRenderer('provider-review:consent', { enabled: consent.enabled });
+    } else if (payload.type === 'candidate_ready') {
+      sessionData.externalReviewConsent = null;
+      providerReview.cancel();
+      sendToRenderer('provider-review:consent', { enabled: false });
+    }
+    if (payload.type !== 'candidate_ready') return;
+  }
+
+  if (payload.type === 'candidate_ready') {
+    sessionData.candidateReady = true;
+    sessionData.telemetry.connected = true;
+  }
+  if (['candidate_interrupted', 'candidate_completed', 'session_ended_remote'].includes(payload.type)) {
+    providerReview.cancel();
+    sessionData.externalReviewConsent = null;
+    sessionData.candidateReady = false;
+    sessionData.telemetry.connected = false;
+    sessionData.telemetry.monitoring = 'unavailable';
+    sendToRenderer('realtime:status', { text: 'Candidate disconnected', candidateReady: false });
+  }
 
   if (payload.type === 'candidate_connected' || payload.type === 'candidate_ready') {
     broadcastSessionPolicy();
@@ -925,8 +1149,8 @@ function handleCandidateEvent(payload = {}) {
     const processName = String(payload.processName || '').trim();
     const title = String(payload.windowTitle || '').trim();
     const rule = payload.matchedRule ? ` (matched ${payload.matchedRule})` : '';
-    if (host) return `Candidate opened ${host} in ${processName || 'a browser'}${rule}`;
-    if (url) return `Candidate opened ${url} in ${processName || 'a browser'}${rule}`;
+    if (host) return `Candidate switched to ${host} in ${processName || 'a browser'}${rule}`;
+    if (url) return `Candidate switched to ${url} in ${processName || 'a browser'}${rule}`;
     if (processName && title) return `Candidate switched to ${processName} - ${title}${rule}`;
     if (processName) return `Candidate switched to ${processName}${rule}`;
     return 'Candidate opened a disallowed app or tab';
@@ -944,7 +1168,7 @@ function handleCandidateEvent(payload = {}) {
     overlay_detected: 'Potential hidden overlay or AI assistant detected',
     recruiter_allowed_target: 'Interviewer allowed the reviewed destination',
     recruiter_reopened_target: 'Interviewer reopened the reviewed destination',
-    recruiter_closed_target: 'Interviewer closed the active reviewed tab',
+    recruiter_closed_target: payload.closedRestrictedTarget ? 'Legacy close action reported; exact tab removal was not verified' : 'Tab close failed',
     recruiter_close_target_missed: 'Close request skipped because the candidate had already switched away',
     candidate_interrupted: 'Candidate ended or closed the secure session',
     candidate_completed: 'Candidate completed the secure session',
@@ -1002,6 +1226,16 @@ function handleCandidateEvent(payload = {}) {
 }
 
 async function closeRealtimeSession({ notifyCandidate = false } = {}) {
+  clearBrowserTabs();
+  if (activeSession?.demo) {
+    const channel = realtimeChannel;
+    realtimeChannel = null;
+    if (channel) {
+      try { await channel.end(); } catch {}
+      channel.close();
+    }
+    return;
+  }
   if (realtimeChannel) {
     if (notifyCandidate) {
       try {
@@ -1035,12 +1269,11 @@ async function persistCompletedSession() {
     chunkId: entry.chunkId || null
   }));
 
-  await client.from('sessions').update({
-    status: 'completed',
+  await updateSessionStatus('completed', {
     transcript,
     flags: sessionData.flags,
     ended_at: new Date(sessionData.endedAt || Date.now()).toISOString()
-  }).eq('id', sessionData.session.sessionId);
+  });
 }
 
 async function cleanupRemoteAudioChunks() {
@@ -1072,17 +1305,19 @@ async function cleanupRemoteAudioChunks() {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1100,
-    minHeight: 720,
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: '#050507',
+    width: 1280,
+    height: 800,
+    minWidth: 760,
+    minHeight: 560,
+    icon: path.join(__dirname, 'assets/truveil.ico'),
+    titleBarStyle: process.platform === 'darwin' ? 'default' : 'hiddenInset',
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      backgroundThrottling: false
     },
     show: false
   });
@@ -1111,7 +1346,8 @@ function createWindow() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromBuffer(Buffer.alloc(16 * 16 * 4, 255), { width: 16, height: 16 });
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets/brand/mark.png')).resize({ width: 18, height: 18 });
+  if (process.platform === 'darwin') icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.setToolTip('Truveil Command Center');
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -1148,9 +1384,15 @@ app.whenReady().then(() => {
   if (pendingAuthUrl) handleAuthUrl(pendingAuthUrl);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    else if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
 });
 app.on('window-all-closed', (e) => e.preventDefault());
+app.on('before-quit', () => { app.isQuitting = true; });
 app.on('open-url', (event, url) => {
   event.preventDefault();
   if (app.isReady()) handleAuthUrl(url);
@@ -1168,8 +1410,35 @@ app.on('second-instance', (_event, argv) => {
 // ─── IPC ───────────────────────────────────────────────────────────────
 
 // Settings
-ipcMain.handle('settings:get', () => SettingsStore.getAll());
-ipcMain.handle('settings:save', (_, patch) => SettingsStore.save(patch));
+function rendererPreferences() {
+  const saved = SettingsStore.getAll();
+  return { transcriptSize: saved.transcriptSize === 'large' ? 'large' : 'standard', reduceMotion: saved.reduceMotion === true };
+}
+ipcMain.handle('settings:get', () => rendererPreferences());
+ipcMain.handle('provider-review:status', () => providerReview.status());
+ipcMain.handle('provider-review:connect-file', async () => {
+  const selected = await dialog.showOpenDialog(mainWindow, { title: 'Connect saved provider environment file', properties: ['openFile'] });
+  if (selected.canceled || selected.filePaths.length !== 1) return providerReview.status();
+  const file = selected.filePaths[0];
+  if (fs.statSync(file).size > 64000) throw new Error('PROVIDER_KEY_FILE_TOO_LARGE');
+  const parsed = require('dotenv').parse(fs.readFileSync(file));
+  if (!parsed.PANGRAM_API_KEY || !parsed.OPENROUTER_API_KEY) throw new Error('BOTH_PROVIDER_KEYS_REQUIRED');
+  SettingsStore.save({ providerReviewEnvFile: file });
+  return providerReview.status();
+});
+ipcMain.handle('provider-review:check', () => providerReview.checkConnections());
+ipcMain.handle('provider-review:begin', () => providerReview.begin());
+ipcMain.handle('provider-review:finish', () => providerReview.finish());
+ipcMain.handle('provider-review:discard', () => providerReview.cancel());
+ipcMain.handle('provider-review:run', (_, confirmations) => providerReview.review(confirmations));
+ipcMain.handle('settings:save', (_, patch = {}) => {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('INVALID_PREFERENCES');
+  const preferences = rendererPreferences();
+  if (Object.hasOwn(patch, 'transcriptSize')) preferences.transcriptSize = patch.transcriptSize === 'large' ? 'large' : 'standard';
+  if (Object.hasOwn(patch, 'reduceMotion')) preferences.reduceMotion = patch.reduceMotion === true;
+  SettingsStore.save(preferences);
+  return preferences;
+});
 ipcMain.handle('auth:get', () => authState());
 ipcMain.handle('auth:send-link', async (_, email) => {
   const client = getSupabase();
@@ -1180,7 +1449,7 @@ ipcMain.handle('auth:send-link', async (_, email) => {
     email: cleanEmail,
     options: {
       emailRedirectTo: 'truveil-recruiter://auth/callback',
-      shouldCreateUser: true
+      shouldCreateUser: false
     }
   });
   if (error) throw error;
@@ -1202,14 +1471,29 @@ ipcMain.handle('auth:verify-code', async (_, { email, token } = {}) => {
   return authState();
 });
 ipcMain.handle('auth:sign-out', async () => {
+  if (activeSession || creatingSession) throw new Error('Finish or cancel the current interview before signing out.');
   const client = getSupabase();
   if (client) await client.auth.signOut();
   return authState();
 });
 
+ipcMain.handle('auth:sign-in-password', async (_, { email, password } = {}) => {
+  if (activeSession || creatingSession) throw new Error('Finish or cancel the current interview before changing accounts.');
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase is not configured.');
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) throw new Error('Enter a valid work email.');
+  if (typeof password !== 'string' || !password || password.length > 1024) throw new Error('Enter your account password.');
+  const { error } = await client.auth.signInWithPassword({ email: cleanEmail, password });
+  if (error) throw new Error('Sign-in failed. Check your account email and password.');
+  return authState();
+});
+
 ipcMain.handle('shell:open-external', async (_, url) => {
   const cleanUrl = String(url || '').trim();
-  if (!/^mailto:/i.test(cleanUrl) && !/^https:\/\/truveil-client\.vercel\.app\//i.test(cleanUrl)) {
+  const parsed = new URL(cleanUrl);
+  const allowedSite = parsed.protocol === 'https:' && [candidateSiteUrl(), 'https://truveil-recruiter.vercel.app'].includes(parsed.origin);
+  if (parsed.username || parsed.password || (parsed.protocol !== 'mailto:' && !allowedSite)) {
     throw new Error('Unsupported external link.');
   }
   await shell.openExternal(cleanUrl);
@@ -1217,29 +1501,113 @@ ipcMain.handle('shell:open-external', async (_, url) => {
 });
 
 // Session lifecycle
+let workspaceMode = 'cloud';
+let browserTabs = { connected: false, closeConsent: false, tabs: [] };
+let lastBrowserEventSequence = 0;
+const tabRequests = new Map();
+
+function cancelTabRequests() {
+  for (const request of tabRequests.values()) { clearTimeout(request.timer); request.resolve({ status: 'unavailable' }); }
+  tabRequests.clear();
+}
+function clearBrowserTabs() {
+  lastBrowserEventSequence = 0;
+  cancelTabRequests();
+  browserTabs = { connected: false, closeConsent: false, tabs: [] };
+  sendToRenderer('browser:tabs', browserTabs);
+}
+function demoDetails(session) {
+  return { candidateName: session.candidateName, role: session.role,
+    policy: session.policy, technicalVocabulary: session.technicalVocabulary || [] };
+}
+ipcMain.handle('demo:config', () => {
+  workspaceMode = process.env.TRUVEIL_APP_MODE === 'cloud' ? 'cloud' : 'demo';
+  return { enabled: workspaceMode === 'demo', relayUrl: process.env.TRUVEIL_DEMO_RELAY_URL || runtimeConfig.demoRelayUrl || SettingsStore.getAll().demoRelayUrl || '' };
+});
+ipcMain.handle('demo:create', async (_, data = {}) => {
+  if (activeSession || creatingSession || endingSession) throw new Error('Finish the current interview first.');
+  const { DemoRelayClient, normalizeRelayUrl } = require('./src/demo/relay-client');
+  const url = normalizeRelayUrl(data.relayUrl || process.env.TRUVEIL_DEMO_RELAY_URL || runtimeConfig.demoRelayUrl || SettingsStore.getAll().demoRelayUrl || '');
+  creatingSession = true;
+  workspaceMode = 'demo';
+  const channel = new DemoRelayClient({ url });
+  const session = SessionManager.create({ candidateName: data.candidateName, role: data.role });
+  session.demo = true;
+  session.policy = normalizePolicy(data.policy || { allowed_apps: [], allowed_sites: [], blocked_sites: [], blocking_mode: 'none' });
+  session.technicalVocabulary = data.technicalVocabulary || [];
+  let disconnected = false;
+  channel.on('closed', () => {
+    disconnected = true;
+    if (realtimeChannel !== channel) return;
+    clearBrowserTabs();
+    providerReview.cancel();
+    if (sessionData) {
+      sessionData.externalReviewConsent = null;
+      sessionData.candidateReady = false;
+      sessionData.telemetry.connected = false;
+      sessionData.telemetry.monitoring = 'unavailable';
+    }
+    sendToRenderer('realtime:status', { text: 'Session connection ended. Save the local report, then create a new interview.', candidateReady: false });
+  });
+  channel.on('join-request', request => { if (realtimeChannel === channel) sendToRenderer('demo:join-request', request); });
+  channel.on('event', ({ event, payload }) => {
+    if (realtimeChannel !== channel || sessionData?.endedAt) return;
+    if (event === 'candidate_transcript') receiveCandidateCaption(payload);
+    if (event === 'candidate_audio_level') handleCandidateAudioLevel(payload);
+    if (event === 'candidate_event') handleCandidateEvent(payload);
+  });
+  try {
+    const room = await channel.create(demoDetails(session), typeof data.hostAccessCode === 'string' ? data.hostAccessCode : '');
+    if (disconnected) throw new Error('Session server disconnected while creating the interview.');
+    session.sessionId = room.code;
+    session.expiresAt = room.expiresAt;
+    session.relayUrl = url;
+    session.candidateLink = require('./src/session/presentation').invitation(room.code, url);
+    LocalRisk.resetHistory();
+    activeSession = session;
+    realtimeChannel = channel;
+    sessionData = { session, startedAt: null, endedAt: null, transcripts: [], flags: [], scores: [], audioChunks: [], notes: [],
+      responseAnalyzer: new ResponseWindowAnalyzer(), candidateReady: false,
+      telemetry: { connected: true, transcription: 'waiting', monitoring: 'waiting' } };
+    SettingsStore.save({ demoRelayUrl: url });
+    return session;
+  } catch (error) {
+    channel.close();
+    throw error;
+  } finally { creatingSession = false; }
+});
+ipcMain.handle('demo:approve', async (_, { requestId, allow } = {}) => {
+  if (!activeSession?.demo || !realtimeChannel || !sessionData?.telemetry.connected) throw new Error('No connected demo room.');
+  if (typeof requestId !== 'string' || typeof allow !== 'boolean') throw new Error('Invalid approval.');
+  return realtimeChannel.approve(requestId, allow);
+});
+ipcMain.handle('browser:close-tab', async (_, target = {}) => {
+  if (!activeSession?.demo || !sessionData?.startedAt || sessionData.endedAt || !sessionData.telemetry.connected
+    || !browserTabs.connected || !browserTabs.closeConsent || !realtimeChannel) throw new Error('No active shared browser is available.');
+  const observed = browserTabs.tabs.find(tab => tab.id === target.id && tab.revision === target.revision);
+  if (!observed || observed.protected) throw new Error('This shared tab is protected or no longer current.');
+  if (tabRequests.size >= 8) throw new Error('Wait for the pending tab requests.');
+  const commandId = crypto.randomUUID();
+  const channel = realtimeChannel;
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { tabRequests.delete(commandId); resolve({ status: 'unavailable' }); }, 10000);
+    tabRequests.set(commandId, { resolve, timer });
+    channel.send({ type: 'broadcast', event: 'recruiter_action', payload: {
+      sessionId: activeSession.sessionId, action: 'close_tab', target: { id: observed.id, revision: observed.revision }, commandId
+    } }).catch(() => { clearTimeout(timer); tabRequests.delete(commandId); resolve({ status: 'failed' }); });
+  });
+});
+
 ipcMain.handle('session:create', async (_, { candidateName, role, policy, technicalVocabulary, policyPreset }) => {
+  if (activeSession || creatingSession) throw new Error('Finish or cancel the current interview before creating another.');
+  creatingSession = true;
   LocalRisk.resetHistory();
   const session = SessionManager.create({ candidateName, role });
   session.policy = normalizePolicy(policy);
   session.technicalVocabulary = technicalVocabulary || [];
   session.policyPreset = policyPreset || 'standard_technical';
-  let remoteReady = false;
   try {
-    remoteReady = await ensureRemoteSession(session);
-  } catch (err) {
-    session.localOnly = true;
-    session.remoteError = err.message || 'Session service unavailable.';
-    console.warn('[Supabase] created local code without remote session:', session.remoteError);
-  }
-  if (remoteReady) {
-    joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: Boolean(session.internalId) }).catch((err) => {
-      console.warn('[Realtime]', err.message);
-    });
-  } else {
-    session.localOnly = true;
-    session.remoteError = session.remoteError || 'Session service unavailable. The TRV code was still generated locally.';
-  }
-
+    await ensureRemoteSession(session);
   activeSession = session;
   sessionData = {
     session,
@@ -1251,12 +1619,45 @@ ipcMain.handle('session:create', async (_, { candidateName, role, policy, techni
     audioChunks: [],
     notes: [],
     responseAnalyzer: new ResponseWindowAnalyzer(),
-    telemetry: { connected: true, transcription: 'waiting', monitoring: 'waiting' }
+    candidateReady: false,
+    telemetry: { connected: false, transcription: 'waiting', monitoring: 'waiting' }
   };
-  return session;
+    await joinRealtimeSession(session.internalId || session.sessionId, { privateChannel: Boolean(session.internalId) });
+    return session;
+  } catch (error) {
+    if (activeSession?.internalId) {
+      try { await updateSessionStatus('cancelled', { ended_at: new Date().toISOString() }); } catch (cleanupError) { console.warn('[Session cleanup]', cleanupError.message); }
+    }
+    await closeRealtimeSession();
+    activeSession = null;
+    sessionData = null;
+    throw error;
+  } finally {
+    creatingSession = false;
+  }
+});
+
+ipcMain.handle('session:cancel', async () => {
+  if (startingSession) throw new Error('Wait for the interview start to finish, then end or cancel it.');
+  if (endingSession) throw new Error('Wait for the current interview action to finish.');
+  if (!activeSession) return { cancelled: false };
+  if (sessionData?.startedAt) throw new Error('End the running interview to save its report.');
+  endingSession = true;
+  providerReview.cancel();
+  try {
+    try { await updateSessionStatus('cancelled', { ended_at: new Date().toISOString() }); }
+    catch (error) { if (!activeSession.demo) throw error; }
+    await closeRealtimeSession({ notifyCandidate: true });
+    activeSession = null;
+    sessionData = null;
+    return { cancelled: true };
+  } finally {
+    endingSession = false;
+  }
 });
 
 ipcMain.handle('session:update', async (_, { candidateName, role, policy, technicalVocabulary, policyPreset }) => {
+  if (startingSession || endingSession) throw new Error('Wait for the current interview action to finish.');
   if (!activeSession || !sessionData) throw new Error('No active session');
   const normalizedPolicy = normalizePolicy(policy || activeSession.policy);
 
@@ -1278,39 +1679,36 @@ ipcMain.handle('session:update', async (_, { candidateName, role, policy, techni
 });
 
 ipcMain.handle('session:start', async () => {
+  if (startingSession || endingSession) throw new Error('Wait for the current interview action to finish.');
   if (!sessionData) throw new Error('No active session');
-  sessionData.startedAt = Date.now();
-  if (activeSession?.localOnly) {
-    sendToRenderer('realtime:status', {
-      text: 'Local dashboard',
-      candidateReady: false,
-      manualMode: true
-    });
-    return { ok: true, localOnly: true };
-  }
-
-  const client = getSupabase();
-  if (client) {
-    const query = client.from('sessions').update({
-      status: 'active',
-      started_at: new Date(sessionData.startedAt).toISOString()
-    });
-    const { error } = activeSession?.internalId
-      ? await query.eq('internal_id', activeSession.internalId)
-      : await query.eq('id', activeSession.sessionId);
-    if (error) console.warn('[Supabase] active status update skipped:', error.message);
-  }
-
-  if (realtimeChannel) {
-    await realtimeChannel.send({
+  if (sessionData.endedAt) throw new Error('This interview has already ended.');
+  if (sessionData.startedAt) return { started: true, startedAt: sessionData.startedAt };
+  if (!sessionData.candidateReady) throw new Error('Wait for the candidate to complete consent and microphone preflight.');
+  if (!realtimeChannel || !sessionData.telemetry.connected) throw new Error('Reconnect the interview before starting.');
+  const owner = sessionData;
+  const session = activeSession;
+  const channel = realtimeChannel;
+  const startedAt = Date.now();
+  startingSession = true;
+  try {
+    await updateSessionStatus('active', { started_at: new Date(startedAt).toISOString() }, session);
+    if (sessionData !== owner || activeSession !== session) throw new Error('The interview changed while starting.');
+    owner.startedAt = startedAt;
+    owner.telemetry.monitoring = 'healthy';
+    owner.telemetry.transcription = 'waiting';
+    let sent;
+    try { sent = session.demo ? 'ok' : await channel.send({
       type: 'broadcast',
       event: 'session_started',
-      payload: { sessionId: activeSession.sessionId, startedAt: sessionData.startedAt }
-    });
+      payload: { sessionId: session.sessionId, startedAt }
+    }); } catch { sent = 'error'; }
+    if (sessionData !== owner || activeSession !== session) throw new Error('The interview changed while starting.');
+    // The persisted status is authoritative; the candidate also polls it. Rolling
+    // back after a missed broadcast could hide already-started candidate capture.
+    return { started: true, startedAt, deliveryPending: sent !== 'ok' };
+  } finally {
+    startingSession = false;
   }
-  sessionData.telemetry.monitoring = 'healthy';
-  sessionData.telemetry.transcription = 'waiting';
-  return { started: true, startedAt: sessionData.startedAt };
 });
 
 ipcMain.handle('session:note', async (_, note = {}) => {
@@ -1344,7 +1742,7 @@ ipcMain.handle('session:note', async (_, note = {}) => {
 
 // Analyze a final transcript chunk from the renderer (Web Speech result)
 ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
-  if (!sessionData) return null;
+  if (!sessionData || sessionData.endedAt) return null;
   if (!text || text.trim().length < 4) return null;
 
   if (sessionData.telemetry) sessionData.telemetry.transcription = 'healthy';
@@ -1374,6 +1772,7 @@ ipcMain.handle('analyze:transcript', async (_, { text, timestamp }) => {
     unscorableReason: analysis.unscorableReason || null
   };
   sessionData.transcripts.push(entry);
+  refreshChunkReview(sessionData);
   if (typeof analysis.score === 'number' && analysis.scorable !== false) {
     sessionData.scores.push({ score: analysis.score, weight: analysis.scoreWeight || 1 });
   }
@@ -1388,7 +1787,7 @@ ipcMain.handle('flag:add', (_, { text, severity, timestamp }) => {
 
 ipcMain.handle('candidate:action', async (_, { action, target }) => {
   if (!activeSession || !sessionData) throw new Error('No active session');
-  if (!['allow_target', 'close_target', 'reopen_target'].includes(action)) {
+  if (!['allow_target', 'reopen_target'].includes(action) || activeSession.demo) {
     throw new Error('Unsupported candidate action');
   }
 
@@ -1425,8 +1824,17 @@ ipcMain.handle('audio:get', (_, { chunkId }) => {
 
 // End session — generate + open report
 ipcMain.handle('session:end', async () => {
+  if (startingSession) throw new Error('Wait for the interview start to finish before ending.');
   if (!sessionData) return { ended: false };
-  sessionData.endedAt = Date.now();
+  if (endingSession) throw new Error('The interview report is already being saved.');
+  endingSession = true;
+  sessionData.endedAt = sessionData.endedAt || Date.now();
+  stopCaptionAnalysis(sessionData);
+  refreshChunkReview(sessionData, true);
+  sessionData.reportId = sessionData.reportId || crypto.randomUUID();
+  if (sessionData.audioChunks.some(chunk => ['received', 'transcribing'].includes(chunk.status))) {
+    sessionData.telemetry.transcription = 'unavailable';
+  }
 
   try {
     await closeRealtimeSession({ notifyCandidate: true });
@@ -1446,7 +1854,8 @@ ipcMain.handle('session:end', async () => {
     const client = getSupabase();
     if (client && sessionData.session.internalId) {
       const { data: authData } = await client.auth.getSession();
-      const { error } = await client.from('reports').insert({
+      const { error } = await client.from('reports').upsert({
+        id: sessionData.reportId,
         session_id: sessionData.session.internalId,
         organization_id: sessionData.session.organizationId || null,
         recruiter_id: authData.session?.user?.id || null,
@@ -1462,20 +1871,19 @@ ipcMain.handle('session:end', async () => {
         evidence: sessionData.flags,
         notes: sessionData.notes || [],
         telemetry_health: review.telemetryHealth
-      });
-      if (error) console.warn('[Supabase] report persistence failed:', error.message);
+      }, { onConflict: 'id', ignoreDuplicates: true });
+      if (error) throw new Error('Could not save the cloud report. Your evidence is retained; retry saving.');
     }
     shell.openPath(reportPath);
-    const finalData = { ...sessionData, reportPath };
     activeSession = null;
     sessionData = null;
     return { ended: true, reportPath };
   } catch (err) {
     console.error('[Report]', err);
     dialog.showErrorBox('Report generation failed', err.message);
-    activeSession = null;
-    sessionData = null;
-    return { ended: true, error: err.message };
+    return { ended: true, reportPending: true, error: err.message };
+  } finally {
+    endingSession = false;
   }
 });
 
